@@ -1,0 +1,170 @@
+import * as THREE from 'three'
+import { segData, segColor } from '../data/portalData'
+
+export interface FigureHandle {
+  setSelected: (key: string) => void
+  dispose: () => void
+}
+
+const NOOP: FigureHandle = { setSelected: () => {}, dispose: () => {} }
+
+/**
+ * Builds the segmental lean 3D figure (capsule-limbs mannequin) and wires
+ * drag-rotate + tap-to-pick. Calls `onPick(segKey)` when a segment is tapped.
+ * Degrades to a no-op if WebGL is unavailable.
+ */
+export function createFigure(mount: HTMLElement, onPick: (seg: string) => void): FigureHandle {
+  try {
+  const segMats: Record<string, THREE.MeshStandardMaterial[]> = {}
+  let selected = 'trunk'
+
+  const w = mount.clientWidth || 520
+  const h = mount.clientHeight || 360
+  const scene = new THREE.Scene()
+  const cam = new THREE.PerspectiveCamera(34, w / h, 0.1, 100)
+  cam.position.set(0, 1.3, 9.4)
+  cam.lookAt(0, 1.25, 0)
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+  renderer.setSize(w, h)
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
+  renderer.setClearColor(0x000000, 0)
+  mount.appendChild(renderer.domElement)
+
+  scene.add(new THREE.HemisphereLight(0xcfeef2, 0x0a2422, 0.85))
+  const key = new THREE.DirectionalLight(0xeafcff, 1.05); key.position.set(4, 8, 6); scene.add(key)
+  const fill = new THREE.DirectionalLight(0x16c0ce, 0.55); fill.position.set(-5, 3, -4); scene.add(fill)
+  const rim = new THREE.DirectionalLight(0xffe8c8, 0.4); rim.position.set(0, 4, -7); scene.add(rim)
+
+  // soft ground blob
+  const sc = document.createElement('canvas'); sc.width = sc.height = 256
+  const sx = sc.getContext('2d')!
+  const grd = sx.createRadialGradient(128, 128, 8, 128, 128, 128)
+  grd.addColorStop(0, 'rgba(0,0,0,0.45)'); grd.addColorStop(1, 'rgba(0,0,0,0)')
+  sx.fillStyle = grd; sx.fillRect(0, 0, 256, 256)
+  const blob = new THREE.Mesh(
+    new THREE.PlaneGeometry(7, 7),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), transparent: true, depthWrite: false }),
+  )
+  blob.rotation.x = -Math.PI / 2; blob.position.y = -2.35; scene.add(blob)
+
+  const fig = new THREE.Group(); scene.add(fig)
+  const mk = (k: string) => {
+    const m = new THREE.MeshStandardMaterial({ color: 0x37b6c2, roughness: 0.5, metalness: 0.15, emissive: 0x06231f, emissiveIntensity: 0.4 });
+    (segMats[k] = segMats[k] || []).push(m)
+    return m
+  }
+  const tag = (obj: THREE.Object3D, k: string) => obj.traverse((o) => { o.userData.seg = k })
+  const neutral = new THREE.MeshStandardMaterial({ color: 0x7c9690, roughness: 0.6, metalness: 0.05 })
+
+  const capsule = (r: number, len: number, mat: THREE.Material) => {
+    const g = new THREE.Group()
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 28), mat)
+    const top = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), mat); top.position.y = len / 2
+    const bot = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), mat); bot.position.y = -len / 2
+    g.add(cyl, top, bot)
+    return g
+  }
+
+  const trunkMat = mk('trunk')
+  const trunk = capsule(0.6, 1.45, trunkMat); trunk.position.set(0, 2.0, 0); trunk.scale.set(1, 1, 0.74); tag(trunk, 'trunk'); fig.add(trunk)
+  const hips = capsule(0.5, 0.35, trunkMat); hips.position.set(0, 1.15, 0); hips.scale.set(1.05, 1, 0.74); tag(hips, 'trunk'); fig.add(hips)
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.46, 28, 20), neutral); head.position.set(0, 3.35, 0); fig.add(head)
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.3, 20), neutral); neck.position.set(0, 2.95, 0); fig.add(neck)
+  const la = capsule(0.185, 1.45, mk('leftArm')); la.position.set(-0.82, 2.35, 0); la.rotation.z = 0.32; tag(la, 'leftArm'); fig.add(la)
+  const ra = capsule(0.185, 1.45, mk('rightArm')); ra.position.set(0.82, 2.35, 0); ra.rotation.z = -0.32; tag(ra, 'rightArm'); fig.add(ra)
+  const ll = capsule(0.245, 1.7, mk('leftLeg')); ll.position.set(-0.3, 0.05, 0); ll.rotation.z = 0.04; tag(ll, 'leftLeg'); fig.add(ll)
+  const rl = capsule(0.245, 1.7, mk('rightLeg')); rl.position.set(0.3, 0.05, 0); rl.rotation.z = -0.04; tag(rl, 'rightLeg'); fig.add(rl)
+  ;[-0.32, 0.32].forEach((x) => {
+    const f = new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 14), neutral)
+    f.scale.set(1, 0.6, 1.6); f.position.set(x, -1.72, 0.12); fig.add(f)
+  })
+  fig.rotation.y = -0.35
+
+  const applySegColors = () => {
+    Object.keys(segMats).forEach((k) => {
+      const sd = segData.find((s) => s.key === k); if (!sd) return
+      const col = segColor(sd.pct); const sel = selected === k
+      segMats[k].forEach((m) => {
+        m.color.set(col); m.emissive.set(sel ? col : 0x06231f); m.emissiveIntensity = sel ? 0.55 : 0.35
+      })
+    })
+  }
+  applySegColors()
+
+  // interaction
+  const el = renderer.domElement
+  const ray = new THREE.Raycaster()
+  const ndc = new THREE.Vector2()
+  let dragging = false; let lastX = 0; let lastY = 0; let moved = 0
+
+  const pick = (e: MouseEvent | TouchEvent) => {
+    const rect = el.getBoundingClientRect()
+    const t = 'changedTouches' in e ? e.changedTouches[0] : e
+    ndc.x = ((t.clientX - rect.left) / rect.width) * 2 - 1
+    ndc.y = -((t.clientY - rect.top) / rect.height) * 2 + 1
+    ray.setFromCamera(ndc, cam)
+    const hits = ray.intersectObjects(fig.children, true)
+    for (const hpt of hits) {
+      const seg = hpt.object.userData.seg
+      if (seg) { onPick(seg); return }
+    }
+  }
+  const down = (e: MouseEvent | TouchEvent) => {
+    dragging = true; moved = 0
+    const t = 'touches' in e ? e.touches[0] : e
+    lastX = t.clientX; lastY = t.clientY; el.style.cursor = 'grabbing'
+  }
+  const moveH = (e: MouseEvent | TouchEvent) => {
+    if (!dragging) return
+    const t = 'touches' in e ? e.touches[0] : e
+    const dx = t.clientX - lastX; const dy = t.clientY - lastY
+    moved += Math.abs(dx) + Math.abs(dy)
+    fig.rotation.y += dx * 0.01
+    fig.rotation.x = Math.max(-0.5, Math.min(0.5, fig.rotation.x + dy * 0.006))
+    lastX = t.clientX; lastY = t.clientY
+    if (e.cancelable && 'touches' in e) e.preventDefault()
+  }
+  const up = (e: MouseEvent | TouchEvent) => {
+    if (dragging && moved < 6) pick(e)
+    dragging = false; el.style.cursor = 'grab'
+  }
+  el.addEventListener('mousedown', down)
+  window.addEventListener('mousemove', moveH)
+  window.addEventListener('mouseup', up)
+  el.addEventListener('touchstart', down, { passive: true })
+  el.addEventListener('touchmove', moveH, { passive: false })
+  el.addEventListener('touchend', up)
+
+  const ro = new ResizeObserver(() => {
+    const W = mount.clientWidth; const H = mount.clientHeight
+    if (W && H) { cam.aspect = W / H; cam.updateProjectionMatrix(); renderer.setSize(W, H) }
+  })
+  ro.observe(mount)
+
+  const clock = new THREE.Clock()
+  let raf = 0
+  const loop = () => {
+    raf = requestAnimationFrame(loop)
+    const t = clock.getElapsedTime()
+    if (!dragging) fig.rotation.y += 0.0045
+    fig.position.y = Math.sin(t * 1.1) * 0.07
+    renderer.render(scene, cam)
+  }
+  loop()
+
+  return {
+    setSelected: (k: string) => { selected = k; applySegColors() },
+    dispose: () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('mousemove', moveH)
+      window.removeEventListener('mouseup', up)
+      ro.disconnect()
+      renderer.dispose()
+      if (el.parentNode === mount) mount.removeChild(el)
+    },
+  }
+  } catch (e) {
+    console.warn('figure 3D failed', e)
+    return NOOP
+  }
+}

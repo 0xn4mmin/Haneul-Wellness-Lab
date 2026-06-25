@@ -74,10 +74,10 @@ export default function Intro() {
   }, [])
 
   return (
-    <div style={{ fontFamily: "'Pretendard',system-ui,sans-serif", color: '#EAF3F1', height: '100vh', overflow: 'hidden', background: '#05100E' }}>
+    <div style={{ fontFamily: "'Pretendard',system-ui,sans-serif", color: '#EAF3F1', height: '100vh', overflow: 'hidden', background: '#060A16' }}>
       <section
         ref={heroRef}
-        style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: 'radial-gradient(130% 110% at 50% 30%,#0C2422 0%,#071613 55%,#04100D 100%)', cursor: 'crosshair' }}
+        style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: 'radial-gradient(130% 110% at 50% 30%,#0E1A33 0%,#081026 55%,#05091A 100%)', cursor: 'crosshair' }}
       >
         {/* BASE: dim immersive 3D field */}
         <div ref={fieldMount} style={{ position: 'absolute', inset: 0, zIndex: 10 }} />
@@ -107,7 +107,7 @@ export default function Intro() {
         <div ref={glowRef} style={{ position: 'absolute', inset: 0, zIndex: 24, pointerEvents: 'none', mixBlendMode: 'screen', background: 'radial-gradient(circle 360px at 50% 64%,rgba(22,192,206,.2),transparent 60%)' }} />
 
         {/* vignette + heading scrim */}
-        <div style={{ position: 'absolute', inset: 0, zIndex: 26, pointerEvents: 'none', background: 'radial-gradient(58% 90% at 50% 36%,rgba(5,16,14,.72) 0%,rgba(5,16,14,.2) 48%,transparent 72%),linear-gradient(180deg,rgba(5,16,14,.5) 0%,transparent 24%,transparent 52%,rgba(5,16,14,.85) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, zIndex: 26, pointerEvents: 'none', background: 'radial-gradient(58% 90% at 50% 36%,rgba(6,9,20,.72) 0%,rgba(6,9,20,.2) 48%,transparent 72%),linear-gradient(180deg,rgba(6,9,20,.5) 0%,transparent 24%,transparent 52%,rgba(6,9,20,.85) 100%)' }} />
 
         {/* NAV */}
         <nav style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 60, display: 'flex', alignItems: 'center', gap: 14, padding: '18px clamp(18px,4vw,40px)' }}>
@@ -116,21 +116,21 @@ export default function Intro() {
             <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 19, letterSpacing: '.4px', color: '#fff' }}>Haneul Wellness Lab</span>
           </a>
           <div className="hwl-pill" style={{ marginLeft: 'auto', marginRight: 'auto', alignItems: 'center', gap: 2, background: 'rgba(255,255,255,.07)', backdropFilter: 'blur(14px)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 30, padding: 6 }}>
-            <span style={{ padding: '8px 16px', borderRadius: 22, fontSize: 13.5, fontWeight: 600, color: '#05100E', background: '#EAF3F1' }}>소개</span>
+            <span style={{ padding: '8px 16px', borderRadius: 22, fontSize: 13.5, fontWeight: 600, color: '#060A16', background: '#EAF3F1' }}>소개</span>
             <span style={{ padding: '8px 16px', borderRadius: 22, fontSize: 13.5, fontWeight: 500, color: 'rgba(234,243,241,.8)' }}>서비스</span>
             <span style={{ padding: '8px 16px', borderRadius: 22, fontSize: 13.5, fontWeight: 500, color: 'rgba(234,243,241,.8)' }}>데이터</span>
             <span style={{ padding: '8px 16px', borderRadius: 22, fontSize: 13.5, fontWeight: 500, color: 'rgba(234,243,241,.8)' }}>커뮤니티</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <a href={PORTAL} className="hwl-glass-hover" style={{ textDecoration: 'none', fontSize: 13.5, fontWeight: 600, color: '#EAF3F1', padding: '11px 18px', borderRadius: 24, background: 'rgba(255,255,255,.07)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,.15)' }}>회원 로그인</a>
-            <a href={PORTAL} className="hwl-bright-hover" style={{ textDecoration: 'none', fontSize: 13.5, fontWeight: 700, color: '#05100E', background: 'linear-gradient(110deg,#67D7DF,#16C0CE)', padding: '11px 20px', borderRadius: 24, boxShadow: '0 12px 28px -12px rgba(22,192,206,.9)' }}>시작하기</a>
+            <a href={PORTAL} className="hwl-bright-hover" style={{ textDecoration: 'none', fontSize: 13.5, fontWeight: 700, color: '#060A16', background: 'linear-gradient(110deg,#67D7DF,#16C0CE)', padding: '11px 20px', borderRadius: 24, boxShadow: '0 12px 28px -12px rgba(22,192,206,.9)' }}>시작하기</a>
           </div>
         </nav>
 
         {/* HEADING */}
         <div style={{ position: 'absolute', top: 'clamp(15%,16vh,18%)', left: 0, right: 0, zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '0 20px', pointerEvents: 'none' }}>
           <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 'clamp(12px,1.4vw,15px)', color: '#9FE9EF', marginBottom: 18, letterSpacing: 4, textTransform: 'uppercase' }}>Illuminate your data</div>
-          <h1 style={{ margin: 0, color: '#fff', lineHeight: 1.08, fontFamily: "'Pretendard',sans-serif", fontWeight: 800, textShadow: '0 2px 34px rgba(5,16,14,.72)' }}>
+          <h1 style={{ margin: 0, color: '#fff', lineHeight: 1.08, fontFamily: "'Pretendard',sans-serif", fontWeight: 800, textShadow: '0 2px 34px rgba(6,9,20,.72)' }}>
             <span style={{ display: 'block', fontSize: 'clamp(38px,7vw,86px)', letterSpacing: '-2px' }}>비추면 보이는</span>
             <span style={{ display: 'block', fontSize: 'clamp(38px,7vw,86px)', letterSpacing: '-2px', background: 'linear-gradient(100deg,#EAFEFF 0%,#86E6EE 48%,#FFFFFF 82%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>내 몸의 지도</span>
           </h1>
@@ -148,7 +148,7 @@ export default function Intro() {
         {/* bottom-right */}
         <div className="hwl-br" style={{ position: 'absolute', bottom: 'clamp(74px,10vh,104px)', left: 20, right: 20, zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 18 }}>
           <p style={{ fontSize: 13.5, lineHeight: 1.7, color: 'rgba(234,243,241,.78)', margin: 0, maxWidth: 300 }}>부위별 3D 분석과 코치의 코멘트, 그리고 함께하는 커뮤니티까지 — 하늘 웰니스 랩에서 만나보세요.</p>
-          <a href={PORTAL} className="hwl-bright-hover" style={{ textDecoration: 'none', fontSize: 15, fontWeight: 700, color: '#05100E', background: 'linear-gradient(110deg,#67D7DF,#16C0CE)', padding: '15px 30px', borderRadius: 30, boxShadow: '0 18px 40px -16px rgba(22,192,206,.9)', animation: 'hwl-pulse 3.2s ease-in-out infinite' }}>포털 입장하기 →</a>
+          <a href={PORTAL} className="hwl-bright-hover" style={{ textDecoration: 'none', fontSize: 15, fontWeight: 700, color: '#060A16', background: 'linear-gradient(110deg,#67D7DF,#16C0CE)', padding: '15px 30px', borderRadius: 30, boxShadow: '0 18px 40px -16px rgba(22,192,206,.9)', animation: 'hwl-pulse 3.2s ease-in-out infinite' }}>포털 입장하기 →</a>
         </div>
 
         {/* scroll/scan cue */}

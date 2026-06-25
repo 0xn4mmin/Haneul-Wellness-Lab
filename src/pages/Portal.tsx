@@ -101,7 +101,7 @@ export default function Portal() {
   // ---- derived values (mirror of renderVals) ------------------------------
   const isTrainer = s.role === 'trainer'
   const isClient = !isTrainer
-  const navColor = (k: View) => { const a = s.view === k; return { bg: a ? 'linear-gradient(110deg,#2E9BA6,#247E88)' : 'transparent', fg: a ? '#06110F' : '#9FBCB5' } }
+  const navColor = (k: View) => { const a = s.view === k; return { bg: a ? 'linear-gradient(110deg,#2E9BA6,#247E88)' : 'transparent', fg: a ? '#060B17' : '#9DAFCB' } }
 
   const meDisp = {
     name: isTrainer ? COACH.name : s.profile.name,
@@ -195,10 +195,10 @@ export default function Portal() {
     { id: 'jiwoo', name: '박지우', initials: '지우', color: '#6E9B8E', score: 78, pbf: 20.0, smm: 31.9, last: '6월 14일' },
     ...s.members.map((m, i) => ({ id: m.id, name: m.name, initials: m.initials, color: m.color, score: m.score, pbf: metrics.pbf.series[5] + (m.score - 80) * -0.3, smm: metrics.smm.series[5] + (m.score - 80) * 0.1, last: ['6월 12일', '6월 13일', '6월 11일'][i] || '6월 10일' })),
   ]
-  const roster = rosterSrc.map((r) => { const st = statusOf(r.score); const tsel = s.coachTargetId === r.id; return { ...r, pbf: r.pbf.toFixed(1), smm: r.smm.toFixed(1), status: st.t, statusFg: st.fg, statusBg: st.bg, selBg: tsel ? CTA : 'rgba(255,255,255,.06)', selFg: tsel ? '#06110F' : '#BFD8D2', selBorder: tsel ? 'transparent' : 'rgba(255,255,255,.16)' } })
+  const roster = rosterSrc.map((r) => { const st = statusOf(r.score); const tsel = s.coachTargetId === r.id; return { ...r, pbf: r.pbf.toFixed(1), smm: r.smm.toFixed(1), status: st.t, statusFg: st.fg, statusBg: st.bg, selBg: tsel ? CTA : 'rgba(255,255,255,.06)', selFg: tsel ? '#060B17' : '#BFCCE6', selBorder: tsel ? 'transparent' : 'rgba(255,255,255,.16)' } })
   const coachTargetMember = s.members.find((m) => m.id === s.coachTargetId)
 
-  const messages = s.messages.map((m) => { const isMe = m.role === 'me'; return { ...m, dir: (isMe ? 'row-reverse' : 'row') as React.CSSProperties['flexDirection'], justify: isMe ? 'flex-end' : 'flex-start', radius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px', bubbleBg: isMe ? 'linear-gradient(135deg,#2E9BA6,#1E6E78)' : (m.role === 'trainer' ? 'rgba(46,155,166,.14)' : 'rgba(255,255,255,.06)'), bubbleFg: isMe ? '#06110F' : '#E7EFEA', bubbleBorder: isMe ? 'transparent' : (m.role === 'trainer' ? 'rgba(103,215,223,.25)' : 'rgba(255,255,255,.1)'), ring: m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none' } })
+  const messages = s.messages.map((m) => { const isMe = m.role === 'me'; return { ...m, dir: (isMe ? 'row-reverse' : 'row') as React.CSSProperties['flexDirection'], justify: isMe ? 'flex-end' : 'flex-start', radius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px', bubbleBg: isMe ? 'linear-gradient(135deg,#2E9BA6,#1E6E78)' : (m.role === 'trainer' ? 'rgba(46,155,166,.14)' : 'rgba(255,255,255,.06)'), bubbleFg: isMe ? '#060B17' : '#E7EFEA', bubbleBorder: isMe ? 'transparent' : (m.role === 'trainer' ? 'rgba(103,215,223,.25)' : 'rgba(255,255,255,.1)'), ring: m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none' } })
   const onlineMembers = [
     { name: '코치 하늘', initials: '하늘', color: '#234B47', role: '트레이너', statusColor: '#2E9BA6' },
     { name: '이민서', initials: '민서', color: '#BE7A57', role: '회원', statusColor: '#2E9BA6' },
@@ -210,18 +210,18 @@ export default function Portal() {
   const segs = segData.map((seg) => { const c = segColor(seg.pct); const selS = s.selectedSegment === seg.key; return { ...seg, color: c, border: selS ? c : 'rgba(255,255,255,.12)', chipBg: selS ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.04)' } })
   const selSeg = (() => { const ss = segData.find((x) => x.key === s.selectedSegment) || segData[2]; const st = ss.pct >= 100 ? '표준 이상 · 우수' : (ss.pct >= 95 ? '표준 범위' : '표준 이하'); return { name: ss.name, pct: ss.pct, kg: ss.kg, color: segColor(ss.pct), status: st } })()
 
-  const metricChips = (Object.keys(metrics) as MetricKey[]).map((k) => { const a = s.selectedMetric === k; return { key: k, label: metrics[k].short || metrics[k].label, bg: a ? CTA : 'rgba(255,255,255,.05)', fg: a ? '#06110F' : '#9FBCB5', border: a ? 'transparent' : 'rgba(255,255,255,.12)' } })
+  const metricChips = (Object.keys(metrics) as MetricKey[]).map((k) => { const a = s.selectedMetric === k; return { key: k, label: metrics[k].short || metrics[k].label, bg: a ? CTA : 'rgba(255,255,255,.05)', fg: a ? '#060B17' : '#9DAFCB', border: a ? 'transparent' : 'rgba(255,255,255,.12)' } })
 
   const comments = (s.commentsByMetric[sel] || []).map((c) => ({ ...c, tag: c.role === 'trainer' ? '코치' : (c.role === 'me' ? '나' : '회원'), tagBg: c.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF' }))
   const postsDisp = s.posts.map((p) => ({ ...p, tag: p.role === 'trainer' ? '코치' : (p.role === 'me' ? '나' : '회원'), tagBg: p.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF', ring: p.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none', likeColor: p.liked ? '#E0A06A' : 'rgba(231,239,234,.6)', likeFill: p.liked ? '#E0A06A' : 'none', commentCount: p.comments.length }))
 
   const P = s.profile
-  const genders = ['남성', '여성', '기타'].map((g) => ({ label: g, bg: P.gender === g ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: P.gender === g ? '#06110F' : '#9FBCB5', border: P.gender === g ? 'transparent' : 'rgba(255,255,255,.12)' }))
-  const chMetrics = ['체지방률', '골격근량', '체중', '인바디 점수'].map((m) => ({ label: m, bg: s.chMetric === m ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chMetric === m ? '#06110F' : '#9FBCB5' }))
-  const chPeriods = ['2주', '4주', '8주'].map((pp) => ({ label: pp, bg: s.chPeriod === pp ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chPeriod === pp ? '#06110F' : '#9FBCB5' }))
-  const chScopes = ['전체 공개', '비공개'].map((pp) => ({ label: pp, bg: s.chScope === pp ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chScope === pp ? '#06110F' : '#9FBCB5' }))
-  const fromChips = dates.map((dt, i) => ({ label: dt.split(' ')[0], bg: i === s.cmpFrom ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: i === s.cmpFrom ? '#06110F' : '#9FBCB5' }))
-  const toChips = dates.map((dt, i) => ({ label: dt.split(' ')[0], bg: i === s.cmpTo ? '#67D7DF' : 'rgba(255,255,255,.05)', fg: i === s.cmpTo ? '#06110F' : '#9FBCB5' }))
+  const genders = ['남성', '여성', '기타'].map((g) => ({ label: g, bg: P.gender === g ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: P.gender === g ? '#060B17' : '#9DAFCB', border: P.gender === g ? 'transparent' : 'rgba(255,255,255,.12)' }))
+  const chMetrics = ['체지방률', '골격근량', '체중', '인바디 점수'].map((m) => ({ label: m, bg: s.chMetric === m ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chMetric === m ? '#060B17' : '#9DAFCB' }))
+  const chPeriods = ['2주', '4주', '8주'].map((pp) => ({ label: pp, bg: s.chPeriod === pp ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chPeriod === pp ? '#060B17' : '#9DAFCB' }))
+  const chScopes = ['전체 공개', '비공개'].map((pp) => ({ label: pp, bg: s.chScope === pp ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chScope === pp ? '#060B17' : '#9DAFCB' }))
+  const fromChips = dates.map((dt, i) => ({ label: dt.split(' ')[0], bg: i === s.cmpFrom ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: i === s.cmpFrom ? '#060B17' : '#9DAFCB' }))
+  const toChips = dates.map((dt, i) => ({ label: dt.split(' ')[0], bg: i === s.cmpTo ? '#67D7DF' : 'rgba(255,255,255,.05)', fg: i === s.cmpTo ? '#060B17' : '#9DAFCB' }))
 
   const titles: Record<View, [string, string]> = {
     profile: ['프로필 설정', '사진·생년월일·성별·연락처를 관리하세요'],
@@ -242,12 +242,12 @@ export default function Portal() {
   const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'rgba(231,239,234,.6)', marginBottom: 7, display: 'block' }
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', display: 'flex', fontFamily: "'Pretendard',system-ui,sans-serif", color: '#E7EFEA', background: 'radial-gradient(120% 90% at 82% -8%,#0F302D 0%,#0A1B18 52%,#06110F 100%)' }}>
+    <div style={{ position: 'relative', minHeight: '100vh', display: 'flex', fontFamily: "'Pretendard',system-ui,sans-serif", color: '#E7EFEA', background: 'radial-gradient(120% 90% at 82% -8%,#0D1A33 0%,#0A1326 52%,#060B17 100%)' }}>
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.4, backgroundImage: 'radial-gradient(rgba(255,255,255,.025) 1px,transparent 1.4px)', backgroundSize: '32px 32px' }} />
 
       {/* LOGIN GATE */}
       {!s.authed && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'radial-gradient(120% 90% at 50% 18%,#11302D 0%,#0A1B18 55%,#06110F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'radial-gradient(120% 90% at 50% 18%,#0E1C38 0%,#0A1326 55%,#060B17 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ position: 'absolute', top: '18%', left: '50%', transform: 'translateX(-50%)', width: '60%', maxWidth: 520, height: 300, background: 'radial-gradient(circle,rgba(46,155,166,.22),transparent 60%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
           <div style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.11)', backdropFilter: 'blur(12px)', borderRadius: 24, padding: '36px 30px', boxShadow: '0 40px 90px -50px rgba(0,0,0,.9)' }}>
             <img src="/assets/logo-mark.png" alt="로고" style={{ width: 56, height: 56, objectFit: 'contain', display: 'block', margin: '0 auto 14px' }} />
@@ -255,7 +255,7 @@ export default function Portal() {
             <div style={{ textAlign: 'center', fontSize: 12.5, color: 'rgba(231,239,234,.5)', margin: '5px 0 26px' }}>회원 전용 포털에 로그인하세요</div>
             <input value={s.loginEmail} onChange={(e) => set({ loginEmail: e.target.value })} placeholder="이메일" style={{ ...inputStyle, padding: '13px 16px', fontSize: 14, marginBottom: 10 }} />
             <input value={s.loginPw} onChange={(e) => set({ loginPw: e.target.value })} type="password" placeholder="비밀번호" style={{ ...inputStyle, padding: '13px 16px', fontSize: 14, marginBottom: 18 }} />
-            <button onClick={() => set({ authed: true })} style={{ all: 'unset', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', fontSize: 15, fontWeight: 700, color: '#06110F', background: CTA, padding: 14, borderRadius: 24, boxShadow: '0 16px 34px -16px rgba(22,192,206,.9)' }}>로그인</button>
+            <button onClick={() => set({ authed: true })} style={{ all: 'unset', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24, boxShadow: '0 16px 34px -16px rgba(22,192,206,.9)' }}>로그인</button>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 18, fontSize: 12, color: 'rgba(231,239,234,.5)' }}>
               <span style={{ cursor: 'pointer' }}>비밀번호 찾기</span>
               <span onClick={() => set({ authed: true })} style={{ cursor: 'pointer', color: '#67D7DF', fontWeight: 600 }}>회원가입</span>
@@ -265,14 +265,14 @@ export default function Portal() {
       )}
 
       {/* SIDEBAR */}
-      <aside style={{ position: 'sticky', top: 0, zIndex: 3, width: 248, flex: 'none', height: '100vh', display: 'flex', flexDirection: 'column', gap: 6, padding: '26px 18px', background: 'linear-gradient(176deg,#11302C 0%,#0B221E 52%,#081915 100%)', borderRight: '1px solid rgba(184,148,85,.2)', color: '#E7EFEA', boxShadow: '18px 0 50px -40px rgba(0,0,0,.9)' }}>
+      <aside style={{ position: 'sticky', top: 0, zIndex: 3, width: 248, flex: 'none', height: '100vh', display: 'flex', flexDirection: 'column', gap: 6, padding: '26px 18px', background: 'linear-gradient(176deg,#112146 0%,#0C1733 52%,#080F22 100%)', borderRight: '1px solid rgba(184,148,85,.2)', color: '#E7EFEA', boxShadow: '18px 0 50px -40px rgba(0,0,0,.9)' }}>
         <a href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 11, padding: '4px 8px 22px' }}>
           <div style={{ width: 46, height: 46, borderRadius: 14, background: 'rgba(255,255,255,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', overflow: 'hidden', boxShadow: '0 8px 18px -10px rgba(0,0,0,.7)' }}>
             <img src="/assets/logo-mark.png" alt="로고" style={{ width: '118%', height: '118%', objectFit: 'contain' }} />
           </div>
           <div style={{ lineHeight: 1.1 }}>
             <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 18, letterSpacing: '.2px' }}>하늘 웰니스 랩</div>
-            <div style={{ fontSize: 9, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#8FB0AA', marginTop: 2 }}>Haneul Wellness Lab</div>
+            <div style={{ fontSize: 9, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#8A9BC0', marginTop: 2 }}>Haneul Wellness Lab</div>
           </div>
         </a>
 
@@ -289,22 +289,22 @@ export default function Portal() {
             <button key={k} onClick={() => go(k)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 13, fontSize: 14.5, fontWeight: 500, transition: 'background .2s', background: ns.bg, color: ns.fg }}>
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={ns.fg} strokeWidth="1.8">{icons[k]}</svg>
               {labels[k]}
-              {k === 'chat' && <span style={{ marginLeft: 'auto', fontSize: 10, fontFamily: "'IBM Plex Mono',monospace", background: '#2E9BA6', color: '#06110F', borderRadius: 8, padding: '1px 6px', fontWeight: 600 }}>4</span>}
+              {k === 'chat' && <span style={{ marginLeft: 'auto', fontSize: 10, fontFamily: "'IBM Plex Mono',monospace", background: '#2E9BA6', color: '#060B17', borderRadius: 8, padding: '1px 6px', fontWeight: 600 }}>4</span>}
             </button>
           )
         })}
 
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 10, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#6F8E86', padding: '0 6px' }}>보기 모드</div>
+          <div style={{ fontSize: 10, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#6E7CA0', padding: '0 6px' }}>보기 모드</div>
           <div style={{ display: 'flex', background: 'rgba(0,0,0,.3)', borderRadius: 12, padding: 4 }}>
-            <button onClick={() => set({ role: 'client', view: s.view === 'trainer' ? 'health' : s.view })} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '8px 0', fontSize: 12.5, fontWeight: 600, borderRadius: 9, transition: 'all .2s', background: isClient ? '#C9A24B' : 'transparent', color: isClient ? '#06110F' : '#8FB0AA' }}>회원</button>
-            <button onClick={() => set({ role: 'trainer', view: 'trainer' })} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '8px 0', fontSize: 12.5, fontWeight: 600, borderRadius: 9, transition: 'all .2s', background: isTrainer ? '#C9A24B' : 'transparent', color: isTrainer ? '#06110F' : '#8FB0AA' }}>트레이너</button>
+            <button onClick={() => set({ role: 'client', view: s.view === 'trainer' ? 'health' : s.view })} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '8px 0', fontSize: 12.5, fontWeight: 600, borderRadius: 9, transition: 'all .2s', background: isClient ? '#C9A24B' : 'transparent', color: isClient ? '#060B17' : '#8A9BC0' }}>회원</button>
+            <button onClick={() => set({ role: 'trainer', view: 'trainer' })} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '8px 0', fontSize: 12.5, fontWeight: 600, borderRadius: 9, transition: 'all .2s', background: isTrainer ? '#C9A24B' : 'transparent', color: isTrainer ? '#060B17' : '#8A9BC0' }}>트레이너</button>
           </div>
           <button onClick={() => go('profile')} className="hwl-soft-hover" style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: 8, borderRadius: 12 }}>
             <Avatar initials={meDisp.initials} color={meDisp.color} size={34} photo={isTrainer ? null : P.photo} fontSize={12} />
             <div style={{ lineHeight: 1.2, overflow: 'hidden', textAlign: 'left' }}>
               <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', color: '#EAF3F1' }}>{meDisp.name}</div>
-              <div style={{ fontSize: 10.5, color: '#8FB0AA' }}>{meDisp.role} · 프로필 설정</div>
+              <div style={{ fontSize: 10.5, color: '#8A9BC0' }}>{meDisp.role} · 프로필 설정</div>
             </div>
           </button>
         </div>
@@ -312,7 +312,7 @@ export default function Portal() {
 
       {/* MAIN */}
       <main style={{ position: 'relative', zIndex: 1, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 18, padding: '18px 34px', background: 'rgba(8,22,19,.66)', backdropFilter: 'blur(18px) saturate(1.2)', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+        <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 18, padding: '18px 34px', background: 'rgba(8,12,26,.66)', backdropFilter: 'blur(18px) saturate(1.2)', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
           <div style={{ lineHeight: 1.15 }}>
             <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, letterSpacing: '.2px', color: '#F2F7F3' }}>{titles[s.view][0]}</div>
             <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', marginTop: 3 }}>{titles[s.view][1]}</div>
@@ -328,7 +328,7 @@ export default function Portal() {
           {/* ============ 나의 건강 ============ */}
           <div style={{ display: s.view === 'health' ? 'block' : 'none', animation: 'hwl-rise .4s ease both' }}>
             {/* HERO BAND */}
-            <section style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(120deg,#1B413B 0%,#102D28 55%,#1A463F 100%)', border: '1px solid rgba(184,148,85,.18)', borderRadius: 26, padding: '24px 30px', marginBottom: 20, boxShadow: '0 30px 64px -44px rgba(0,0,0,.9)', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+            <section style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(120deg,#1B2A52 0%,#122046 55%,#1D2E58 100%)', border: '1px solid rgba(184,148,85,.18)', borderRadius: 26, padding: '24px 30px', marginBottom: 20, boxShadow: '0 30px 64px -44px rgba(0,0,0,.9)', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
               <div style={{ position: 'absolute', top: '-55%', right: '7%', width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle,rgba(46,155,166,.45),transparent 65%)', filter: 'blur(38px)', pointerEvents: 'none' }} />
               <div style={{ position: 'absolute', bottom: '-65%', left: '28%', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle,rgba(184,148,85,.34),transparent 68%)', filter: 'blur(36px)', pointerEvents: 'none' }} />
               <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -336,13 +336,13 @@ export default function Portal() {
                 <div>
                   <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#C9A24B' }}>My Wellness</div>
                   <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, color: '#F3EFE6', marginTop: 2 }}>{meDisp.name}</div>
-                  <div style={{ fontSize: 12.5, color: '#9FBCB5', marginTop: 3 }}>171cm · 26세 · 남성 · {dateLatest} 측정</div>
+                  <div style={{ fontSize: 12.5, color: '#9DAFCB', marginTop: 3 }}>171cm · 26세 · 남성 · {dateLatest} 측정</div>
                 </div>
               </div>
               <div style={{ position: 'relative', zIndex: 2, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 26, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: 22 }}>
-                  <div><div style={{ fontSize: 11, color: '#9FBCB5' }}>체지방률</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>20.0<span style={{ fontSize: 12, color: '#C9A24B' }}> %</span></div></div>
-                  <div><div style={{ fontSize: 11, color: '#9FBCB5' }}>골격근량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>31.9<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
+                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체지방률</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>20.0<span style={{ fontSize: 12, color: '#C9A24B' }}> %</span></div></div>
+                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>골격근량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>31.9<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
                 </div>
                 <div style={{ position: 'relative', width: 98, height: 98, flex: 'none' }}>
                   <svg viewBox="0 0 120 120" style={{ width: 98, height: 98, transform: 'rotate(-90deg)' }}>
@@ -352,7 +352,7 @@ export default function Portal() {
                   </svg>
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 29, color: '#fff', lineHeight: 1 }}>{score}</div>
-                    <div style={{ fontSize: 9, color: '#9FBCB5', letterSpacing: '1px', marginTop: 2 }}>인바디 점수</div>
+                    <div style={{ fontSize: 9, color: '#9DAFCB', letterSpacing: '1px', marginTop: 2 }}>인바디 점수</div>
                   </div>
                 </div>
               </div>
@@ -426,7 +426,7 @@ export default function Portal() {
               <section style={{ ...card, padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div><div style={eyebrow}>Latest Scan</div><div style={cardTitle}>체성분 · {dateLatest}</div></div>
-                  <div style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: '#8FB0AA' }}>측정 6회</div>
+                  <div style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: '#8A9BC0' }}>측정 6회</div>
                 </div>
                 {gauges.map((g) => {
                   const gp = s.privacy[g.key]; const gpub = gp === 'public'
@@ -485,13 +485,13 @@ export default function Portal() {
                   {trend.pts.map((p, i) => (
                     <g key={i}>
                       <text x={p.x} y="252" textAnchor="middle" fontSize="10" fill="rgba(231,239,234,.4)" fontFamily="IBM Plex Mono">{p.label}</text>
-                      <circle cx={p.x} cy={p.y} r={p.r} fill="#0A1B18" stroke="#67D7DF" strokeWidth="2.4" />
+                      <circle cx={p.x} cy={p.y} r={p.r} fill="#0A1326" stroke="#67D7DF" strokeWidth="2.4" />
                       <circle cx={p.x} cy={p.y} r="17" fill="transparent" onMouseEnter={() => set({ hoverIdx: i })} onMouseLeave={() => set({ hoverIdx: -1 })} style={{ cursor: 'pointer' }} />
                     </g>
                   ))}
                   {trend.tip.show && <>
-                    <rect x={trend.tip.rx} y={trend.tip.ry} width="100" height="42" rx="10" fill="#0C2A26" stroke="rgba(103,215,223,.45)" />
-                    <text x={trend.tip.cx} y={trend.tip.t1} textAnchor="middle" fontSize="10" fill="#9FBCB5" fontFamily="IBM Plex Mono">{trend.tip.date}</text>
+                    <rect x={trend.tip.rx} y={trend.tip.ry} width="100" height="42" rx="10" fill="#0E1A38" stroke="rgba(103,215,223,.45)" />
+                    <text x={trend.tip.cx} y={trend.tip.t1} textAnchor="middle" fontSize="10" fill="#9DAFCB" fontFamily="IBM Plex Mono">{trend.tip.date}</text>
                     <text x={trend.tip.cx} y={trend.tip.t2} textAnchor="middle" fontSize="15" fontWeight="700" fill="#EAF3F1" fontFamily="IBM Plex Mono">{trend.tip.val}</text>
                   </>}
                 </svg>
@@ -513,8 +513,8 @@ export default function Portal() {
                   ))}
                   {radar.labels.map((l, i) => <text key={i} x={l.x} y={l.y} textAnchor={l.anchor} fontSize="10.5" fontWeight="600" fill="rgba(231,239,234,.6)" fontFamily="Pretendard">{l.k}</text>)}
                   {radar.tip.show && <>
-                    <rect x={radar.tip.rx} y={radar.tip.ry} width="96" height="30" rx="8" fill="#0C2A26" stroke="rgba(103,215,223,.45)" />
-                    <text x={radar.tip.cx} y={radar.tip.t1} textAnchor="middle" fontSize="9" fill="#9FBCB5" fontFamily="Pretendard">{radar.tip.k}</text>
+                    <rect x={radar.tip.rx} y={radar.tip.ry} width="96" height="30" rx="8" fill="#0E1A38" stroke="rgba(103,215,223,.45)" />
+                    <text x={radar.tip.cx} y={radar.tip.t1} textAnchor="middle" fontSize="9" fill="#9DAFCB" fontFamily="Pretendard">{radar.tip.k}</text>
                     <text x={radar.tip.cx} y={radar.tip.t2} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#EAF3F1" fontFamily="IBM Plex Mono">{radar.tip.raw}</text>
                   </>}
                 </svg>
@@ -550,7 +550,7 @@ export default function Portal() {
                   {scans.map((r, i) => (
                     <button key={i} onClick={() => { if (r.has) set({ scanOpen: true }) }} className="hwl-row-hover" style={{ all: 'unset', cursor: r.cursor, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 15px', borderRadius: 13, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8FB0AA" strokeWidth="1.7"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" /></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A9BC0" strokeWidth="1.7"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" /></svg>
                         <span style={{ fontSize: 13.5, color: '#EAF3F1', fontWeight: 500 }}>{r.date}</span>
                       </div>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: r.chipFg, background: r.chipBg, padding: '5px 11px', borderRadius: 18 }}>{r.label}</span>
@@ -628,7 +628,7 @@ export default function Portal() {
               <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
                 <Avatar initials={meDisp.initials} color={meDisp.color} size={36} fontSize={11.5} />
                 <input value={s.newComment} onChange={(e) => set({ newComment: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitComment() } }} placeholder="이 차트에 코멘트를 남겨보세요…" style={{ flex: 1, fontFamily: 'inherit', fontSize: 14, padding: '12px 16px', borderRadius: 22, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
-                <button onClick={submitComment} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#06110F', background: CTA, padding: '11px 20px', borderRadius: 22 }}>등록</button>
+                <button onClick={submitComment} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '11px 20px', borderRadius: 22 }}>등록</button>
               </div>
             </section>
           </div>
@@ -654,13 +654,13 @@ export default function Portal() {
                 <div style={{ position: 'relative', fontSize: 11.5, color: 'rgba(231,239,234,.4)', marginTop: 11 }}>닉네임은 익명으로 표시되며, 공개 설정한 지표만 집계돼요.</div>
               </section>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 20 }}>
-                <button onClick={() => set({ showChallengeForm: true, chDone: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#06110F', background: CTA, padding: '11px 20px', borderRadius: 22 }}>+ 챌린지 만들기</button>
+                <button onClick={() => set({ showChallengeForm: true, chDone: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '11px 20px', borderRadius: 22 }}>+ 챌린지 만들기</button>
                 <span style={{ fontSize: 12, color: '#67D7DF' }}>{s.chDone}</span>
               </div>
 
               {s.showChallengeForm && (
                 <div onClick={() => set({ showChallengeForm: false })} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,12,10,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'hwl-fade .25s ease both' }}>
-                  <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#0C2622', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                  <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
                     <div style={eyebrow}>New Challenge</div><div style={cardTitle}>챌린지 만들기</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 18 }}>
                       <div><label style={labelStyle}>제목</label><input value={s.chTitle} onChange={(e) => set({ chTitle: e.target.value })} placeholder="예) 6월 체지방 챌린지" style={inputStyle} /></div>
@@ -672,8 +672,8 @@ export default function Portal() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-                      <button onClick={() => set({ showChallengeForm: false })} style={{ all: 'unset', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9FBCB5', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
-                      <button onClick={createChallenge} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#06110F', background: CTA, padding: 13, borderRadius: 22 }}>만들기</button>
+                      <button onClick={() => set({ showChallengeForm: false })} style={{ all: 'unset', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
+                      <button onClick={createChallenge} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>만들기</button>
                     </div>
                   </div>
                 </div>
@@ -685,7 +685,7 @@ export default function Portal() {
                   <textarea value={s.newPost} onChange={(e) => set({ newPost: e.target.value })} placeholder="오늘의 성과나 궁금한 점을 나눠보세요…" style={{ flex: 1, fontFamily: 'inherit', fontSize: 14.5, lineHeight: 1.5, padding: '11px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', resize: 'none', minHeight: 54, color: '#EAF3F1' }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 11 }}>
-                  <button onClick={submitPost} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#06110F', background: CTA, padding: '10px 22px', borderRadius: 22 }}>피드에 올리기</button>
+                  <button onClick={submitPost} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 22px', borderRadius: 22 }}>피드에 올리기</button>
                 </div>
               </section>
 
@@ -756,14 +756,14 @@ export default function Portal() {
                 </div>
                 <div style={{ padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 11, alignItems: 'center' }}>
                   <input value={s.newMsg} onChange={(e) => set({ newMsg: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder="메시지를 입력하세요…" style={{ flex: 1, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
-                  <button onClick={sendMsg} style={{ all: 'unset', cursor: 'pointer', width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg,#67D7DF,#2E9BA6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#06110F" strokeWidth="2"><path d="M4 12l16-7-7 16-2-7z" strokeLinejoin="round" /></svg></button>
+                  <button onClick={sendMsg} style={{ all: 'unset', cursor: 'pointer', width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg,#67D7DF,#2E9BA6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#060B17" strokeWidth="2"><path d="M4 12l16-7-7 16-2-7z" strokeLinejoin="round" /></svg></button>
                 </div>
               </section>
               <aside style={{ ...card, borderRadius: 22, padding: 18, height: 'fit-content' }}>
                 <div style={{ fontSize: 10.5, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 13 }}>접속 중</div>
                 {onlineMembers.map((o, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 13 }}>
-                    <div style={{ position: 'relative', flex: 'none' }}><div style={{ width: 34, height: 34, borderRadius: '50%', background: o.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11 }}>{o.initials}</div><span style={{ position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: '50%', background: o.statusColor, border: '2.5px solid #0C2622' }} /></div>
+                    <div style={{ position: 'relative', flex: 'none' }}><div style={{ width: 34, height: 34, borderRadius: '50%', background: o.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11 }}>{o.initials}</div><span style={{ position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: '50%', background: o.statusColor, border: '2.5px solid #0E1834' }} /></div>
                     <div style={{ lineHeight: 1.2 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#EAF3F1' }}>{o.name}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>{o.role}</div></div>
                   </div>
                 ))}
@@ -809,7 +809,7 @@ export default function Portal() {
                       ))}
                       <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 6 }}>
                         <input value={s.memberDraft} onChange={(e) => set({ memberDraft: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitMemberComment() } }} placeholder="따뜻한 한마디를 남겨보세요…" style={{ flex: 1, fontFamily: 'inherit', fontSize: 13.5, padding: '11px 15px', borderRadius: 20, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
-                        <button onClick={submitMemberComment} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#06110F', background: CTA, padding: '10px 18px', borderRadius: 20 }}>보내기</button>
+                        <button onClick={submitMemberComment} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 18px', borderRadius: 20 }}>보내기</button>
                       </div>
                     </div>
                   </section>
@@ -848,7 +848,7 @@ export default function Portal() {
                   <div><label style={labelStyle}>성별</label><div style={{ display: 'flex', gap: 8 }}>{genders.map((g, i) => <button key={i} onClick={() => onProfileField('gender', g.label)} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '11px 0', borderRadius: 12, fontSize: 13.5, fontWeight: 600, border: `1px solid ${g.border}`, background: g.bg, color: g.fg }}>{g.label}</button>)}</div></div>
                   <div><label style={labelStyle}>핸드폰 번호</label><input value={P.phone} onChange={(e) => onProfileField('phone', e.target.value)} placeholder="010-0000-0000" style={inputStyle} /></div>
                 </div>
-                <button onClick={() => { set({ profileSaved: '✓ 저장되었습니다.' }); go('health') }} style={{ all: 'unset', cursor: 'pointer', marginTop: 24, textAlign: 'center', display: 'block', width: '100%', fontSize: 15, fontWeight: 700, color: '#06110F', background: CTA, padding: 14, borderRadius: 24 }}>저장하기</button>
+                <button onClick={() => { set({ profileSaved: '✓ 저장되었습니다.' }); go('health') }} style={{ all: 'unset', cursor: 'pointer', marginTop: 24, textAlign: 'center', display: 'block', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24 }}>저장하기</button>
                 <div style={{ textAlign: 'center', fontSize: 12, color: '#67D7DF', marginTop: 10 }}>{s.profileSaved}</div>
               </section>
             </div>
@@ -871,9 +871,9 @@ export default function Portal() {
                   </div>
                 ))}
               </section>
-              <section style={{ background: 'linear-gradient(165deg,#15403A,#0E2A26)', border: '1px solid rgba(184,148,85,.18)', color: '#EAF3F1', borderRadius: 24, padding: 24, marginTop: 20, boxShadow: '0 26px 52px -40px rgba(0,0,0,.8)' }}>
+              <section style={{ background: 'linear-gradient(165deg,#16264E,#101D3E)', border: '1px solid rgba(184,148,85,.18)', color: '#EAF3F1', borderRadius: 24, padding: 24, marginTop: 20, boxShadow: '0 26px 52px -40px rgba(0,0,0,.8)' }}>
                 <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 21, marginBottom: 4, color: '#F2F7F3' }}>코칭 노트 보내기</div>
-                <div style={{ fontSize: 13, color: '#9FBCB5', marginBottom: 16 }}>선택한 회원의 “{trend.title}” 차트에 코치 하늘 이름으로 등록됩니다.</div>
+                <div style={{ fontSize: 13, color: '#9DAFCB', marginBottom: 16 }}>선택한 회원의 “{trend.title}” 차트에 코치 하늘 이름으로 등록됩니다.</div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
                   {roster.map((r) => (
                     <button key={r.id} onClick={() => set({ coachTargetId: r.id === 'jiwoo' ? 'minseo' : r.id, coachConfirm: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '7px 14px', borderRadius: 20, border: `1px solid ${r.selBorder}`, background: r.selBg, color: r.selFg }}>{r.name}</button>
@@ -881,9 +881,9 @@ export default function Portal() {
                 </div>
                 <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
                   <input value={s.coachNote} onChange={(e) => set({ coachNote: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendCoachNote() } }} placeholder={`${coachTargetMember ? coachTargetMember.name : '회원'}님에게 피드백을 작성하세요…`} style={{ flex: 1, fontFamily: 'inherit', fontSize: 14, padding: '13px 17px', borderRadius: 24, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.07)', outline: 'none', color: '#fff' }} />
-                  <button onClick={sendCoachNote} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#06110F', background: CTA, padding: '12px 22px', borderRadius: 24 }}>노트 보내기</button>
+                  <button onClick={sendCoachNote} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '12px 22px', borderRadius: 24 }}>노트 보내기</button>
                 </div>
-                <div style={{ fontSize: 12, color: '#7FB8B0', marginTop: 11 }}>{s.coachConfirm}</div>
+                <div style={{ fontSize: 12, color: '#8AA4CC', marginTop: 11 }}>{s.coachConfirm}</div>
               </section>
             </div>
           )}
@@ -896,7 +896,7 @@ export default function Portal() {
           <div style={{ position: 'relative', maxHeight: '92vh', overflow: 'auto', borderRadius: 16, boxShadow: '0 30px 80px -20px rgba(0,0,0,.8)', background: '#fff' }} onClick={(e) => e.stopPropagation()}>
             <img src="/assets/inbody-result.jpg" alt="인바디 결과지 원본" style={{ display: 'block', width: 'auto', maxWidth: '88vw', maxHeight: 'none' }} />
           </div>
-          <button onClick={() => set({ scanOpen: false })} style={{ all: 'unset', cursor: 'pointer', position: 'fixed', top: 24, right: 28, width: 44, height: 44, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#0A1B18', boxShadow: '0 8px 20px -8px rgba(0,0,0,.6)' }}>×</button>
+          <button onClick={() => set({ scanOpen: false })} style={{ all: 'unset', cursor: 'pointer', position: 'fixed', top: 24, right: 28, width: 44, height: 44, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#0A1326', boxShadow: '0 8px 20px -8px rgba(0,0,0,.6)' }}>×</button>
         </div>
       )}
     </div>

@@ -38,6 +38,18 @@ npm run preview  # 빌드 결과 미리보기
 요구 사항: Node 18+ (개발은 Node 22 기준). 외부 폰트(Pretendard·Gowun Batang·Outfit·
 IBM Plex Mono)는 CDN 으로 로드합니다.
 
+### 백엔드(Supabase) 연결 — 선택
+
+환경 변수가 없으면 앱은 **목업 데이터**로 동작합니다. 실제 백엔드(Supabase)에 붙이려면:
+
+```bash
+cp .env.example .env   # VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 채우기
+```
+
+호스팅: **프론트 → Vercel**, **백엔드(DB·인증·스토리지·실시간) → Supabase**,
+(OCR 워커가 필요해지면 → Railway). 마이그레이션/RLS/배포 절차는
+[`docs/SUPABASE.md`](docs/SUPABASE.md), 전체 설계는 [`docs/BACKEND_PLAN.md`](docs/BACKEND_PLAN.md).
+
 ---
 
 ## 기술 스택

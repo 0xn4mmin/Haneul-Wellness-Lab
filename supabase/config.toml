@@ -1,0 +1,6 @@
+# Supabase CLI project config. Replace project_id with your project ref
+# (Project Settings → General) before running `supabase link`.
+project_id = "haneul-wellness-lab"
+
+[db]
+major_version = 15

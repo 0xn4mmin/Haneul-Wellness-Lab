@@ -27,6 +27,19 @@
 
 ---
 
+## 1.5 호스팅 & 구현 결정 (확정)
+
+- **프론트엔드 → Vercel** (Vite SPA, GitHub 자동 배포, `vercel.json` SPA rewrite).
+- **백엔드 → Supabase** (Postgres + Auth + Storage + Realtime + **RLS**). 별도 서버 호스팅 불필요.
+- **OCR 워커 → Railway**(또는 Render/Fly), M4에서 필요해질 때 추가하는 하이브리드.
+
+> **스키마 결정**: 아래 3절의 와이드 컬럼형 Prisma 스케치 대신, 실제 스캐폴딩은
+> **`metric_readings`(user_id·metric_key·date·value) 롱 테이블**로 구현했습니다.
+> 이유 — 지표별 공개/비공개를 **RLS(행 단위)** 로 강제하려면 메트릭이 행이어야 하고,
+> 이는 프론트의 "지표별 시계열" 모델과도 일치합니다. 부위별/상세값은 `measurements`
+> 스캔 이벤트의 JSONB로 둡니다. 실제 SQL·정책은 `supabase/migrations/*.sql` 참고.
+> (Supabase 채택으로 NestJS 자체 API 레이어는 OCR/커스텀 로직 단계까지 보류.)
+
 ## 2. 권장 스택
 
 | 영역 | 권장 | 대안 |

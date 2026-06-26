@@ -6,6 +6,7 @@ import {
 } from '../data/portalData'
 import { initialState, type PortalState, type View } from '../data/portalState'
 import { createFigure, type FigureHandle } from '../lib/threeFigure'
+import { useBackend } from '../data/useBackend'
 
 const CTA = 'linear-gradient(110deg,#67D7DF,#2E9BA6)'
 const card: React.CSSProperties = {
@@ -30,6 +31,8 @@ export default function Portal() {
   const [s, setS] = useState<PortalState>(initialState)
   const set = (p: Partial<PortalState>) => setS((prev) => ({ ...prev, ...p }))
   const setFn = (fn: (prev: PortalState) => Partial<PortalState>) => setS((prev) => ({ ...prev, ...fn(prev) }))
+
+  const be = useBackend()
 
   const mount3d = useRef<HTMLDivElement | null>(null)
   const figure = useRef<FigureHandle | null>(null)
@@ -98,20 +101,31 @@ export default function Portal() {
     set({ showChallengeForm: false, chDone: '✓ “' + t + '” 챌린지가 생성되었어요.' })
   }
 
+  // auth: real Supabase when configured, else the local mock gate
+  const showLogin = be.configured ? !be.session : !s.authed
+  const doLogin = () => { if (be.configured) void be.signIn(s.loginEmail, s.loginPw); else set({ authed: true }) }
+  const doSignup = () => { if (be.configured) void be.signUp(s.loginEmail, s.loginPw); else set({ authed: true }) }
+  const doLogout = () => { void be.signOut() }
+
   // ---- derived values (mirror of renderVals) ------------------------------
   const isTrainer = s.role === 'trainer'
   const isClient = !isTrainer
   const navColor = (k: View) => { const a = s.view === k; return { bg: a ? 'linear-gradient(110deg,#2E9BA6,#247E88)' : 'transparent', fg: a ? '#060B17' : '#9DAFCB' } }
 
+  // Data source for the OWN dashboard: real (Supabase) when signed in, else mock.
+  const M = be.metrics
+  const D = be.dates
+  const privacyMap = be.privacy ?? s.privacy
+
   const meDisp = {
-    name: isTrainer ? COACH.name : s.profile.name,
-    initials: isTrainer ? COACH.initials : ME.initials,
-    color: isTrainer ? COACH.color : ME.color,
+    name: isTrainer ? COACH.name : (be.profile?.name ?? s.profile.name),
+    initials: isTrainer ? COACH.initials : (be.profile?.initials ?? ME.initials),
+    color: isTrainer ? COACH.color : (be.profile?.color ?? ME.color),
     role: isTrainer ? '트레이너 · 관리자' : ME.role,
   }
 
   const trend = useMemo(() => {
-    const base = buildTrend(s.selectedMetric)
+    const base = buildTrend(s.selectedMetric, M, D)
     const h = s.hoverIdx
     const pts = base.pts.map((p, i) => ({ ...p, r: h === i ? 6 : 4.2, idx: i }))
     let tip
@@ -124,28 +138,28 @@ export default function Portal() {
       tip = { show: false, x: 0, cx: 0, rx: 0, ry: 0, t1: 0, t2: 0, date: '', val: '' }
     }
     return { ...base, pts, tip }
-  }, [s.selectedMetric, s.hoverIdx])
+  }, [s.selectedMetric, s.hoverIdx, M, D])
 
-  const gauges = buildGauges()
+  const gauges = buildGauges(M)
   const radar = useMemo(() => {
-    const base = buildRadar()
+    const base = buildRadar(M)
     const rh = s.radarHover
     const rd = base.curDots[rh]
     const tip = (rh >= 0 && rd)
       ? { show: true, cx: rd.x, rx: +Math.max(2, Math.min(142, rd.x - 48)).toFixed(1), ry: +(rd.y - 34).toFixed(1), t1: +(rd.y - 20).toFixed(1), t2: +(rd.y - 6).toFixed(1), k: rd.k, raw: rd.raw }
       : { show: false, cx: 0, rx: 0, ry: 0, t1: 0, t2: 0, k: '', raw: '' }
     return { ...base, tip }
-  }, [s.radarHover])
+  }, [s.radarHover, M])
 
   const sel = s.selectedMetric
-  const pub = s.privacy[sel] === 'public'
+  const pub = privacyMap[sel] === 'public'
   const shareInfo = pub
     ? { text: '공개 · 다른 회원이 보고 코멘트할 수 있어요', color: '#67D7DF', bg: 'rgba(46,155,166,.16)', dot: '#2E9BA6' }
     : { text: '비공개 · 나와 코치만 볼 수 있어요', color: 'rgba(231,239,234,.6)', bg: 'rgba(255,255,255,.06)', dot: 'rgba(231,239,234,.4)' }
 
   // brief
-  const _f = (k: MetricKey, i: number) => metrics[k].series[i]
-  const _l5 = metrics.smm.series.length - 1
+  const _f = (k: MetricKey, i: number) => M[k].series[i]
+  const _l5 = M.smm.series.length - 1
   const dPbf = +(_f('pbf', _l5) - _f('pbf', 0)).toFixed(1)
   const dSmm = +(_f('smm', _l5) - _f('smm', 0)).toFixed(1)
   const dScore = _f('score', _l5) - _f('score', 0)
@@ -165,16 +179,18 @@ export default function Portal() {
     p = Math.max(0, Math.min(1, p))
     return { label, value: cur + unit, goal: '목표 ' + goal + unit, pct: Math.round(p * 100), dashArray: (ringCirc * p).toFixed(1) + ' ' + ringCirc.toFixed(1), color }
   }
+  const lastV = (k: MetricKey) => M[k].series[M[k].series.length - 1]
+  const firstV = (k: MetricKey) => M[k].series[0]
   const rings = [
-    mkRing('인바디 점수', 78, 90, 70, '점', false, '#67D7DF'),
-    mkRing('골격근량', 31.9, 34, 29.4, 'kg', false, '#8FD89E'),
-    mkRing('체지방률', 20.0, 15, 26.5, '%', true, '#E0B86A'),
-    mkRing('내장지방', 5, 4, 8, '', true, '#E0A06A'),
+    mkRing('인바디 점수', lastV('score'), goals.score, firstV('score'), '점', false, '#67D7DF'),
+    mkRing('골격근량', lastV('smm'), goals.smm, firstV('smm'), 'kg', false, '#8FD89E'),
+    mkRing('체지방률', lastV('pbf'), goals.pbf, firstV('pbf'), '%', true, '#E0B86A'),
+    mkRing('내장지방', lastV('visceral'), goals.visceral, firstV('visceral'), '', true, '#E0A06A'),
   ]
 
   const cmpKeys: MetricKey[] = ['weight', 'smm', 'pbf', 'bmi', 'tbw', 'score']
   const compare = cmpKeys.map((k) => {
-    const m = metrics[k]; const a = m.series[s.cmpFrom]; const b = m.series[s.cmpTo]; const d = +(b - a).toFixed(1)
+    const m = M[k]; const a = m.series[s.cmpFrom]; const b = m.series[s.cmpTo]; const d = +(b - a).toFixed(1)
     const improved = (m.good === 'up') ? d >= 0 : d <= 0
     return { label: m.label, unit: m.unit, before: a, after: b, delta: (d > 0 ? '+' : '') + d, deltaColor: improved ? '#67D7DF' : '#E0A06A', deltaBg: improved ? 'rgba(46,155,166,.16)' : 'rgba(224,138,94,.18)' }
   })
@@ -210,7 +226,7 @@ export default function Portal() {
   const segs = segData.map((seg) => { const c = segColor(seg.pct); const selS = s.selectedSegment === seg.key; return { ...seg, color: c, border: selS ? c : 'rgba(255,255,255,.12)', chipBg: selS ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.04)' } })
   const selSeg = (() => { const ss = segData.find((x) => x.key === s.selectedSegment) || segData[2]; const st = ss.pct >= 100 ? '표준 이상 · 우수' : (ss.pct >= 95 ? '표준 범위' : '표준 이하'); return { name: ss.name, pct: ss.pct, kg: ss.kg, color: segColor(ss.pct), status: st } })()
 
-  const metricChips = (Object.keys(metrics) as MetricKey[]).map((k) => { const a = s.selectedMetric === k; return { key: k, label: metrics[k].short || metrics[k].label, bg: a ? CTA : 'rgba(255,255,255,.05)', fg: a ? '#060B17' : '#9DAFCB', border: a ? 'transparent' : 'rgba(255,255,255,.12)' } })
+  const metricChips = (Object.keys(M) as MetricKey[]).map((k) => { const a = s.selectedMetric === k; return { key: k, label: M[k].short || M[k].label, bg: a ? CTA : 'rgba(255,255,255,.05)', fg: a ? '#060B17' : '#9DAFCB', border: a ? 'transparent' : 'rgba(255,255,255,.12)' } })
 
   const comments = (s.commentsByMetric[sel] || []).map((c) => ({ ...c, tag: c.role === 'trainer' ? '코치' : (c.role === 'me' ? '나' : '회원'), tagBg: c.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF' }))
   const postsDisp = s.posts.map((p) => ({ ...p, tag: p.role === 'trainer' ? '코치' : (p.role === 'me' ? '나' : '회원'), tagBg: p.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF', ring: p.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none', likeColor: p.liked ? '#E0A06A' : 'rgba(231,239,234,.6)', likeFill: p.liked ? '#E0A06A' : 'none', commentCount: p.comments.length }))
@@ -220,8 +236,8 @@ export default function Portal() {
   const chMetrics = ['체지방률', '골격근량', '체중', '인바디 점수'].map((m) => ({ label: m, bg: s.chMetric === m ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chMetric === m ? '#060B17' : '#9DAFCB' }))
   const chPeriods = ['2주', '4주', '8주'].map((pp) => ({ label: pp, bg: s.chPeriod === pp ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chPeriod === pp ? '#060B17' : '#9DAFCB' }))
   const chScopes = ['전체 공개', '비공개'].map((pp) => ({ label: pp, bg: s.chScope === pp ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chScope === pp ? '#060B17' : '#9DAFCB' }))
-  const fromChips = dates.map((dt, i) => ({ label: dt.split(' ')[0], bg: i === s.cmpFrom ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: i === s.cmpFrom ? '#060B17' : '#9DAFCB' }))
-  const toChips = dates.map((dt, i) => ({ label: dt.split(' ')[0], bg: i === s.cmpTo ? '#67D7DF' : 'rgba(255,255,255,.05)', fg: i === s.cmpTo ? '#060B17' : '#9DAFCB' }))
+  const fromChips = D.map((dt, i) => ({ label: dt.split(' ')[0], bg: i === s.cmpFrom ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: i === s.cmpFrom ? '#060B17' : '#9DAFCB' }))
+  const toChips = D.map((dt, i) => ({ label: dt.split(' ')[0], bg: i === s.cmpTo ? '#67D7DF' : 'rgba(255,255,255,.05)', fg: i === s.cmpTo ? '#060B17' : '#9DAFCB' }))
 
   const titles: Record<View, [string, string]> = {
     profile: ['프로필 설정', '사진·생년월일·성별·연락처를 관리하세요'],
@@ -231,8 +247,8 @@ export default function Portal() {
     members: ['멤버', '다른 회원이 공개한 기록을 둘러보세요'],
     trainer: ['트레이너 스튜디오', '모든 회원을 한 곳에서 관리하세요'],
   }
-  const score = metrics.score.series[5]
-  const dateLatest = dates[5]
+  const score = M.score.series[M.score.series.length - 1]
+  const dateLatest = D[D.length - 1]
   const scans = [
     { date: '2026 · 6월 14일', has: true }, { date: '2026 · 5월 10일', has: false },
     { date: '2026 · 4월 12일', has: false }, { date: '2026 · 3월 15일', has: false },
@@ -246,7 +262,7 @@ export default function Portal() {
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.4, backgroundImage: 'radial-gradient(rgba(255,255,255,.025) 1px,transparent 1.4px)', backgroundSize: '32px 32px' }} />
 
       {/* LOGIN GATE */}
-      {!s.authed && (
+      {showLogin && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'radial-gradient(120% 90% at 50% 18%,#0E1C38 0%,#0A1326 55%,#060B17 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ position: 'absolute', top: '18%', left: '50%', transform: 'translateX(-50%)', width: '60%', maxWidth: 520, height: 300, background: 'radial-gradient(circle,rgba(46,155,166,.22),transparent 60%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
           <div style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.11)', backdropFilter: 'blur(12px)', borderRadius: 24, padding: '36px 30px', boxShadow: '0 40px 90px -50px rgba(0,0,0,.9)' }}>
@@ -255,10 +271,11 @@ export default function Portal() {
             <div style={{ textAlign: 'center', fontSize: 12.5, color: 'rgba(231,239,234,.5)', margin: '5px 0 26px' }}>회원 전용 포털에 로그인하세요</div>
             <input value={s.loginEmail} onChange={(e) => set({ loginEmail: e.target.value })} placeholder="이메일" style={{ ...inputStyle, padding: '13px 16px', fontSize: 14, marginBottom: 10 }} />
             <input value={s.loginPw} onChange={(e) => set({ loginPw: e.target.value })} type="password" placeholder="비밀번호" style={{ ...inputStyle, padding: '13px 16px', fontSize: 14, marginBottom: 18 }} />
-            <button onClick={() => set({ authed: true })} style={{ all: 'unset', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24, boxShadow: '0 16px 34px -16px rgba(22,192,206,.9)' }}>로그인</button>
+            <button onClick={doLogin} style={{ all: 'unset', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24, boxShadow: '0 16px 34px -16px rgba(22,192,206,.9)' }}>로그인</button>
+            {be.loginError && <div style={{ marginTop: 12, fontSize: 12, color: '#E0A06A', textAlign: 'center', lineHeight: 1.5 }}>{be.loginError}</div>}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 18, fontSize: 12, color: 'rgba(231,239,234,.5)' }}>
               <span style={{ cursor: 'pointer' }}>비밀번호 찾기</span>
-              <span onClick={() => set({ authed: true })} style={{ cursor: 'pointer', color: '#67D7DF', fontWeight: 600 }}>회원가입</span>
+              <span onClick={doSignup} style={{ cursor: 'pointer', color: '#67D7DF', fontWeight: 600 }}>회원가입</span>
             </div>
           </div>
         </div>
@@ -341,8 +358,8 @@ export default function Portal() {
               </div>
               <div style={{ position: 'relative', zIndex: 2, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 26, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: 22 }}>
-                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체지방률</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>20.0<span style={{ fontSize: 12, color: '#C9A24B' }}> %</span></div></div>
-                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>골격근량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>31.9<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
+                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체지방률</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.pbf.series[M.pbf.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> %</span></div></div>
+                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>골격근량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.smm.series[M.smm.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
                 </div>
                 <div style={{ position: 'relative', width: 98, height: 98, flex: 'none' }}>
                   <svg viewBox="0 0 120 120" style={{ width: 98, height: 98, transform: 'rotate(-90deg)' }}>
@@ -429,7 +446,7 @@ export default function Portal() {
                   <div style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: '#8A9BC0' }}>측정 6회</div>
                 </div>
                 {gauges.map((g) => {
-                  const gp = s.privacy[g.key]; const gpub = gp === 'public'
+                  const gp = privacyMap[g.key]; const gpub = gp === 'public'
                   return (
                     <div key={g.key} style={{ display: 'flex', flexDirection: 'column', gap: 7, animation: 'hwl-rise .4s ease both' }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
@@ -439,7 +456,7 @@ export default function Portal() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                           <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 18, color: '#F2F7F3' }}>{g.value}<span style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', fontFamily: "'Pretendard'" }}> {g.unit}</span></span>
-                          <button onClick={() => togglePrivacy(g.key)} title="공개 설정" style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 600, padding: '4px 9px', borderRadius: 20, border: `1px solid ${gpub ? 'rgba(103,215,223,.4)' : 'rgba(255,255,255,.12)'}`, background: gpub ? 'rgba(46,155,166,.16)' : 'rgba(255,255,255,.05)', color: gpub ? '#67D7DF' : 'rgba(231,239,234,.5)' }}>
+                          <button onClick={() => (be.configured ? be.togglePrivacy(g.key) : togglePrivacy(g.key))} title="공개 설정" style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 600, padding: '4px 9px', borderRadius: 20, border: `1px solid ${gpub ? 'rgba(103,215,223,.4)' : 'rgba(255,255,255,.12)'}`, background: gpub ? 'rgba(46,155,166,.16)' : 'rgba(255,255,255,.05)', color: gpub ? '#67D7DF' : 'rgba(231,239,234,.5)' }}>
                             <span style={{ width: 6, height: 6, borderRadius: '50%', background: gpub ? '#2E9BA6' : 'rgba(231,239,234,.4)' }} />{gpub ? '공개' : '비공개'}
                           </button>
                         </div>
@@ -566,11 +583,11 @@ export default function Portal() {
                 <div style={eyebrow}>Compare</div><div style={cardTitle}>변화 비교</div>
                 <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', margin: '14px 0 16px' }}>
                   <div>
-                    <div style={{ fontSize: 11, color: 'rgba(231,239,234,.5)', marginBottom: 6 }}>기준 · {dates[s.cmpFrom]}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(231,239,234,.5)', marginBottom: 6 }}>기준 · {D[s.cmpFrom]}</div>
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{fromChips.map((c, i) => <button key={i} onClick={() => set({ cmpFrom: i })} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '5px 9px', borderRadius: 8, background: c.bg, color: c.fg }}>{c.label}</button>)}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: 'rgba(231,239,234,.5)', marginBottom: 6 }}>비교 · {dates[s.cmpTo]}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(231,239,234,.5)', marginBottom: 6 }}>비교 · {D[s.cmpTo]}</div>
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{toChips.map((c, i) => <button key={i} onClick={() => set({ cmpTo: i })} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '5px 9px', borderRadius: 8, background: c.bg, color: c.fg }}>{c.label}</button>)}</div>
                   </div>
                 </div>
@@ -850,6 +867,9 @@ export default function Portal() {
                 </div>
                 <button onClick={() => { set({ profileSaved: '✓ 저장되었습니다.' }); go('health') }} style={{ all: 'unset', cursor: 'pointer', marginTop: 24, textAlign: 'center', display: 'block', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24 }}>저장하기</button>
                 <div style={{ textAlign: 'center', fontSize: 12, color: '#67D7DF', marginTop: 10 }}>{s.profileSaved}</div>
+                {be.configured && be.session && (
+                  <button onClick={doLogout} style={{ all: 'unset', cursor: 'pointer', marginTop: 14, textAlign: 'center', display: 'block', width: '100%', fontSize: 13.5, fontWeight: 600, color: 'rgba(231,239,234,.6)', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: 12, borderRadius: 24 }}>로그아웃</button>
+                )}
               </section>
             </div>
           )}

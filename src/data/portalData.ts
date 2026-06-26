@@ -115,8 +115,12 @@ export interface TrendData {
   deltaText: string; deltaColor: string; deltaBg: string
 }
 
-export function buildTrend(selectedMetric: MetricKey): TrendData {
-  const m = metrics[selectedMetric]
+export function buildTrend(
+  selectedMetric: MetricKey,
+  metricsData: Record<MetricKey, Metric> = metrics,
+  datesData: string[] = dates,
+): TrendData {
+  const m = metricsData[selectedMetric]
   const vals = m.series
   const W = 560, H = 260, pL = 44, pR = 20, pT = 26, pB = 42
   const min = Math.min(...vals), max = Math.max(...vals), span = (max - min) || 1
@@ -125,7 +129,7 @@ export function buildTrend(selectedMetric: MetricKey): TrendData {
   const ys = vals.map((v) => pT + (1 - (v - lo) / rng) * (H - pT - pB))
   const pts: TrendPoint[] = xs.map((x, i) => ({
     x: +x.toFixed(1), y: +ys[i].toFixed(1), v: vals[i],
-    label: dates[i].split(' ')[0], full: dates[i],
+    label: datesData[i].split(' ')[0], full: datesData[i],
     disp: vals[i] + (m.unit ? ' ' + m.unit : ''), ly: +(ys[i] - 12).toFixed(1),
   }))
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ')
@@ -153,9 +157,9 @@ export interface GaugeGeom {
   status: string; statusColor: string
   markerPct: number; underW: number; normW: number; overW: number
 }
-export function buildGauges(): GaugeGeom[] {
+export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics): GaugeGeom[] {
   return Object.keys(gconf).map((key) => {
-    const m = metrics[key as MetricKey]
+    const m = metricsData[key as MetricKey]
     const c = gconf[key]
     const val = m.series[m.series.length - 1]
     const [dMin, dMax] = c.disp
@@ -183,10 +187,10 @@ export interface RadarData {
   curPoints: string
   prevPoints: string
 }
-export function buildRadar(): RadarData {
+export function buildRadar(metricsData: Record<MetricKey, Metric> = metrics): RadarData {
   const cx = 120, cy = 120, R = 88
-  const last = (k: MetricKey) => metrics[k].series[metrics[k].series.length - 1]
-  const first = (k: MetricKey) => metrics[k].series[0]
+  const last = (k: MetricKey) => metricsData[k].series[metricsData[k].series.length - 1]
+  const first = (k: MetricKey) => metricsData[k].series[0]
   const axes = [
     { k: '근육', cur: norm(last('smm'), 24, 36), prev: norm(first('smm'), 24, 36), raw: '골격근량 ' + last('smm') + 'kg' },
     { k: '체지방', cur: 1 - norm(last('pbf'), 8, 32), prev: 1 - norm(first('pbf'), 8, 32), raw: '체지방률 ' + last('pbf') + '%' },

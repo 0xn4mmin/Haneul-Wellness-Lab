@@ -17,6 +17,12 @@ begin
   delete from measurements    where user_id = uid;
   delete from condition_logs  where user_id = uid;
 
+  -- demo identity (so the dashboard shows 박지우, not the signup default)
+  update public.profiles set
+    name = '박지우', initials = '지우', avatar_color = '#6E9B8E',
+    height_cm = 171, birth = date '1999-03-12', gender = '남성'
+  where id = uid;
+
   -- scan events (segmental/detail only on the latest)
   insert into measurements (user_id, date, segmental, detail, source) values
     (uid, '2026-06-14',

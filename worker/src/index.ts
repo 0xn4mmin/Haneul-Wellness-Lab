@@ -29,7 +29,7 @@ async function claimOne(): Promise<{ id: string; image_path: string } | null> {
   return claimed[0] as { id: string; image_path: string }
 }
 
-async function process(job: { id: string; image_path: string }) {
+async function processJob(job: { id: string; image_path: string }) {
   console.log(`[ocr] processing ${job.id} (${job.image_path})`)
   try {
     const { data: blob, error } = await sb.storage.from(BUCKET).download(job.image_path)
@@ -52,7 +52,7 @@ async function loop() {
   for (;;) {
     try {
       const job = await claimOne()
-      if (job) await process(job)
+      if (job) await processJob(job)
       else await sleep(POLL_MS)
     } catch (e) {
       console.warn('[ocr] loop error', e)

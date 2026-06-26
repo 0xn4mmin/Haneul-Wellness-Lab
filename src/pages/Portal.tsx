@@ -50,7 +50,19 @@ export default function Portal() {
   // chat auto-scroll
   useEffect(() => {
     if (s.view === 'chat' && chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
-  }, [s.view, s.messages])
+  }, [s.view, s.messages, be.messages])
+
+  // sync the profile-settings form with the loaded backend profile
+  useEffect(() => {
+    if (be.profile) set({ profile: { name: be.profile.name, birth: be.profile.birth ?? '', gender: be.profile.gender ?? '남성', phone: be.profile.phone ?? '', photo: null } })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [be.profile])
+
+  // load chart comments for the selected metric from the backend
+  useEffect(() => {
+    if (be.configured && be.session) be.loadChartComments(s.selectedMetric)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [be.configured, be.session, s.selectedMetric])
 
   // ---- handlers -----------------------------------------------------------
   const go = (v: View) => set({ view: v, activeMember: null })
@@ -58,18 +70,21 @@ export default function Portal() {
   const onProfileField = (k: keyof PortalState['profile'], v: string) => setFn((p) => ({ profile: { ...p.profile, [k]: v } }))
   const onPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files && e.target.files[0]; if (!f) return
+    if (be.configured) { void be.uploadAvatar(f); return }
     const r = new FileReader()
     r.onload = () => setFn((p) => ({ profile: { ...p.profile, photo: r.result as string } }))
     r.readAsDataURL(f)
   }
   const submitComment = () => {
     const t = s.newComment.trim(); if (!t) return
+    if (be.configured) { void be.addChartComment(s.selectedMetric, t); set({ newComment: '' }); return }
     const key = s.selectedMetric
     const entry = { author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, text: t, time: '방금' }
     setFn((p) => ({ newComment: '', commentsByMetric: { ...p.commentsByMetric, [key]: [...(p.commentsByMetric[key] || []), entry] } }))
   }
   const submitPost = () => {
     const t = s.newPost.trim(); if (!t) return
+    if (be.configured) { void be.createPost(t); set({ newPost: '' }); return }
     const post = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t, likes: 0, liked: false, open: false, comments: [], draft: '' }
     setFn((p) => ({ newPost: '', posts: [post, ...p.posts] }))
   }
@@ -81,20 +96,31 @@ export default function Portal() {
     const t = (x.draft || '').trim(); if (!t) return x
     return { ...x, comments: [...x.comments, { author: ME.name, initials: ME.initials, color: ME.color, text: t }], draft: '' }
   }) }))
+  // routed post handlers (backend ids are strings, mock ids are numbers)
+  const onPostLike = (id: string | number) => (be.configured ? be.toggleLike(String(id)) : toggleLike(Number(id)))
+  const onPostToggle = (id: string | number) => (be.configured ? be.toggleComments(String(id)) : toggleComments(Number(id)))
+  const onPostDraftChange = (id: string | number, v: string) => (be.configured ? be.setPostDraft(String(id), v) : setPostDraft(Number(id), v))
+  const onPostCommentSubmit = (id: string | number) => (be.configured ? be.submitPostComment(String(id)) : submitPostComment(Number(id)))
   const sendMsg = () => {
     const t = s.newMsg.trim(); if (!t) return
+    if (be.configured) { void be.sendMessage(t); set({ newMsg: '' }); return }
     const msg = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t }
     setFn((p) => ({ newMsg: '', messages: [...p.messages, msg] }))
   }
-  const openMember = (id: string) => set({ activeMember: id })
+  const openMember = (id: string) => { if (be.configured) be.openMember(id); else set({ activeMember: id }) }
+  const closeMember = () => { if (be.configured) be.closeMember(); else set({ activeMember: null }) }
   const submitMemberComment = () => {
-    const t = s.memberDraft.trim(); const id = s.activeMember; if (!t || !id) return
+    const t = s.memberDraft.trim(); if (!t) return
+    if (be.configured) { void be.addMemberCheer(t); set({ memberDraft: '' }); return }
+    const id = s.activeMember; if (!id) return
     setFn((p) => ({ memberDraft: '', memberComments: { ...p.memberComments, [id]: [...(p.memberComments[id] || []), { author: ME.name, initials: ME.initials, color: ME.color, text: t }] } }))
   }
   const sendCoachNote = () => {
     const t = s.coachNote.trim(); if (!t) return
-    const target = s.members.find((m) => m.id === s.coachTargetId)
-    set({ coachNote: '', coachConfirm: '✓ ' + (target ? target.name : '회원') + '님의 ' + metrics[s.selectedMetric].label + ' 차트에 노트를 전달했어요.' })
+    const target = (be.configured ? be.roster : null)?.find((m) => m.id === s.coachTargetId) ?? s.members.find((m) => m.id === s.coachTargetId)
+    const done = () => set({ coachNote: '', coachConfirm: '✓ ' + (target ? target.name : '회원') + '님의 ' + M[s.selectedMetric].label + ' 차트에 노트를 전달했어요.' })
+    if (be.configured) { void be.addCoachNote(s.coachTargetId, s.selectedMetric, t).then((err) => err ? set({ coachConfirm: '⚠ ' + err }) : done()); return }
+    done()
   }
   const createChallenge = () => {
     const t = (s.chTitle || '').trim() || '새 챌린지'
@@ -198,23 +224,31 @@ export default function Portal() {
   const board = challenge.board.map((b, i) => ({ handle: b.handle, rank: i + 1, chgText: (b.chg > 0 ? '+' : '') + b.chg + '%p', rowBg: b.me ? 'rgba(46,155,166,.16)' : 'transparent', rowBorder: b.me ? 'rgba(103,215,223,.35)' : 'rgba(255,255,255,.07)' }))
 
   const metricKeysForCard: MetricKey[] = ['score', 'weight', 'smm', 'pbf', 'bmi', 'tbw']
-  const membersDisp = s.members.map((m) => ({ ...m, publicCount: m.pub.length, lockedCount: metricKeysForCard.length - m.pub.filter((k) => metricKeysForCard.includes(k as MetricKey)).length }))
-  let activeMember: (typeof membersDisp[number] & { metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]; comments: { author: string; initials: string; color: string; text: string }[] }) | null = null
-  if (s.activeMember) {
+  const membersSource = be.configured ? (be.members ?? []) : s.members
+  const membersDisp = membersSource.map((m) => ({ ...m, publicCount: m.pub.length, lockedCount: metricKeysForCard.length - m.pub.filter((k) => metricKeysForCard.includes(k as MetricKey)).length }))
+  type ActiveMember = { id: string; name: string; initials: string; color: string; bio2: string; score: number; metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]; comments: { author: string; initials: string; color: string; text: string }[] }
+  let activeMember: ActiveMember | null = null
+  if (be.configured) {
+    activeMember = be.activeMember
+  } else if (s.activeMember) {
     const m = s.members.find((x) => x.id === s.activeMember)!
     const mc = metricKeysForCard.map((k) => { const open = m.pub.includes(k); const met = metrics[k]; return { label: met.label, unit: met.unit, locked: !open, shown: open, value: met.series[met.series.length - 1], spark: buildSpark(met.series) } })
-    activeMember = { ...m, publicCount: m.pub.length, lockedCount: metricKeysForCard.length - m.pub.filter((k) => metricKeysForCard.includes(k as MetricKey)).length, metrics: mc, comments: s.memberComments[m.id] || [] }
+    activeMember = { id: m.id, name: m.name, initials: m.initials, color: m.color, bio2: m.bio2, score: m.score, metrics: mc, comments: s.memberComments[m.id] || [] }
   }
+  const memberOpen = be.configured ? !!be.activeMember : !!s.activeMember
 
   const statusOf = (score: number) => score >= 85 ? { t: '순조', fg: '#67D7DF', bg: 'rgba(46,155,166,.18)' } : score >= 78 ? { t: '유지', fg: '#D9B45A', bg: 'rgba(214,178,90,.2)' } : { t: '점검 필요', fg: '#E0A06A', bg: 'rgba(224,138,94,.2)' }
-  const rosterSrc = [
-    { id: 'jiwoo', name: '박지우', initials: '지우', color: '#6E9B8E', score: 78, pbf: 20.0, smm: 31.9, last: '6월 14일' },
-    ...s.members.map((m, i) => ({ id: m.id, name: m.name, initials: m.initials, color: m.color, score: m.score, pbf: metrics.pbf.series[5] + (m.score - 80) * -0.3, smm: metrics.smm.series[5] + (m.score - 80) * 0.1, last: ['6월 12일', '6월 13일', '6월 11일'][i] || '6월 10일' })),
-  ]
+  const rosterSrc = be.configured
+    ? (be.roster ?? []).map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, score: r.score, pbf: r.pbf, smm: r.smm, last: D[D.length - 1] }))
+    : [
+      { id: 'jiwoo', name: '박지우', initials: '지우', color: '#6E9B8E', score: 78, pbf: 20.0, smm: 31.9, last: '6월 14일' },
+      ...s.members.map((m, i) => ({ id: m.id, name: m.name, initials: m.initials, color: m.color, score: m.score, pbf: metrics.pbf.series[5] + (m.score - 80) * -0.3, smm: metrics.smm.series[5] + (m.score - 80) * 0.1, last: ['6월 12일', '6월 13일', '6월 11일'][i] || '6월 10일' })),
+    ]
   const roster = rosterSrc.map((r) => { const st = statusOf(r.score); const tsel = s.coachTargetId === r.id; return { ...r, pbf: r.pbf.toFixed(1), smm: r.smm.toFixed(1), status: st.t, statusFg: st.fg, statusBg: st.bg, selBg: tsel ? CTA : 'rgba(255,255,255,.06)', selFg: tsel ? '#060B17' : '#BFCCE6', selBorder: tsel ? 'transparent' : 'rgba(255,255,255,.16)' } })
-  const coachTargetMember = s.members.find((m) => m.id === s.coachTargetId)
+  const coachTargetMember = roster.find((m) => m.id === s.coachTargetId)
 
-  const messages = s.messages.map((m) => { const isMe = m.role === 'me'; return { ...m, dir: (isMe ? 'row-reverse' : 'row') as React.CSSProperties['flexDirection'], justify: isMe ? 'flex-end' : 'flex-start', radius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px', bubbleBg: isMe ? 'linear-gradient(135deg,#2E9BA6,#1E6E78)' : (m.role === 'trainer' ? 'rgba(46,155,166,.14)' : 'rgba(255,255,255,.06)'), bubbleFg: isMe ? '#060B17' : '#E7EFEA', bubbleBorder: isMe ? 'transparent' : (m.role === 'trainer' ? 'rgba(103,215,223,.25)' : 'rgba(255,255,255,.1)'), ring: m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none' } })
+  const messagesSource = be.configured ? (be.messages ?? []) : s.messages
+  const messages = messagesSource.map((m) => { const isMe = m.role === 'me'; return { ...m, dir: (isMe ? 'row-reverse' : 'row') as React.CSSProperties['flexDirection'], justify: isMe ? 'flex-end' : 'flex-start', radius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px', bubbleBg: isMe ? 'linear-gradient(135deg,#2E9BA6,#1E6E78)' : (m.role === 'trainer' ? 'rgba(46,155,166,.14)' : 'rgba(255,255,255,.06)'), bubbleFg: isMe ? '#060B17' : '#E7EFEA', bubbleBorder: isMe ? 'transparent' : (m.role === 'trainer' ? 'rgba(103,215,223,.25)' : 'rgba(255,255,255,.1)'), ring: m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none' } })
   const onlineMembers = [
     { name: '코치 하늘', initials: '하늘', color: '#234B47', role: '트레이너', statusColor: '#2E9BA6' },
     { name: '이민서', initials: '민서', color: '#BE7A57', role: '회원', statusColor: '#2E9BA6' },
@@ -228,8 +262,10 @@ export default function Portal() {
 
   const metricChips = (Object.keys(M) as MetricKey[]).map((k) => { const a = s.selectedMetric === k; return { key: k, label: M[k].short || M[k].label, bg: a ? CTA : 'rgba(255,255,255,.05)', fg: a ? '#060B17' : '#9DAFCB', border: a ? 'transparent' : 'rgba(255,255,255,.12)' } })
 
-  const comments = (s.commentsByMetric[sel] || []).map((c) => ({ ...c, tag: c.role === 'trainer' ? '코치' : (c.role === 'me' ? '나' : '회원'), tagBg: c.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF' }))
-  const postsDisp = s.posts.map((p) => ({ ...p, tag: p.role === 'trainer' ? '코치' : (p.role === 'me' ? '나' : '회원'), tagBg: p.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF', ring: p.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none', likeColor: p.liked ? '#E0A06A' : 'rgba(231,239,234,.6)', likeFill: p.liked ? '#E0A06A' : 'none', commentCount: p.comments.length }))
+  const commentsSource = be.configured ? (be.chartComments ?? []) : (s.commentsByMetric[sel] || [])
+  const comments = commentsSource.map((c) => ({ ...c, tag: c.role === 'trainer' ? '코치' : (c.role === 'me' ? '나' : '회원'), tagBg: c.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF' }))
+  const postsSource = be.configured ? (be.posts ?? []) : s.posts
+  const postsDisp = postsSource.map((p) => ({ ...p, tag: p.role === 'trainer' ? '코치' : (p.role === 'me' ? '나' : '회원'), tagBg: p.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF', ring: p.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none', likeColor: p.liked ? '#E0A06A' : 'rgba(231,239,234,.6)', likeFill: p.liked ? '#E0A06A' : 'none', commentCount: p.comments.length }))
 
   const P = s.profile
   const genders = ['남성', '여성', '기타'].map((g) => ({ label: g, bg: P.gender === g ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: P.gender === g ? '#060B17' : '#9DAFCB', border: P.gender === g ? 'transparent' : 'rgba(255,255,255,.12)' }))
@@ -318,7 +354,7 @@ export default function Portal() {
             <button onClick={() => set({ role: 'trainer', view: 'trainer' })} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '8px 0', fontSize: 12.5, fontWeight: 600, borderRadius: 9, transition: 'all .2s', background: isTrainer ? '#C9A24B' : 'transparent', color: isTrainer ? '#060B17' : '#8A9BC0' }}>트레이너</button>
           </div>
           <button onClick={() => go('profile')} className="hwl-soft-hover" style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: 8, borderRadius: 12 }}>
-            <Avatar initials={meDisp.initials} color={meDisp.color} size={34} photo={isTrainer ? null : P.photo} fontSize={12} />
+            <Avatar initials={meDisp.initials} color={meDisp.color} size={34} photo={isTrainer ? null : (be.profile?.photoUrl ?? P.photo)} fontSize={12} />
             <div style={{ lineHeight: 1.2, overflow: 'hidden', textAlign: 'left' }}>
               <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', color: '#EAF3F1' }}>{meDisp.name}</div>
               <div style={{ fontSize: 10.5, color: '#8A9BC0' }}>{meDisp.role} · 프로필 설정</div>
@@ -724,10 +760,10 @@ export default function Portal() {
                     </div>
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.08)' }}>
-                    <button onClick={() => toggleLike(p.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: p.likeColor }}>
+                    <button onClick={() => onPostLike(p.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: p.likeColor }}>
                       <svg width="17" height="17" viewBox="0 0 24 24" fill={p.likeFill} stroke={p.likeColor} strokeWidth="1.8"><path d="M12 20s-7-4.5-9.2-8.6C1.2 8.5 2.6 5.5 5.6 5.5c1.9 0 3.1 1.1 3.9 2.3.8-1.2 2-2.3 3.9-2.3 3 0 4.4 3 2.8 5.9C19 15.5 12 20 12 20z" strokeLinejoin="round" /></svg>{p.likes}
                     </button>
-                    <button onClick={() => toggleComments(p.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'rgba(231,239,234,.6)' }}>
+                    <button onClick={() => onPostToggle(p.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'rgba(231,239,234,.6)' }}>
                       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(231,239,234,.6)" strokeWidth="1.8"><path d="M4 5h16v10H9l-4 4v-4H4z" strokeLinejoin="round" /></svg>댓글 {p.commentCount}
                     </button>
                   </div>
@@ -741,8 +777,8 @@ export default function Portal() {
                       ))}
                       <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 2 }}>
                         <Avatar initials={meDisp.initials} color={meDisp.color} size={30} fontSize={10.5} />
-                        <input value={p.draft} onChange={(e) => setPostDraft(p.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitPostComment(p.id) } }} placeholder="댓글을 입력하세요…" style={{ flex: 1, fontFamily: 'inherit', fontSize: 13, padding: '9px 14px', borderRadius: 18, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
-                        <button onClick={() => submitPostComment(p.id)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#67D7DF' }}>댓글</button>
+                        <input value={p.draft} onChange={(e) => onPostDraftChange(p.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onPostCommentSubmit(p.id) } }} placeholder="댓글을 입력하세요…" style={{ flex: 1, fontFamily: 'inherit', fontSize: 13, padding: '9px 14px', borderRadius: 18, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
+                        <button onClick={() => onPostCommentSubmit(p.id)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#67D7DF' }}>댓글</button>
                       </div>
                     </div>
                   )}
@@ -793,7 +829,7 @@ export default function Portal() {
             <div style={{ animation: 'hwl-rise .4s ease both' }}>
               {activeMember ? (
                 <div>
-                  <button onClick={() => set({ activeMember: null })} style={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'rgba(231,239,234,.6)', marginBottom: 16 }}>‹ 멤버 목록으로</button>
+                  <button onClick={closeMember} style={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'rgba(231,239,234,.6)', marginBottom: 16 }}>‹ 멤버 목록으로</button>
                   <section style={{ ...card, padding: 24 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 15, marginBottom: 6 }}>
                       <Avatar initials={activeMember.initials} color={activeMember.color} size={58} fontSize={17} />
@@ -856,7 +892,7 @@ export default function Portal() {
               <section style={{ ...card, padding: 28 }}>
                 <div style={eyebrow}>Profile</div><div style={cardTitle}>프로필 설정</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 18, margin: '22px 0 24px' }}>
-                  <Avatar initials={meDisp.initials} color={meDisp.color} size={84} photo={P.photo} fontSize={24} />
+                  <Avatar initials={meDisp.initials} color={meDisp.color} size={84} photo={be.profile?.photoUrl ?? P.photo} fontSize={24} />
                   <label style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '9px 16px' }}>프로필 사진 변경<input type="file" accept="image/*" onChange={onPhoto} style={{ display: 'none' }} /></label>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -865,7 +901,7 @@ export default function Portal() {
                   <div><label style={labelStyle}>성별</label><div style={{ display: 'flex', gap: 8 }}>{genders.map((g, i) => <button key={i} onClick={() => onProfileField('gender', g.label)} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '11px 0', borderRadius: 12, fontSize: 13.5, fontWeight: 600, border: `1px solid ${g.border}`, background: g.bg, color: g.fg }}>{g.label}</button>)}</div></div>
                   <div><label style={labelStyle}>핸드폰 번호</label><input value={P.phone} onChange={(e) => onProfileField('phone', e.target.value)} placeholder="010-0000-0000" style={inputStyle} /></div>
                 </div>
-                <button onClick={() => { set({ profileSaved: '✓ 저장되었습니다.' }); go('health') }} style={{ all: 'unset', cursor: 'pointer', marginTop: 24, textAlign: 'center', display: 'block', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24 }}>저장하기</button>
+                <button onClick={() => { if (be.configured) void be.updateProfile({ name: P.name, birth: P.birth, gender: P.gender, phone: P.phone }); set({ profileSaved: '✓ 저장되었습니다.' }); go('health') }} style={{ all: 'unset', cursor: 'pointer', marginTop: 24, textAlign: 'center', display: 'block', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24 }}>저장하기</button>
                 <div style={{ textAlign: 'center', fontSize: 12, color: '#67D7DF', marginTop: 10 }}>{s.profileSaved}</div>
                 {be.configured && be.session && (
                   <button onClick={doLogout} style={{ all: 'unset', cursor: 'pointer', marginTop: 14, textAlign: 'center', display: 'block', width: '100%', fontSize: 13.5, fontWeight: 600, color: 'rgba(231,239,234,.6)', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: 12, borderRadius: 24 }}>로그아웃</button>

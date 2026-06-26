@@ -134,7 +134,7 @@ export async function addChartComment(ownerId: string, metricKey: string, text: 
 export async function fetchPosts() {
   const { data, error } = await requireSupabase()
     .from('posts')
-    .select('id, text, shared_metric, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role), post_likes(user_id), post_comments(id, text, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color))')
+    .select('id, author_id, text, shared_metric, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role), post_likes(user_id), post_comments(id, text, author_id, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color))')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
@@ -193,4 +193,80 @@ export async function uploadAvatar(file: File): Promise<string> {
   if (error) throw error
   await sb.from('profiles').update({ photo_path: path }).eq('id', me)
   return sb.storage.from('avatars').getPublicUrl(path).data.publicUrl
+}
+
+// ───────────────────────── members ──────────────────────
+export interface MemberCard {
+  id: string; name: string; initials: string; color: string
+  bio: string | null; bio2: string | null; pub: string[]; score: number | null
+}
+/** Member roster with each member's public metric keys + score (if public). */
+export async function fetchMemberCards(): Promise<MemberCard[]> {
+  const sb = requireSupabase()
+  const me = await uid()
+  const { data: profs } = await sb.from('profiles')
+    .select('id, name, initials, avatar_color, bio, bio2').neq('id', me).eq('role', 'client')
+  const cards: MemberCard[] = []
+  for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null }>) {
+    const { data: pv } = await sb.from('metric_privacy').select('metric_key, visibility').eq('user_id', p.id)
+    const pub = ((pv ?? []) as { metric_key: string; visibility: string }[]).filter((r) => r.visibility === 'public').map((r) => r.metric_key)
+    let score: number | null = null
+    if (pub.includes('score')) {
+      const { data: sc } = await sb.from('metric_readings').select('value').eq('user_id', p.id).eq('metric_key', 'score').order('date', { ascending: false }).limit(1)
+      score = (sc?.[0] as { value: number } | undefined)?.value ?? null
+    }
+    cards.push({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, bio: p.bio, bio2: p.bio2, pub, score })
+  }
+  return cards
+}
+
+export async function fetchMemberCheers(id: string) {
+  const { data } = await requireSupabase().from('member_cheers')
+    .select('text, author:profiles!member_cheers_author_id_fkey(name, initials, avatar_color)')
+    .eq('target_user_id', id).order('created_at', { ascending: true })
+  return data ?? []
+}
+export async function addMemberCheer(id: string, text: string) {
+  const me = await uid()
+  return requireSupabase().from('member_cheers').insert({ target_user_id: id, author_id: me, text })
+}
+export async function fetchMemberProfile(id: string) {
+  const { data } = await requireSupabase().from('profiles')
+    .select('name, initials, avatar_color, bio, bio2').eq('id', id).single()
+  return data as { name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null } | null
+}
+
+// ───────────────────── trainer studio ───────────────────
+export interface RosterRow { id: string; name: string; initials: string; color: string; score: number | null; pbf: number | null; smm: number | null }
+export async function fetchRoster(): Promise<RosterRow[]> {
+  const sb = requireSupabase()
+  const { data: profs } = await sb.from('profiles').select('id, name, initials, avatar_color, role').eq('role', 'client')
+  const rows: RosterRow[] = []
+  for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string }>) {
+    const latest = async (k: string) => {
+      const { data } = await sb.from('metric_readings').select('value').eq('user_id', p.id).eq('metric_key', k).order('date', { ascending: false }).limit(1)
+      return (data?.[0] as { value: number } | undefined)?.value ?? null
+    }
+    rows.push({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, score: await latest('score'), pbf: await latest('pbf'), smm: await latest('smm') })
+  }
+  return rows
+}
+export async function addCoachNote(memberId: string, metricKey: string, text: string) {
+  const me = await uid()
+  return requireSupabase().from('coach_notes').insert({ trainer_id: me, member_id: memberId, metric_key: metricKey, text })
+}
+
+// ───────────────────────── chat room ────────────────────
+/** Returns the shared lounge room id, creating it + joining if needed. */
+export async function getOrCreateDefaultRoom(): Promise<string | null> {
+  const sb = requireSupabase()
+  const me = await uid()
+  const { data: rooms } = await sb.from('chat_rooms').select('id').eq('name', '하늘 라운지').limit(1)
+  let roomId = (rooms?.[0] as { id: string } | undefined)?.id
+  if (!roomId) {
+    const { data: r } = await sb.from('chat_rooms').insert({ name: '하늘 라운지', is_private: false }).select('id').single()
+    roomId = (r as { id: string } | null)?.id
+  }
+  if (roomId) await sb.from('room_members').upsert({ room_id: roomId, user_id: me })
+  return roomId ?? null
 }

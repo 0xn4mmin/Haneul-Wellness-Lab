@@ -26,6 +26,7 @@ export interface PortalState {
   newPost: string
   newMsg: string
   commentsByMetric: Record<string, MetricComment[]>
+  coachFeedback: { author: string; initials: string; color: string; isCoach: boolean; text: string; time: string }[]
   posts: Post[]
   messages: Message[]
   members: Member[]
@@ -69,6 +70,10 @@ export const initialState: PortalState = {
     smm: [{ author: '코치 하늘', initials: '하늘', color: '#234B47', role: 'trainer', text: '꾸준히 우상향이에요 — 운동 일관성이 그대로 보입니다. 다음 사이클엔 몸통 근력을 더 끌어올려봐요.', time: '2일 전' }],
     pbf: [{ author: '코치 하늘', initials: '하늘', color: '#234B47', role: 'trainer', text: '1월 대비 6.5%p 줄었어요. 단백질을 체중당 1.6g로 유지하면 이 흐름 그대로 갑니다.', time: '1주 전' }],
   },
+  coachFeedback: [
+    { author: '코치 하늘', initials: '하늘', color: '#234B47', isCoach: true, text: '6월 측정 종합이에요 — 골격근 우상향, 체지방 안정적입니다. 다음 사이클엔 몸통 근력과 수면 7시간 고정에 집중해봐요.', time: '2일 전' },
+    { author: '박지우', initials: '지우', color: '#6E9B8E', isCoach: false, text: '감사합니다 코치님! 수면부터 잡아볼게요.', time: '1일 전' },
+  ],
   posts: [
     { id: 1, author: '코치 하늘', initials: '하늘', color: '#234B47', role: 'trainer', time: '3시간 전', text: '측정 팁 하나 드려요 🌿 인바디 당일 아침엔 물을 충분히 마시고, 측정 2시간 전에는 과식을 피해주세요. 같은 조건에서 재야 데이터가 정직해집니다.', likes: 12, liked: false, open: false, comments: [{ author: '조다온', initials: '다온', color: '#C29A4B', text: '저장했어요! 물 마시는 거 항상 까먹네요.' }], draft: '' },
     { id: 2, author: '이민서', initials: '민서', color: '#BE7A57', role: 'client', time: '6시간 전', text: '3개월 차, 드디어 이 과정을 믿게 됐어요. 체지방 한 단계가 통째로 빠졌고 오후에 늘어지던 컨디션이 완전히 달라졌어요.', likes: 24, liked: false, open: false, hasMetric: true, metricVal: '-4.2%', metricLabel: '체지방률', metricSub: '3월 → 6월 · 전체 공개', comments: [{ author: '박지우', initials: '지우', color: '#6E9B8E', text: '진짜 동기부여 돼요, 축하해요!' }, { author: '김아리', initials: '아리', color: '#5E97A0', text: '멋져요 💚' }], draft: '' },

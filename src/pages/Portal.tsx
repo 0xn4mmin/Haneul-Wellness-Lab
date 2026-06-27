@@ -93,6 +93,12 @@ export default function Portal() {
     const entry = { author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, text: t, time: '방금' }
     setFn((p) => ({ newComment: '', commentsByMetric: { ...p.commentsByMetric, [key]: [...(p.commentsByMetric[key] || []), entry] } }))
   }
+  const submitFeedback = () => {
+    const t = s.newComment.trim(); if (!t) return
+    if (be.configured) { void be.addCoachFeedback(t); set({ newComment: '' }); return }
+    const item = { author: meDisp.name, initials: meDisp.initials, color: meDisp.color, isCoach: isTrainer, text: t, time: '방금' }
+    setFn((p) => ({ newComment: '', coachFeedback: [...p.coachFeedback, item] }))
+  }
   const submitPost = () => {
     const t = s.newPost.trim(); if (!t) return
     if (be.configured) { void be.createPost(t); set({ newPost: '' }); return }
@@ -307,6 +313,7 @@ export default function Portal() {
 
   const commentsSource = be.configured ? (be.chartComments ?? []) : (s.commentsByMetric[sel] || [])
   const comments = commentsSource.map((c) => ({ ...c, tag: c.role === 'trainer' ? '코치' : (c.role === 'me' ? '나' : '회원'), tagBg: c.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF' }))
+  const feedbackThread = be.configured ? (be.coachFeedback ?? []) : s.coachFeedback
   const postsSource = be.configured ? (be.posts ?? []) : s.posts
   const postsDisp = postsSource.map((p) => ({ ...p, tag: p.role === 'trainer' ? '코치' : (p.role === 'me' ? '나' : '회원'), tagBg: p.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF', ring: p.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none', likeColor: p.liked ? '#E0A06A' : 'rgba(231,239,234,.6)', likeFill: p.liked ? '#E0A06A' : 'none', commentCount: p.comments.length }))
 
@@ -561,6 +568,37 @@ export default function Portal() {
                     </div>
                   )
                 })}
+
+                {/* 하늘 코치의 피드백 (이번 측정 전체) */}
+                <div style={{ marginTop: 4, paddingTop: 16, borderTop: '1px solid rgba(255,247,232,.1)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 3px rgba(46,155,166,.25)' }} />
+                    <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 17, color: '#F2F7F3' }}>하늘 코치의 피드백</div>
+                  </div>
+                  {feedbackThread.length === 0 && (
+                    <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', lineHeight: 1.6, marginBottom: 12 }}>{isTrainer ? '이번 측정에 대한 종합 피드백을 남겨보세요.' : '코치가 이번 측정에 대한 종합 피드백을 남기면 여기에 표시돼요.'}</div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+                    {feedbackThread.map((c, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 10, animation: 'hwl-rise .3s ease both' }}>
+                        <Avatar initials={c.initials} color={c.color} size={32} fontSize={11} ring={c.isCoach ? '0 0 0 2px #2E9BA6' : undefined} />
+                        <div style={{ flex: 1, minWidth: 0, background: c.isCoach ? 'rgba(46,155,166,.12)' : 'rgba(255,255,255,.05)', border: `1px solid ${c.isCoach ? 'rgba(103,215,223,.25)' : 'rgba(255,255,255,.09)'}`, borderRadius: '4px 14px 14px 14px', padding: '10px 13px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+                            <span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{c.author}</span>
+                            <span style={{ fontSize: 9.5, fontWeight: 600, color: '#67D7DF', background: c.isCoach ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', padding: '1px 7px', borderRadius: 9 }}>{c.isCoach ? '코치' : '회원'}</span>
+                            <span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginLeft: 'auto' }}>{c.time}</span>
+                          </div>
+                          <div style={{ fontSize: 13, lineHeight: 1.55, color: 'rgba(231,239,234,.82)', whiteSpace: 'pre-wrap' }}>{c.text}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
+                    <Avatar initials={meDisp.initials} color={meDisp.color} size={32} fontSize={11} />
+                    <input value={s.newComment} onChange={(e) => set({ newComment: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitFeedback() } }} placeholder={isTrainer ? '회원에게 종합 피드백을 남기세요…' : '코치 피드백에 댓글을 남기세요…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 13.5, padding: '10px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
+                    <button onClick={submitFeedback} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 16px', borderRadius: 20 }}>{isTrainer ? '피드백' : '댓글'}</button>
+                  </div>
+                </div>
               </section>
             </div>
 
@@ -711,35 +749,6 @@ export default function Portal() {
               </section>
             </div>
 
-            {/* CHART COMMENTS */}
-            <section style={{ ...card, padding: 22, marginTop: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 20, color: '#F2F7F3' }}>“{trend.title}” 코멘트</div>
-                <div style={{ fontSize: 12, color: shareInfo.color, display: 'flex', alignItems: 'center', gap: 7, background: shareInfo.bg, padding: '5px 11px', borderRadius: 20 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: shareInfo.dot }} />{shareInfo.text}
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, margin: '18px 0' }}>
-                {comments.map((c, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 12, animation: 'hwl-rise .35s ease both' }}>
-                    <Avatar initials={c.initials} color={c.color} size={36} fontSize={11.5} />
-                    <div style={{ flex: 1, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.09)', borderRadius: '4px 16px 16px 16px', padding: '12px 15px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                        <span style={{ fontWeight: 700, fontSize: 13.5, color: '#EAF3F1' }}>{c.author}</span>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: c.tagFg, background: c.tagBg, padding: '1px 7px', borderRadius: 10 }}>{c.tag}</span>
-                        <span style={{ fontSize: 11, color: 'rgba(231,239,234,.4)', marginLeft: 'auto' }}>{c.time}</span>
-                      </div>
-                      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'rgba(231,239,234,.8)' }}>{c.text}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
-                <Avatar initials={meDisp.initials} color={meDisp.color} size={36} fontSize={11.5} />
-                <input value={s.newComment} onChange={(e) => set({ newComment: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitComment() } }} placeholder="이 차트에 코멘트를 남겨보세요…" style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14, padding: '12px 16px', borderRadius: 22, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
-                <button onClick={submitComment} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '11px 20px', borderRadius: 22 }}>등록</button>
-              </div>
-            </section>
           </div>
 
           {/* ============ 커뮤니티 ============ */}
@@ -817,7 +826,7 @@ export default function Portal() {
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.08)' }}>
                     <button onClick={() => onPostLike(p.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: p.likeColor }}>
-                      <svg width="17" height="17" viewBox="0 0 24 24" fill={p.likeFill} stroke={p.likeColor} strokeWidth="1.8"><path d="M12 20s-7-4.5-9.2-8.6C1.2 8.5 2.6 5.5 5.6 5.5c1.9 0 3.1 1.1 3.9 2.3.8-1.2 2-2.3 3.9-2.3 3 0 4.4 3 2.8 5.9C19 15.5 12 20 12 20z" strokeLinejoin="round" /></svg>{p.likes}
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill={p.likeFill} stroke={p.likeColor} strokeWidth="1.8"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" strokeLinejoin="round" /></svg>{p.likes}
                     </button>
                     <button onClick={() => onPostToggle(p.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'rgba(231,239,234,.6)' }}>
                       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(231,239,234,.6)" strokeWidth="1.8"><path d="M4 5h16v10H9l-4 4v-4H4z" strokeLinejoin="round" /></svg>댓글 {p.commentCount}

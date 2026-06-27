@@ -49,6 +49,7 @@ export interface ActiveMemberDetail {
   comments: PostComment[]
 }
 export interface ChartCommentView { author: string; initials: string; color: string; role: Role; text: string; time: string }
+export interface FeedbackItem { author: string; initials: string; color: string; isCoach: boolean; text: string; time: string }
 export interface RosterRow { id: string; name: string; initials: string; color: string; score: number; pbf: number; smm: number }
 
 export interface Backend {
@@ -93,6 +94,9 @@ export interface Backend {
   chartComments: ChartCommentView[] | null
   loadChartComments: (metricKey: string) => void
   addChartComment: (metricKey: string, text: string) => Promise<void>
+  // overall coach feedback thread (on the latest scan)
+  coachFeedback: FeedbackItem[] | null
+  addCoachFeedback: (text: string) => void
   // trainer
   roster: RosterRow[] | null
   addCoachNote: (memberId: string, metricKey: string, text: string) => Promise<string>
@@ -120,6 +124,7 @@ export function useBackend(): Backend {
   const [members, setMembers] = useState<MemberView[] | null>(null)
   const [activeMember, setActiveMember] = useState<ActiveMemberDetail | null>(null)
   const [chartComments, setChartComments] = useState<ChartCommentView[] | null>(null)
+  const [coachFeedback, setCoachFeedback] = useState<FeedbackItem[] | null>(null)
   const [roster, setRoster] = useState<RosterRow[] | null>(null)
   const [briefing, setBriefing] = useState<{ focus: string; summary: string; actions: string[] } | null>(null)
   const [briefingBusy, setBriefingBusy] = useState(false)
@@ -170,6 +175,15 @@ export function useBackend(): Backend {
     }))
   }, [meId])
 
+  const reloadCoachFeedback = useCallback(async () => {
+    if (!meId) return
+    const rows = await api.fetchChartComments(meId, 'overall')
+    setCoachFeedback((rows as any[]).map((c) => ({
+      author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color,
+      isCoach: c.author?.role === 'trainer', text: c.text, time: relTime(c.created_at),
+    })))
+  }, [meId])
+
   const reloadRooms = useCallback(async () => {
     const rows = await api.fetchMyRooms()
     setRooms(rows.map((r) => ({ id: r.id, name: r.name, isPrivate: r.is_private, joinCode: r.join_code })))
@@ -187,7 +201,7 @@ export function useBackend(): Backend {
       setRemoteMetrics(null); setRemoteDates(null); setPrivacyState(null); setProfile(null)
       setPosts(null); setMessages(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
-      setRooms(null); setActiveRoomId(null); setRoomMembers([])
+      setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null)
       roomId.current = null
       return
     }
@@ -219,6 +233,7 @@ export function useBackend(): Backend {
         if (cancelled) return
         setBriefing(latestBrief ? { focus: latestBrief.focus, summary: latestBrief.summary, actions: latestBrief.actions } : null)
         setBriefingUsed(used)
+        await reloadCoachFeedback()
         await Promise.all([reloadPosts(), reloadMembers()])
         const myRooms = await reloadRooms()   // no auto-created lounge — empty until the user makes/joins one
         const first = myRooms[0]?.id ?? null
@@ -231,7 +246,7 @@ export function useBackend(): Backend {
       }
     })()
     return () => { cancelled = true }
-  }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages, reloadRooms])
+  }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages, reloadRooms, reloadCoachFeedback])
 
   // realtime: a new briefing finished → show it, clear busy, count manual usage
   useEffect(() => {
@@ -394,6 +409,12 @@ export function useBackend(): Backend {
     loadChartComments(metricKey)
   }, [meId, loadChartComments])
 
+  const addCoachFeedback = useCallback(async (text: string) => {
+    if (!meId || !text.trim()) return
+    await api.addChartComment(meId, 'overall', text.trim())
+    reloadCoachFeedback()
+  }, [meId, reloadCoachFeedback])
+
   // ── trainer ──
   useEffect(() => {
     if (!supabase || !meId) { setRoster(null); return }
@@ -436,7 +457,7 @@ export function useBackend(): Backend {
     posts, createPost, toggleLike, toggleComments, setPostDraft, submitPostComment,
     messages, sendMessage, rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom,
     members, activeMember, openMember, closeMember, addMemberCheer,
-    chartComments, loadChartComments, addChartComment,
+    chartComments, loadChartComments, addChartComment, coachFeedback, addCoachFeedback,
     roster, addCoachNote,
   }
 }

@@ -8,6 +8,7 @@ import { initialState, type PortalState, type View } from '../data/portalState'
 import { createFigure, type FigureHandle } from '../lib/threeFigure'
 import { useBackend } from '../data/useBackend'
 import OcrUpload from '../components/OcrUpload'
+import TabBar from '../components/TabBar'
 
 const CTA = 'linear-gradient(110deg,#67D7DF,#2E9BA6)'
 const card: React.CSSProperties = {
@@ -344,7 +345,7 @@ export default function Portal() {
       {showLogin && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'radial-gradient(120% 90% at 50% 18%,#0E1C38 0%,#0A1326 55%,#060B17 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ position: 'absolute', top: '18%', left: '50%', transform: 'translateX(-50%)', width: '60%', maxWidth: 520, height: 300, background: 'radial-gradient(circle,rgba(46,155,166,.22),transparent 60%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
-          <div style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.11)', backdropFilter: 'blur(12px)', borderRadius: 24, padding: '36px 30px', boxShadow: '0 40px 90px -50px rgba(0,0,0,.9)' }}>
+          <div className="hwl-login-card" style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.11)', backdropFilter: 'blur(12px)', borderRadius: 24, padding: '36px 30px', boxShadow: '0 40px 90px -50px rgba(0,0,0,.9)' }}>
             <img src="/assets/logo-mark.png" alt="로고" style={{ width: 56, height: 56, objectFit: 'contain', display: 'block', margin: '0 auto 14px' }} />
             <div style={{ textAlign: 'center', fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#F2F7F3' }}>하늘 웰니스 랩</div>
             <div style={{ textAlign: 'center', fontSize: 12.5, color: 'rgba(231,239,234,.5)', margin: '5px 0 26px' }}>회원 전용 포털에 로그인하세요</div>
@@ -418,7 +419,7 @@ export default function Portal() {
             <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', marginTop: 3 }}>{titles[s.view][1]}</div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#9FE2E8', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 11, padding: '8px 13px' }}>
+            <div className="hwl-header-chip" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#9FE2E8', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 11, padding: '8px 13px', whiteSpace: 'nowrap' }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 3px rgba(46,155,166,.25)' }} />다음 측정까지 19일
             </div>
           </div>
@@ -461,7 +462,7 @@ export default function Portal() {
             {/* BRIEFING + GOAL RINGS */}
             <div className="hwl-2col" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 20, marginBottom: 20 }}>
               <section style={{ ...card, padding: 22, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                <div className="hwl-brief-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                   <div><div style={eyebrow}>AI Coach Briefing</div><div style={cardTitle}>이번 달 코치 브리핑</div></div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 14, padding: '4px 10px' }}>{brief.focus}</span>
@@ -519,7 +520,7 @@ export default function Portal() {
                   </div>
                 </div>
                 <div ref={mount3d} style={{ flex: 1, minHeight: 340, width: '100%', cursor: 'grab', position: 'relative', zIndex: 1 }} />
-                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', padding: '6px 20px 18px', position: 'relative', zIndex: 2 }}>
+                <div className="hwl-chiprow" style={{ display: 'flex', gap: 7, flexWrap: 'wrap', padding: '6px 20px 18px', position: 'relative', zIndex: 2 }}>
                   {segs.map((sg) => (
                     <button key={sg.key} onClick={() => set({ selectedSegment: sg.key })} onMouseEnter={() => set({ selectedSegment: sg.key })} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, padding: '7px 11px', borderRadius: 11, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${sg.border}`, background: sg.chipBg, color: '#EAF3F1', transition: 'all .18s' }}>
                       <span style={{ width: 11, height: 11, borderRadius: 3, background: sg.color }} />{sg.name}<span style={{ fontFamily: "'IBM Plex Mono',monospace", color: 'rgba(231,239,234,.5)', fontWeight: 500 }}>{sg.pct}%</span>
@@ -571,7 +572,7 @@ export default function Portal() {
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: trend.deltaColor, background: trend.deltaBg, padding: '3px 9px', borderRadius: 20 }}>{trend.deltaText}</span>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', margin: '15px 0 6px' }}>
+                <div className="hwl-chiprow" style={{ display: 'flex', gap: 7, flexWrap: 'wrap', margin: '15px 0 6px' }}>
                   {metricChips.map((c) => (
                     <button key={c.key} onClick={() => set({ selectedMetric: c.key })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 9, transition: 'all .18s', border: `1px solid ${c.border}`, background: c.bg, color: c.fg }}>{c.label}</button>
                   ))}
@@ -1032,6 +1033,18 @@ export default function Portal() {
                 </div>
                 <button onClick={() => { if (be.configured) void be.updateProfile({ name: P.name, birth: P.birth, gender: P.gender, phone: P.phone }); set({ profileSaved: '✓ 저장되었습니다.' }); go('health') }} style={{ all: 'unset', cursor: 'pointer', marginTop: 24, textAlign: 'center', display: 'block', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24 }}>저장하기</button>
                 <div style={{ textAlign: 'center', fontSize: 12, color: '#67D7DF', marginTop: 10 }}>{s.profileSaved}</div>
+
+                {/* 보기 모드 — 모바일에선 사이드바가 없으므로 여기서 전환 (트레이너 계정만) */}
+                {canTrainer && (
+                  <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid rgba(255,247,232,.1)' }}>
+                    <div style={{ fontSize: 11, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 9 }}>보기 모드</div>
+                    <div style={{ display: 'flex', background: 'rgba(0,0,0,.25)', borderRadius: 13, padding: 4 }}>
+                      <button onClick={() => set({ role: 'client', view: 'health' })} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '11px 0', fontSize: 13.5, fontWeight: 700, borderRadius: 10, background: isClient ? '#C9A24B' : 'transparent', color: isClient ? '#060B17' : '#8A9BC0' }}>회원</button>
+                      <button onClick={() => set({ role: 'trainer', view: 'trainer' })} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '11px 0', fontSize: 13.5, fontWeight: 700, borderRadius: 10, background: isTrainer ? '#C9A24B' : 'transparent', color: isTrainer ? '#060B17' : '#8A9BC0' }}>트레이너</button>
+                    </div>
+                  </div>
+                )}
+
                 {be.configured && be.session && (
                   <button onClick={doLogout} style={{ all: 'unset', cursor: 'pointer', marginTop: 14, textAlign: 'center', display: 'block', width: '100%', fontSize: 13.5, fontWeight: 600, color: 'rgba(231,239,234,.6)', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: 12, borderRadius: 24 }}>로그아웃</button>
                 )}
@@ -1076,6 +1089,8 @@ export default function Portal() {
           )}
         </div>
       </main>
+
+      {!showLogin && <TabBar view={s.view} go={go} chatBadge={be.configured ? undefined : 4} />}
 
       {/* 결과지 라이트박스 */}
       {s.scanOpen && (

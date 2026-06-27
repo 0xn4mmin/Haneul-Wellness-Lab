@@ -1,9 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import Intro from './pages/Intro'
 import Portal from './pages/Portal'
+
+registerSW({ immediate: true })
 
 const router = createBrowserRouter([
   { path: '/', element: <Intro /> },

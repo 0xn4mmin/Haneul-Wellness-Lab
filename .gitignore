@@ -9,3 +9,5 @@ dist
 
 # generated demo artifacts
 *.mp4
+
+vite.config.ts.timestamp-*

@@ -111,9 +111,9 @@ export default function Intro() {
 
         {/* NAV */}
         <nav style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 60, display: 'flex', alignItems: 'center', gap: 14, padding: '18px clamp(18px,4vw,40px)' }}>
-          <a href={PORTAL} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 11, flex: 'none' }}>
-            <img src="/assets/logo-mark.png" alt="로고" style={{ width: 36, height: 36, objectFit: 'contain' }} />
-            <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 19, letterSpacing: '.4px', color: '#fff' }}>Haneul Wellness Lab</span>
+          <a href={PORTAL} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 11, flex: 'none', minWidth: 0 }}>
+            <img src="/assets/logo-mark.png" alt="로고" style={{ width: 36, height: 36, objectFit: 'contain', flex: 'none' }} />
+            <span className="hwl-wordmark" style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 19, letterSpacing: '.4px', color: '#fff', whiteSpace: 'nowrap' }}>Haneul Wellness Lab</span>
           </a>
           <div className="hwl-pill" style={{ marginLeft: 'auto', marginRight: 'auto', alignItems: 'center', gap: 2, background: 'rgba(255,255,255,.07)', backdropFilter: 'blur(14px)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 30, padding: 6 }}>
             <span style={{ padding: '8px 16px', borderRadius: 22, fontSize: 13.5, fontWeight: 600, color: '#060A16', background: '#EAF3F1' }}>소개</span>
@@ -121,9 +121,9 @@ export default function Intro() {
             <span style={{ padding: '8px 16px', borderRadius: 22, fontSize: 13.5, fontWeight: 500, color: 'rgba(234,243,241,.8)' }}>데이터</span>
             <span style={{ padding: '8px 16px', borderRadius: 22, fontSize: 13.5, fontWeight: 500, color: 'rgba(234,243,241,.8)' }}>커뮤니티</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <a href={PORTAL} className="hwl-glass-hover" style={{ textDecoration: 'none', fontSize: 13.5, fontWeight: 600, color: '#EAF3F1', padding: '11px 18px', borderRadius: 24, background: 'rgba(255,255,255,.07)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,.15)' }}>회원 로그인</a>
-            <a href={PORTAL} className="hwl-bright-hover" style={{ textDecoration: 'none', fontSize: 13.5, fontWeight: 700, color: '#060A16', background: 'linear-gradient(110deg,#67D7DF,#16C0CE)', padding: '11px 20px', borderRadius: 24, boxShadow: '0 12px 28px -12px rgba(22,192,206,.9)' }}>시작하기</a>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
+            <a href={PORTAL} className="hwl-glass-hover hwl-nav-login" style={{ textDecoration: 'none', fontSize: 13.5, fontWeight: 600, color: '#EAF3F1', padding: '11px 18px', borderRadius: 24, background: 'rgba(255,255,255,.07)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,.15)', whiteSpace: 'nowrap', flexShrink: 0 }}>회원 로그인</a>
+            <a href={PORTAL} className="hwl-bright-hover" style={{ textDecoration: 'none', fontSize: 13.5, fontWeight: 700, color: '#060A16', background: 'linear-gradient(110deg,#67D7DF,#16C0CE)', padding: '11px 20px', borderRadius: 24, boxShadow: '0 12px 28px -12px rgba(22,192,206,.9)', whiteSpace: 'nowrap', flexShrink: 0 }}>시작하기</a>
           </div>
         </nav>
 

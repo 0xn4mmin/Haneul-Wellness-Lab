@@ -85,3 +85,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
   .hwl-hero-name{font-size:21px!important}
   .hwl-header-chip{font-size:11px!important;padding:7px 10px!important}
 }
+/* intro nav: drop the long wordmark on small screens so CTAs never squish */
+@media(max-width:520px){
+  .hwl-wordmark{display:none}
+  .hwl-nav-login{display:none}
+}

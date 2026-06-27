@@ -419,9 +419,11 @@ export default function Portal() {
             <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', marginTop: 3 }}>{titles[s.view][1]}</div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="hwl-header-chip" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#9FE2E8', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 11, padding: '8px 13px', whiteSpace: 'nowrap' }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 3px rgba(46,155,166,.25)' }} />다음 측정까지 19일
-            </div>
+            {s.view === 'health' && (
+              <div className="hwl-header-chip" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#9FE2E8', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 11, padding: '8px 13px', whiteSpace: 'nowrap' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 3px rgba(46,155,166,.25)' }} />다음 측정까지 19일
+              </div>
+            )}
           </div>
         </header>
 

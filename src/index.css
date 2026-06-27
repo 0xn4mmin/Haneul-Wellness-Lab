@@ -56,8 +56,11 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
     padding:9px 2px 8px;min-height:54px;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .hwl-tab-label{font-size:10px;font-weight:600;letter-spacing:-.2px}
 
-  .hwl-2col{grid-template-columns:1fr!important;gap:14px!important}
-  .hwl-chat-grid{grid-template-columns:1fr!important;gap:14px!important}
+  /* minmax(0,1fr) — NOT 1fr — so the column can shrink below its content's
+     intrinsic width (SVG charts default to viewBox width and would otherwise
+     force the card to overflow the screen) */
+  .hwl-2col{grid-template-columns:minmax(0,1fr)!important;gap:14px!important}
+  .hwl-chat-grid{grid-template-columns:minmax(0,1fr)!important;gap:14px!important}
   .hwl-content{padding:16px 14px calc(86px + env(safe-area-inset-bottom))!important}
   .hwl-header{padding:calc(12px + env(safe-area-inset-top)) 16px 12px!important;gap:10px!important}
   .hwl-hero{padding:20px 18px!important}

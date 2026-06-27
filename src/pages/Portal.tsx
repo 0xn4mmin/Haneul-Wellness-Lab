@@ -20,6 +20,15 @@ const eyebrow: React.CSSProperties = { fontSize: 11, letterSpacing: '2.5px', tex
 const cardTitle: React.CSSProperties = { fontFamily: "'Gowun Batang',serif", fontSize: 21, marginTop: 3, color: '#F2F7F3' }
 const ringCirc = 2 * Math.PI * 34
 
+// Highlights @멘션 tokens in teal.
+function renderMentions(text: string): React.ReactNode {
+  return text.split(/(@[가-힣A-Za-z0-9_]+)/g).map((part, i) =>
+    part.startsWith('@')
+      ? <span key={i} style={{ color: '#67D7DF', fontWeight: 600 }}>{part}</span>
+      : part,
+  )
+}
+
 function Avatar({ initials, color, size, photo, fontSize, ring }: { initials: string; color: string; size: number; photo?: string | null; fontSize: number; ring?: string }) {
   return (
     <div style={{ position: 'relative', width: size, height: size, borderRadius: '50%', overflow: 'hidden', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize, flex: 'none', boxShadow: ring }}>
@@ -314,6 +323,7 @@ export default function Portal() {
   const commentsSource = be.configured ? (be.chartComments ?? []) : (s.commentsByMetric[sel] || [])
   const comments = commentsSource.map((c) => ({ ...c, tag: c.role === 'trainer' ? '코치' : (c.role === 'me' ? '나' : '회원'), tagBg: c.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF' }))
   const feedbackThread = be.configured ? (be.coachFeedback ?? []) : s.coachFeedback
+  const mentionNames = [...new Set([...(be.configured ? (be.members ?? []) : s.members).map((m) => m.name), '코치 하늘'])]
   const postsSource = be.configured ? (be.posts ?? []) : s.posts
   const postsDisp = postsSource.map((p) => ({ ...p, tag: p.role === 'trainer' ? '코치' : (p.role === 'me' ? '나' : '회원'), tagBg: p.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF', ring: p.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none', likeColor: p.liked ? '#E0A06A' : 'rgba(231,239,234,.6)', likeFill: p.liked ? '#E0A06A' : 'none', commentCount: p.comments.length }))
 
@@ -800,8 +810,13 @@ export default function Portal() {
               <section style={{ ...card, borderRadius: 22, padding: 18, marginBottom: 20 }}>
                 <div style={{ display: 'flex', gap: 12 }}>
                   <Avatar initials={meDisp.initials} color={meDisp.color} size={42} fontSize={13} />
-                  <textarea value={s.newPost} onChange={(e) => set({ newPost: e.target.value })} placeholder="오늘의 성과나 궁금한 점을 나눠보세요…" style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, lineHeight: 1.5, padding: '11px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', resize: 'none', minHeight: 54, color: '#EAF3F1' }} />
+                  <textarea value={s.newPost} onChange={(e) => set({ newPost: e.target.value })} placeholder="오늘의 성과나 궁금한 점을 나눠보세요… (@로 멘션)" style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, lineHeight: 1.5, padding: '11px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', resize: 'none', minHeight: 54, color: '#EAF3F1' }} />
                 </div>
+                {(() => { const m = s.newPost.match(/@([가-힣A-Za-z0-9_]*)$/); if (!m) return null; const q = m[1]; const hits = mentionNames.filter((n) => n.includes(q)).slice(0, 5); if (!hits.length) return null; return (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 9 }}>
+                    {hits.map((n) => <button key={n} onClick={() => set({ newPost: s.newPost.replace(/@[가-힣A-Za-z0-9_]*$/, `@${n} `) })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 14, padding: '5px 11px' }}>@{n}</button>)}
+                  </div>
+                ) })()}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 11 }}>
                   <button onClick={submitPost} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 22px', borderRadius: 22 }}>피드에 올리기</button>
                 </div>
@@ -816,7 +831,7 @@ export default function Portal() {
                       <div style={{ fontSize: 12, color: 'rgba(231,239,234,.4)' }}>{p.time}</div>
                     </div>
                   </div>
-                  <div style={{ fontSize: 15, lineHeight: 1.65, color: 'rgba(231,239,234,.85)', margin: '14px 2px 4px', whiteSpace: 'pre-wrap' }}>{p.text}</div>
+                  <div style={{ fontSize: 15, lineHeight: 1.65, color: 'rgba(231,239,234,.85)', margin: '14px 2px 4px', whiteSpace: 'pre-wrap' }}>{renderMentions(p.text)}</div>
                   {p.hasMetric && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 13, background: 'rgba(46,155,166,.12)', border: '1px solid rgba(103,215,223,.25)', borderRadius: 14, padding: '13px 15px', margin: '6px 0 2px' }}>
                       <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 30, color: '#67D7DF' }}>{p.metricVal}</div>
@@ -837,12 +852,20 @@ export default function Portal() {
                       {p.comments.map((cm, i) => (
                         <div key={i} style={{ display: 'flex', gap: 10 }}>
                           <Avatar initials={cm.initials} color={cm.color} size={30} fontSize={10.5} />
-                          <div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px', flex: 1 }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{cm.author}</span> <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{cm.text}</span></div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px' }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{cm.author}</span> <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{renderMentions(cm.text)}</span></div>
+                            <button onClick={() => { onPostDraftChange(p.id, `@${cm.author} `); document.getElementById(`cmt-${p.id}`)?.focus() }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(157,175,203,.8)', marginTop: 4, marginLeft: 4 }}>답글</button>
+                          </div>
                         </div>
                       ))}
+                      {(() => { const m = String(p.draft).match(/@([가-힣A-Za-z0-9_]*)$/); if (!m) return null; const q = m[1]; const hits = mentionNames.filter((n) => n.includes(q)).slice(0, 5); if (!hits.length) return null; return (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                          {hits.map((n) => <button key={n} onClick={() => onPostDraftChange(p.id, String(p.draft).replace(/@[가-힣A-Za-z0-9_]*$/, `@${n} `))} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 14, padding: '5px 11px' }}>@{n}</button>)}
+                        </div>
+                      ) })()}
                       <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 2 }}>
                         <Avatar initials={meDisp.initials} color={meDisp.color} size={30} fontSize={10.5} />
-                        <input value={p.draft} onChange={(e) => onPostDraftChange(p.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onPostCommentSubmit(p.id) } }} placeholder="댓글을 입력하세요…" style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 13, padding: '9px 14px', borderRadius: 18, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
+                        <input id={`cmt-${p.id}`} value={p.draft} onChange={(e) => onPostDraftChange(p.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onPostCommentSubmit(p.id) } }} placeholder="댓글 · @로 멘션…" style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 13, padding: '9px 14px', borderRadius: 18, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
                         <button onClick={() => onPostCommentSubmit(p.id)} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 600, color: '#67D7DF' }}>댓글</button>
                       </div>
                     </div>

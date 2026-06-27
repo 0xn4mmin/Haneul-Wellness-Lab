@@ -199,7 +199,12 @@ export default function Portal() {
     { focus: '취약 구간', summary: '팔·다리 균형은 좋지만 몸통(트렁크)이 상대적으로 낮습니다. 남은 목표 중 골격근 +' + gapSmm + 'kg가 핵심이고, 여기서 인바디 점수 ' + gapScore + '점을 끌어올릴 여지가 큽니다.', actions: ['데드리프트·바벨로우 주 2회', '복부·코어 10분 루틴', '점진적 과부하로 중량 +2.5kg'] },
     { focus: '생활 습관', summary: '최근 평균 수면은 ' + avgSleep + '시간이에요. 수면이 7시간을 넘은 주에 체지방 감소 폭이 가장 컸습니다. 수면·수분을 고정하면 지금 흐름이 더 빨라져요.', actions: [(avgSleep < 7 ? '취침 24시 이전으로 당겨 7시간 확보' : '수면 7시간 이상 유지'), '하루 물 2.5L 채우기', '주말 액티브 리커버리 1회'] },
   ]
-  const brief = briefVariants[s.briefIdx % briefVariants.length]
+  // Prefer the cached AI briefing (generated at measurement time); fall back to
+  // the rule-based variants until one exists (or in mock mode).
+  const ruleBrief = briefVariants[s.briefIdx % briefVariants.length]
+  const aiBrief = be.configured && be.session ? be.briefing : null
+  const brief = aiBrief ?? ruleBrief
+  const briefIsAI = !!aiBrief
 
   const mkRing = (label: string, cur: number, goal: number, start: number, unit: string, down: boolean, color: string) => {
     let p = down ? (start - cur) / ((start - goal) || 1) : cur / (goal || 1)
@@ -419,10 +424,15 @@ export default function Portal() {
                   <div><div style={eyebrow}>AI Coach Briefing</div><div style={cardTitle}>이번 달 코치 브리핑</div></div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 14, padding: '4px 10px' }}>{brief.focus}</span>
-                    <button onClick={() => setFn((p) => ({ briefIdx: (p.briefIdx + 1) % briefVariants.length }))} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '6px 12px' }}>다시 생성</button>
+                    {briefIsAI ? (
+                      <button onClick={be.regenBriefing} disabled={be.briefingBusy || be.briefingRemaining <= 0} title={`이번 주 ${be.briefingRemaining}회 남음`} style={{ all: 'unset', cursor: be.briefingBusy || be.briefingRemaining <= 0 ? 'default' : 'pointer', fontSize: 11.5, fontWeight: 600, color: be.briefingRemaining <= 0 ? 'rgba(231,239,234,.4)' : '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '6px 12px', opacity: be.briefingBusy ? 0.7 : 1 }}>{be.briefingBusy ? '생성 중…' : `다시 생성 · ${be.briefingRemaining}/2`}</button>
+                    ) : (
+                      <button onClick={() => setFn((p) => ({ briefIdx: (p.briefIdx + 1) % briefVariants.length }))} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '6px 12px' }}>다시 생성</button>
+                    )}
                   </div>
                 </div>
                 <p style={{ fontSize: 14, lineHeight: 1.7, color: 'rgba(231,239,234,.82)', margin: '14px 0 16px' }}>{brief.summary}</p>
+                {briefIsAI && be.briefingMsg && <div style={{ fontSize: 11.5, color: be.briefingRemaining <= 0 ? '#E0A06A' : '#9FE2E8', margin: '-8px 0 12px' }}>{be.briefingMsg}</div>}
                 <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 9 }}>다음 2주 액션</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {brief.actions.map((a, i) => (

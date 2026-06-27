@@ -88,6 +88,12 @@ export interface Backend {
   // trainer
   roster: RosterRow[] | null
   addCoachNote: (memberId: string, metricKey: string, text: string) => Promise<string>
+  // AI briefing (measurement-cached, manual regen ≤ 2/week)
+  briefing: { focus: string; summary: string; actions: string[] } | null
+  briefingBusy: boolean
+  briefingRemaining: number   // manual regens left this week (0–2)
+  briefingMsg: string
+  regenBriefing: () => void
 }
 
 export function useBackend(): Backend {
@@ -104,6 +110,10 @@ export function useBackend(): Backend {
   const [activeMember, setActiveMember] = useState<ActiveMemberDetail | null>(null)
   const [chartComments, setChartComments] = useState<ChartCommentView[] | null>(null)
   const [roster, setRoster] = useState<RosterRow[] | null>(null)
+  const [briefing, setBriefing] = useState<{ focus: string; summary: string; actions: string[] } | null>(null)
+  const [briefingBusy, setBriefingBusy] = useState(false)
+  const [briefingUsed, setBriefingUsed] = useState(0)
+  const [briefingMsg, setBriefingMsg] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const roomId = useRef<string | null>(null)
   const postUi = useRef<Record<string, { open: boolean; draft: string }>>({})
@@ -158,6 +168,7 @@ export function useBackend(): Backend {
     if (!supabase || !meId) {
       setRemoteMetrics(null); setRemoteDates(null); setPrivacyState(null); setProfile(null)
       setPosts(null); setMessages(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
+      setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
       roomId.current = null
       return
     }
@@ -183,6 +194,12 @@ export function useBackend(): Backend {
             : null
           setProfile({ name: prof.name, initials: prof.initials, color: prof.avatar_color, birth: prof.birth, gender: prof.gender, phone: prof.phone, photoUrl })
         }
+        const [latestBrief, used] = await Promise.all([
+          api.fetchLatestBriefing(meId), api.manualBriefingsThisWeek(meId),
+        ])
+        if (cancelled) return
+        setBriefing(latestBrief ? { focus: latestBrief.focus, summary: latestBrief.summary, actions: latestBrief.actions } : null)
+        setBriefingUsed(used)
         await Promise.all([reloadPosts(), reloadMembers()])
         roomId.current = await api.getOrCreateDefaultRoom()
         await reloadMessages()
@@ -192,6 +209,18 @@ export function useBackend(): Backend {
     })()
     return () => { cancelled = true }
   }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages])
+
+  // realtime: a new briefing finished → show it, clear busy, count manual usage
+  useEffect(() => {
+    if (!supabase || !meId) return
+    const unsub = api.subscribeBriefings(meId, (row) => {
+      setBriefing({ focus: row.focus, summary: row.summary, actions: row.actions })
+      setBriefingBusy(false)
+      setBriefingMsg('')
+      if (row.source === 'manual') setBriefingUsed((u) => u + 1)
+    })
+    return unsub
+  }, [meId])
 
   // realtime chat
   useEffect(() => {
@@ -332,8 +361,26 @@ export function useBackend(): Backend {
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), [])
 
+  const regenBriefing = useCallback(() => {
+    if (briefingBusy) return
+    setBriefingMsg('')
+    void (async () => {
+      const res = await api.requestBriefing('manual')
+      if (!res.ok) {
+        if (res.reason === 'rate_limited') setBriefingMsg('이번 주 재생성 2회를 모두 사용했어요.')
+        else setBriefingMsg(res.reason || '요청 실패')
+        return
+      }
+      setBriefingBusy(true)
+      setBriefingMsg('새 브리핑을 생성하고 있어요…')
+      // safety: clear the spinner if realtime is missed
+      setTimeout(() => setBriefingBusy((b) => (b ? false : b)), 30000)
+    })()
+  }, [briefingBusy])
+
   return {
     configured: isSupabaseConfigured, ready, session, loginError, signIn, signUp, signOut, reload,
+    briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, updateProfile, uploadAvatar,
     posts, createPost, toggleLike, toggleComments, setPostDraft, submitPostComment,

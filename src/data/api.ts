@@ -341,4 +341,43 @@ export async function commitOcrMeasurement(jobId: string, r: OcrResult): Promise
   const { error: rErr } = await sb.from('metric_readings').insert(rows)
   if (rErr) throw rErr
   await sb.from('ocr_jobs').update({ status: 'committed' }).eq('id', jobId)
+  // new measurement → enqueue a fresh AI briefing (measurement source, no rate limit)
+  await sb.rpc('request_briefing', { p_source: 'measurement' }).then(() => {}, () => {})
+}
+
+// ───────────────────── AI coach briefing ────────────────
+export interface BriefingRow { focus: string; summary: string; actions: string[]; source: 'measurement' | 'manual'; created_at: string }
+
+export async function fetchLatestBriefing(userId: string): Promise<BriefingRow | null> {
+  const { data } = await requireSupabase()
+    .from('briefings').select('focus, summary, actions, source, created_at')
+    .eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
+  return (data?.[0] as BriefingRow) ?? null
+}
+
+/** How many manual regenerations the user has used in the last 7 days. */
+export async function manualBriefingsThisWeek(userId: string): Promise<number> {
+  const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
+  const { count } = await requireSupabase()
+    .from('briefings').select('id', { count: 'exact', head: true })
+    .eq('user_id', userId).eq('source', 'manual').gte('created_at', since)
+  return count ?? 0
+}
+
+/** Requests a briefing. Returns {ok, reason?, used, limit}. RPC enforces the cap. */
+export async function requestBriefing(source: 'measurement' | 'manual'): Promise<{ ok: boolean; reason?: string; used?: number; limit?: number }> {
+  const { data, error } = await requireSupabase().rpc('request_briefing', { p_source: source })
+  if (error) return { ok: false, reason: error.message }
+  return data as { ok: boolean; reason?: string; used?: number; limit?: number }
+}
+
+/** Subscribe to new briefings for a user. Returns an unsubscribe fn. */
+export function subscribeBriefings(userId: string, onInsert: (row: BriefingRow) => void) {
+  const sb = requireSupabase()
+  const channel = sb
+    .channel(`briefings:${userId}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'briefings', filter: `user_id=eq.${userId}` },
+      (payload) => onInsert(payload.new as BriefingRow))
+    .subscribe()
+  return () => { sb.removeChannel(channel) }
 }

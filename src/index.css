@@ -71,10 +71,14 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
   /* prevent iOS zoom-on-focus: inputs must be >=16px */
   input,textarea,select{font-size:16px!important}
 
-  /* chip rows scroll horizontally instead of cramped wrapping */
+  /* chip rows scroll horizontally instead of cramped wrapping.
+     !important is required: the chips use inline `all:unset`, and inline
+     styles beat non-important class rules — without it flex-shrink stays 1
+     and the chip text wraps vertically. */
   .hwl-chiprow{flex-wrap:nowrap!important;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none}
   .hwl-chiprow::-webkit-scrollbar{display:none}
-  .hwl-chiprow > *{flex:0 0 auto}
+  .hwl-chiprow > *{flex:0 0 auto!important;white-space:nowrap!important}
+  .hwl-chiprow > * *{white-space:nowrap!important}
 
   /* brief card header stacks so title/button never collide */
   .hwl-brief-head{flex-direction:column;align-items:flex-start!important;gap:10px!important}

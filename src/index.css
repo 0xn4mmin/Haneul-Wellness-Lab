@@ -34,3 +34,26 @@ body{background:#060B17;font-family:'Pretendard',system-ui,sans-serif;color:#E7E
 
 input::placeholder,textarea::placeholder{color:rgba(231,239,234,.4)}
 input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
+
+/* portal responsive */
+.hwl-hamburger{display:none}
+.hwl-backdrop{display:none}
+.hwl-roster-wrap{overflow-x:auto}
+@media(max-width:880px){
+  .hwl-sidebar{position:fixed!important;top:0;left:0;height:100vh!important;z-index:300;width:268px!important;transform:translateX(-100%);transition:transform .25s ease}
+  .hwl-sidebar.open{transform:translateX(0);box-shadow:0 0 70px rgba(0,0,0,.7)}
+  .hwl-backdrop.show{display:block;position:fixed;inset:0;z-index:290;background:rgba(4,9,18,.55);backdrop-filter:blur(2px)}
+  .hwl-hamburger{display:flex!important}
+  .hwl-2col{grid-template-columns:1fr!important}
+  .hwl-chat-grid{grid-template-columns:1fr!important}
+  .hwl-content{padding:18px 16px 60px!important}
+  .hwl-header{padding:14px 16px!important;gap:12px!important}
+  .hwl-hero{padding:20px 18px!important}
+  .hwl-hero-stats{margin-left:0!important;width:100%}
+  .hwl-roster-inner{min-width:560px}
+  .hwl-chat-panel{height:auto!important;min-height:460px}
+}
+@media(max-width:560px){
+  .hwl-page-title{font-size:21px!important}
+  .hwl-hero-name{font-size:21px!important}
+}

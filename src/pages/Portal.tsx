@@ -35,6 +35,8 @@ export default function Portal() {
 
   const be = useBackend()
 
+  const [mobileNav, setMobileNav] = useState(false)
+
   // chat-room UI (backend mode)
   const [chatModal, setChatModal] = useState<'none' | 'create' | 'join'>('none')
   const [roomName, setRoomName] = useState('')
@@ -73,7 +75,7 @@ export default function Portal() {
   }, [be.configured, be.session, s.selectedMetric])
 
   // ---- handlers -----------------------------------------------------------
-  const go = (v: View) => set({ view: v, activeMember: null })
+  const go = (v: View) => { set({ view: v, activeMember: null }); setMobileNav(false) }
   const togglePrivacy = (key: string) => setFn((p) => ({ privacy: { ...p.privacy, [key]: p.privacy[key] === 'public' ? 'private' : 'public' } }))
   const onProfileField = (k: keyof PortalState['profile'], v: string) => setFn((p) => ({ profile: { ...p.profile, [k]: v } }))
   const onPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,6 +159,8 @@ export default function Portal() {
   // ---- derived values (mirror of renderVals) ------------------------------
   const isTrainer = s.role === 'trainer'
   const isClient = !isTrainer
+  // only accounts whose real role is trainer may use the trainer view (mock mode allows it for the demo)
+  const canTrainer = be.configured ? be.profile?.role === 'trainer' : true
   const navColor = (k: View) => { const a = s.view === k; return { bg: a ? 'linear-gradient(110deg,#2E9BA6,#247E88)' : 'transparent', fg: a ? '#060B17' : '#9DAFCB' } }
 
   // Data source for the OWN dashboard: real (Supabase) when signed in, else mock.
@@ -282,14 +286,18 @@ export default function Portal() {
   const messages = messagesSource.map((m) => { const isMe = m.role === 'me'; return { ...m, dir: (isMe ? 'row-reverse' : 'row') as React.CSSProperties['flexDirection'], justify: isMe ? 'flex-end' : 'flex-start', radius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px', bubbleBg: isMe ? 'linear-gradient(135deg,#2E9BA6,#1E6E78)' : (m.role === 'trainer' ? 'rgba(46,155,166,.14)' : 'rgba(255,255,255,.06)'), bubbleFg: isMe ? '#060B17' : '#E7EFEA', bubbleBorder: isMe ? 'transparent' : (m.role === 'trainer' ? 'rgba(103,215,223,.25)' : 'rgba(255,255,255,.1)'), ring: m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none' } })
   const chatRooms = be.configured ? (be.rooms ?? []) : null
   const activeRoom = chatRooms?.find((r) => r.id === be.activeRoomId) ?? null
-  const roomTitle = activeRoom ? activeRoom.name : '하늘 라운지'
-  const onlineMembers = [
+  const roomTitle = activeRoom ? activeRoom.name : '그룹 채팅'
+  const hasRooms = !be.configured || (chatRooms != null && chatRooms.length > 0)
+  const mockOnline = [
     { name: '코치 하늘', initials: '하늘', color: '#234B47', role: '트레이너', statusColor: '#2E9BA6' },
     { name: '이민서', initials: '민서', color: '#BE7A57', role: '회원', statusColor: '#2E9BA6' },
     { name: '조다온', initials: '다온', color: '#C29A4B', role: '회원', statusColor: '#2E9BA6' },
     { name: '박지우 (나)', initials: '지우', color: '#6E9B8E', role: '회원', statusColor: '#2E9BA6' },
     { name: '김아리', initials: '아리', color: '#5E97A0', role: '회원', statusColor: '#D6B25A' },
   ]
+  const onlineMembers = be.configured
+    ? be.roomMembers.map((m) => ({ name: m.name, initials: m.initials, color: m.color, role: m.role === 'trainer' ? '트레이너' : '회원', statusColor: '#2E9BA6' }))
+    : mockOnline
 
   const segs = segData.map((seg) => { const c = segColor(seg.pct); const selS = s.selectedSegment === seg.key; return { ...seg, color: c, border: selS ? c : 'rgba(255,255,255,.12)', chipBg: selS ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.04)' } })
   const selSeg = (() => { const ss = segData.find((x) => x.key === s.selectedSegment) || segData[2]; const st = ss.pct >= 100 ? '표준 이상 · 우수' : (ss.pct >= 95 ? '표준 범위' : '표준 이하'); return { name: ss.name, pct: ss.pct, kg: ss.kg, color: segColor(ss.pct), status: st } })()
@@ -353,7 +361,8 @@ export default function Portal() {
       )}
 
       {/* SIDEBAR */}
-      <aside style={{ position: 'sticky', top: 0, zIndex: 3, width: 248, flex: 'none', height: '100vh', display: 'flex', flexDirection: 'column', gap: 6, padding: '26px 18px', background: 'linear-gradient(176deg,#112146 0%,#0C1733 52%,#080F22 100%)', borderRight: '1px solid rgba(184,148,85,.2)', color: '#E7EFEA', boxShadow: '18px 0 50px -40px rgba(0,0,0,.9)' }}>
+      <div className={`hwl-backdrop${mobileNav ? ' show' : ''}`} onClick={() => setMobileNav(false)} />
+      <aside className={`hwl-sidebar${mobileNav ? ' open' : ''}`} style={{ position: 'sticky', top: 0, zIndex: 3, width: 248, flex: 'none', height: '100vh', display: 'flex', flexDirection: 'column', gap: 6, padding: '26px 18px', background: 'linear-gradient(176deg,#112146 0%,#0C1733 52%,#080F22 100%)', borderRight: '1px solid rgba(184,148,85,.2)', color: '#E7EFEA', boxShadow: '18px 0 50px -40px rgba(0,0,0,.9)' }}>
         <a href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 11, padding: '4px 8px 22px' }}>
           <div style={{ width: 46, height: 46, borderRadius: 14, background: 'rgba(255,255,255,.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', overflow: 'hidden', boxShadow: '0 8px 18px -10px rgba(0,0,0,.7)' }}>
             <img src="/assets/logo-mark.png" alt="로고" style={{ width: '118%', height: '118%', objectFit: 'contain' }} />
@@ -386,7 +395,7 @@ export default function Portal() {
           <div style={{ fontSize: 10, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#6E7CA0', padding: '0 6px' }}>보기 모드</div>
           <div style={{ display: 'flex', background: 'rgba(0,0,0,.3)', borderRadius: 12, padding: 4 }}>
             <button onClick={() => set({ role: 'client', view: s.view === 'trainer' ? 'health' : s.view })} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '8px 0', fontSize: 12.5, fontWeight: 600, borderRadius: 9, transition: 'all .2s', background: isClient ? '#C9A24B' : 'transparent', color: isClient ? '#060B17' : '#8A9BC0' }}>회원</button>
-            <button onClick={() => set({ role: 'trainer', view: 'trainer' })} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '8px 0', fontSize: 12.5, fontWeight: 600, borderRadius: 9, transition: 'all .2s', background: isTrainer ? '#C9A24B' : 'transparent', color: isTrainer ? '#060B17' : '#8A9BC0' }}>트레이너</button>
+            <button onClick={() => { if (canTrainer) set({ role: 'trainer', view: 'trainer' }) }} title={canTrainer ? '' : '트레이너 계정만 사용할 수 있어요'} style={{ all: 'unset', cursor: canTrainer ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', padding: '8px 0', fontSize: 12.5, fontWeight: 600, borderRadius: 9, transition: 'all .2s', background: isTrainer ? '#C9A24B' : 'transparent', color: isTrainer ? '#060B17' : (canTrainer ? '#8A9BC0' : 'rgba(138,155,192,.4)'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>{!canTrainer && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(138,155,192,.5)" strokeWidth="2"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}트레이너</button>
           </div>
           <button onClick={() => go('profile')} className="hwl-soft-hover" style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: 8, borderRadius: 12 }}>
             <Avatar initials={meDisp.initials} color={meDisp.color} size={34} photo={isTrainer ? null : (be.profile?.photoUrl ?? P.photo)} fontSize={12} />
@@ -400,9 +409,12 @@ export default function Portal() {
 
       {/* MAIN */}
       <main style={{ position: 'relative', zIndex: 1, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 18, padding: '18px 34px', background: 'rgba(8,12,26,.66)', backdropFilter: 'blur(18px) saturate(1.2)', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+        <header className="hwl-header" style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 18, padding: '18px 34px', background: 'rgba(8,12,26,.66)', backdropFilter: 'blur(18px) saturate(1.2)', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+          <button className="hwl-hamburger" onClick={() => setMobileNav(true)} aria-label="메뉴" style={{ all: 'unset', cursor: 'pointer', width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center', flex: 'none', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9DAFCB" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" /></svg>
+          </button>
           <div style={{ lineHeight: 1.15 }}>
-            <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, letterSpacing: '.2px', color: '#F2F7F3' }}>{titles[s.view][0]}</div>
+            <div className="hwl-page-title" style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, letterSpacing: '.2px', color: '#F2F7F3' }}>{titles[s.view][0]}</div>
             <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', marginTop: 3 }}>{titles[s.view][1]}</div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -412,22 +424,22 @@ export default function Portal() {
           </div>
         </header>
 
-        <div style={{ flex: 1, minWidth: 0, padding: '26px 34px 60px', maxWidth: 1180, width: '100%', margin: '0 auto' }}>
+        <div className="hwl-content" style={{ flex: 1, minWidth: 0, padding: '26px 34px 60px', maxWidth: 1180, width: '100%', margin: '0 auto' }}>
           {/* ============ 나의 건강 ============ */}
           <div style={{ display: s.view === 'health' ? 'block' : 'none', animation: 'hwl-rise .4s ease both' }}>
             {/* HERO BAND */}
-            <section style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(120deg,#1B2A52 0%,#122046 55%,#1D2E58 100%)', border: '1px solid rgba(184,148,85,.18)', borderRadius: 26, padding: '24px 30px', marginBottom: 20, boxShadow: '0 30px 64px -44px rgba(0,0,0,.9)', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+            <section className="hwl-hero" style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(120deg,#1B2A52 0%,#122046 55%,#1D2E58 100%)', border: '1px solid rgba(184,148,85,.18)', borderRadius: 26, padding: '24px 30px', marginBottom: 20, boxShadow: '0 30px 64px -44px rgba(0,0,0,.9)', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
               <div style={{ position: 'absolute', top: '-55%', right: '7%', width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle,rgba(46,155,166,.45),transparent 65%)', filter: 'blur(38px)', pointerEvents: 'none' }} />
               <div style={{ position: 'absolute', bottom: '-65%', left: '28%', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle,rgba(184,148,85,.34),transparent 68%)', filter: 'blur(36px)', pointerEvents: 'none' }} />
               <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 16 }}>
                 <div style={{ width: 60, height: 60, borderRadius: '50%', flex: 'none', background: meDisp.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 18, boxShadow: '0 0 0 2px rgba(184,148,85,.6),0 10px 24px -10px rgba(0,0,0,.6)' }}>{meDisp.initials}</div>
                 <div>
                   <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#C9A24B' }}>My Wellness</div>
-                  <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, color: '#F3EFE6', marginTop: 2 }}>{meDisp.name}</div>
+                  <div className="hwl-hero-name" style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, color: '#F3EFE6', marginTop: 2 }}>{meDisp.name}</div>
                   <div style={{ fontSize: 12.5, color: '#9DAFCB', marginTop: 3 }}>171cm · 26세 · 남성 · {dateLatest} 측정</div>
                 </div>
               </div>
-              <div style={{ position: 'relative', zIndex: 2, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 26, flexWrap: 'wrap' }}>
+              <div className="hwl-hero-stats" style={{ position: 'relative', zIndex: 2, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 26, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: 22 }}>
                   <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체지방률</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.pbf.series[M.pbf.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> %</span></div></div>
                   <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>골격근량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.smm.series[M.smm.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
@@ -447,7 +459,7 @@ export default function Portal() {
             </section>
 
             {/* BRIEFING + GOAL RINGS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 20, marginBottom: 20 }}>
+            <div className="hwl-2col" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 20, marginBottom: 20 }}>
               <section style={{ ...card, padding: 22, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                   <div><div style={eyebrow}>AI Coach Briefing</div><div style={cardTitle}>이번 달 코치 브리핑</div></div>
@@ -491,7 +503,7 @@ export default function Portal() {
             </div>
 
             {/* 3D MODEL + GAUGES */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,1fr)', gap: 20, alignItems: 'stretch' }}>
+            <div className="hwl-2col" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,1fr)', gap: 20, alignItems: 'stretch' }}>
               <section style={{ ...card, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '20px 22px 4px', position: 'relative', zIndex: 2 }}>
                   <div>
@@ -550,7 +562,7 @@ export default function Portal() {
             </div>
 
             {/* TREND + RADAR */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.45fr) minmax(0,1fr)', gap: 20, marginTop: 20 }}>
+            <div className="hwl-2col" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.45fr) minmax(0,1fr)', gap: 20, marginTop: 20 }}>
               <section style={{ ...card, padding: 22 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                   <div><div style={eyebrow}>Trend</div><div style={cardTitle}>{trend.title} 추이</div></div>
@@ -623,7 +635,7 @@ export default function Portal() {
             </div>
 
             {/* RESEARCH + RECORDS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: 20, marginTop: 20 }}>
+            <div className="hwl-2col" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: 20, marginTop: 20 }}>
               <section style={{ ...card, padding: 22 }}>
                 <div style={eyebrow}>Research</div>
                 <div style={{ ...cardTitle, margin: '3px 0 16px' }}>측정 상세값</div>
@@ -655,7 +667,7 @@ export default function Portal() {
             </div>
 
             {/* COMPARE + LIFESTYLE */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1fr)', gap: 20, marginTop: 20 }}>
+            <div className="hwl-2col" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1fr)', gap: 20, marginTop: 20 }}>
               <section style={{ ...card, padding: 22 }}>
                 <div style={eyebrow}>Compare</div><div style={cardTitle}>변화 비교</div>
                 <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', margin: '14px 0 16px' }}>
@@ -830,15 +842,15 @@ export default function Portal() {
 
           {/* ============ 그룹 채팅 ============ */}
           {s.view === 'chat' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 224px', gap: 20, animation: 'hwl-rise .4s ease both' }}>
-              <section style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)', overflow: 'hidden' }}>
+            <div className="hwl-chat-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 224px', gap: 20, animation: 'hwl-rise .4s ease both' }}>
+              <section className="hwl-chat-panel" style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)', overflow: 'hidden' }}>
                 <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)' }} />
                   <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3' }}>{roomTitle}</div>
                   {activeRoom?.isPrivate && <span style={{ fontSize: 10.5, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 10, padding: '2px 8px' }}>비공개</span>}
-                  <div style={{ marginLeft: 'auto', fontSize: 11.5, color: 'rgba(231,239,234,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>{be.configured ? `${messages.length}개 메시지` : '5명 접속'}</div>
+                  <div style={{ marginLeft: 'auto', fontSize: 11.5, color: 'rgba(231,239,234,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>{be.configured ? (activeRoom ? `${messages.length}개 메시지` : '') : '5명 접속'}</div>
                 </div>
-                {chatRooms && chatRooms.length > 0 && (
+                {chatRooms != null && (
                   <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
                     {chatRooms.map((r) => {
                       const sel = r.id === be.activeRoomId
@@ -854,7 +866,17 @@ export default function Portal() {
                   </div>
                 )}
                 <div ref={chatRef} style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {messages.map((m) => (
+                  {be.configured && !hasRooms ? (
+                    <div style={{ margin: 'auto', textAlign: 'center', maxWidth: 280, padding: 20 }}>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.5)" strokeWidth="1.6" style={{ margin: '0 auto 12px' }}><path d="M4 5h16v10H9l-4 4v-4H4z" strokeLinejoin="round" /></svg>
+                      <div style={{ fontSize: 14.5, fontWeight: 600, color: '#EAF3F1', marginBottom: 6 }}>아직 채팅방이 없어요</div>
+                      <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', lineHeight: 1.6, marginBottom: 16 }}>새 방을 만들어 코드를 공유하거나, 받은 코드로 입장해 대화를 시작하세요.</div>
+                      <div style={{ display: 'flex', gap: 9, justifyContent: 'center' }}>
+                        <button onClick={() => { setChatErr(''); setChatModal('create') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 18px', borderRadius: 22 }}>+ 방 만들기</button>
+                        <button onClick={() => { setChatErr(''); setChatModal('join') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', padding: '10px 18px', borderRadius: 22 }}>코드로 입장</button>
+                      </div>
+                    </div>
+                  ) : messages.map((m) => (
                     <div key={m.id} style={{ display: 'flex', gap: 11, flexDirection: m.dir, animation: 'hwl-rise .3s ease both' }}>
                       <Avatar initials={m.initials} color={m.color} size={34} fontSize={11} ring={m.ring} />
                       <div style={{ maxWidth: '74%' }}>
@@ -865,7 +887,7 @@ export default function Portal() {
                   ))}
                 </div>
                 <div style={{ padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 11, alignItems: 'center' }}>
-                  <input value={s.newMsg} onChange={(e) => set({ newMsg: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder="메시지를 입력하세요…" style={{ flex: 1, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
+                  <input value={s.newMsg} disabled={be.configured && !activeRoom} onChange={(e) => set({ newMsg: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder={be.configured && !activeRoom ? '먼저 채팅방을 만들거나 입장하세요' : '메시지를 입력하세요…'} style={{ flex: 1, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1', opacity: be.configured && !activeRoom ? 0.5 : 1 }} />
                   <button onClick={sendMsg} style={{ all: 'unset', cursor: 'pointer', width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg,#67D7DF,#2E9BA6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#060B17" strokeWidth="2"><path d="M4 12l16-7-7 16-2-7z" strokeLinejoin="round" /></svg></button>
                 </div>
               </section>
@@ -1021,6 +1043,7 @@ export default function Portal() {
           {s.view === 'trainer' && (
             <div style={{ animation: 'hwl-rise .4s ease both' }}>
               <section style={{ ...card, padding: 8, overflow: 'hidden' }}>
+                <div className="hwl-roster-wrap"><div className="hwl-roster-inner">
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.3fr', gap: 8, padding: '14px 18px', fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>
                   <div>회원</div><div>인바디</div><div>체지방률</div><div>골격근</div><div>상태</div>
                 </div>
@@ -1033,6 +1056,7 @@ export default function Portal() {
                     <div><span style={{ fontSize: 11.5, fontWeight: 600, color: r.statusFg, background: r.statusBg, padding: '4px 11px', borderRadius: 20 }}>{r.status}</span></div>
                   </div>
                 ))}
+                </div></div>
               </section>
               <section style={{ background: 'linear-gradient(165deg,#16264E,#101D3E)', border: '1px solid rgba(184,148,85,.18)', color: '#EAF3F1', borderRadius: 24, padding: 24, marginTop: 20, boxShadow: '0 26px 52px -40px rgba(0,0,0,.8)' }}>
                 <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 21, marginBottom: 4, color: '#F2F7F3' }}>코칭 노트 보내기</div>

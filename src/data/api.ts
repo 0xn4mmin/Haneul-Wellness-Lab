@@ -229,6 +229,19 @@ export async function joinRoomByCode(code: string): Promise<{ ok: boolean; reaso
   return data as { ok: boolean; reason?: string; room_id?: string; name?: string }
 }
 
+export interface RoomMember { name: string; initials: string; color: string; role: 'client' | 'trainer' }
+/** Members of a room (for the "접속 중" list). */
+export async function fetchRoomMembers(roomId: string): Promise<RoomMember[]> {
+  const { data } = await requireSupabase().from('room_members')
+    .select('profile:profiles!room_members_user_id_fkey(name, initials, avatar_color, role)')
+    .eq('room_id', roomId)
+  return ((data ?? []) as unknown[]).map((r) => {
+    const p = (r as { profile: any }).profile
+    const prof = Array.isArray(p) ? p[0] : p
+    return prof ? { name: prof.name, initials: prof.initials, color: prof.avatar_color, role: prof.role } : null
+  }).filter(Boolean) as RoomMember[]
+}
+
 // ───────────────────── profile / uploads ────────────────
 export async function updateProfile(patch: Partial<Pick<ProfileRow, 'name' | 'birth' | 'gender' | 'phone'>>) {
   const me = await uid()

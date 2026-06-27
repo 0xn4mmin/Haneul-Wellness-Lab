@@ -30,7 +30,7 @@ type Role = 'me' | 'trainer' | 'client'
 interface Author { name: string; initials: string; avatar_color: string; role?: Role }
 
 export interface BackendProfile {
-  name: string; initials: string; color: string
+  name: string; initials: string; color: string; role: 'client' | 'trainer'
   birth: string | null; gender: string | null; phone: string | null; photoUrl: string | null
 }
 export interface PostComment { author: string; initials: string; color: string; text: string }
@@ -79,6 +79,7 @@ export interface Backend {
   sendMessage: (text: string) => Promise<void>
   rooms: RoomView[] | null
   activeRoomId: string | null
+  roomMembers: { name: string; initials: string; color: string; role: 'client' | 'trainer' }[]
   selectRoom: (id: string) => void
   createRoom: (name: string, isPrivate: boolean) => Promise<void>
   joinRoom: (code: string) => Promise<{ ok: boolean; reason?: string }>
@@ -115,6 +116,7 @@ export function useBackend(): Backend {
   const [messages, setMessages] = useState<MessageView[] | null>(null)
   const [rooms, setRooms] = useState<RoomView[] | null>(null)
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
+  const [roomMembers, setRoomMembers] = useState<{ name: string; initials: string; color: string; role: 'client' | 'trainer' }[]>([])
   const [members, setMembers] = useState<MemberView[] | null>(null)
   const [activeMember, setActiveMember] = useState<ActiveMemberDetail | null>(null)
   const [chartComments, setChartComments] = useState<ChartCommentView[] | null>(null)
@@ -185,7 +187,7 @@ export function useBackend(): Backend {
       setRemoteMetrics(null); setRemoteDates(null); setPrivacyState(null); setProfile(null)
       setPosts(null); setMessages(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
-      setRooms(null); setActiveRoomId(null)
+      setRooms(null); setActiveRoomId(null); setRoomMembers([])
       roomId.current = null
       return
     }
@@ -209,7 +211,7 @@ export function useBackend(): Backend {
           const photoUrl = prof.photo_path
             ? supabase.storage.from('avatars').getPublicUrl(prof.photo_path).data.publicUrl
             : null
-          setProfile({ name: prof.name, initials: prof.initials, color: prof.avatar_color, birth: prof.birth, gender: prof.gender, phone: prof.phone, photoUrl })
+          setProfile({ name: prof.name, initials: prof.initials, color: prof.avatar_color, role: prof.role, birth: prof.birth, gender: prof.gender, phone: prof.phone, photoUrl })
         }
         const [latestBrief, used] = await Promise.all([
           api.fetchLatestBriefing(meId), api.manualBriefingsThisWeek(meId),
@@ -218,12 +220,12 @@ export function useBackend(): Backend {
         setBriefing(latestBrief ? { focus: latestBrief.focus, summary: latestBrief.summary, actions: latestBrief.actions } : null)
         setBriefingUsed(used)
         await Promise.all([reloadPosts(), reloadMembers()])
-        await api.getOrCreateDefaultRoom()   // ensure the shared lounge exists + joined
-        const myRooms = await reloadRooms()
+        const myRooms = await reloadRooms()   // no auto-created lounge — empty until the user makes/joins one
         const first = myRooms[0]?.id ?? null
         roomId.current = first
         setActiveRoomId(first)
-        await reloadMessages(first)
+        if (first) { await reloadMessages(first); setRoomMembers(await api.fetchRoomMembers(first)) }
+        else { setMessages([]); setRoomMembers([]) }
       } catch (e) {
         console.warn('[backend] load failed', e)
       }
@@ -318,6 +320,7 @@ export function useBackend(): Backend {
     setActiveRoomId(id)
     setMessages(null)
     void reloadMessages(id)
+    void api.fetchRoomMembers(id).then(setRoomMembers).catch(() => setRoomMembers([]))
   }, [reloadMessages])
 
   const createRoom = useCallback(async (name: string, isPrivate: boolean) => {
@@ -431,7 +434,7 @@ export function useBackend(): Backend {
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, updateProfile, uploadAvatar,
     posts, createPost, toggleLike, toggleComments, setPostDraft, submitPostComment,
-    messages, sendMessage, rooms, activeRoomId, selectRoom, createRoom, joinRoom,
+    messages, sendMessage, rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom,
     members, activeMember, openMember, closeMember, addMemberCheer,
     chartComments, loadChartComments, addChartComment,
     roster, addCoachNote,

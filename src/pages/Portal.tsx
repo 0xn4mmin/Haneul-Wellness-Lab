@@ -114,6 +114,14 @@ export default function Portal() {
     const post = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t, likes: 0, liked: false, open: false, comments: [], draft: '' }
     setFn((p) => ({ newPost: '', posts: [post, ...p.posts] }))
   }
+  const onDeletePost = (id: string | number) => {
+    if (be.configured) { void be.deletePost(String(id)); return }
+    setFn((p) => ({ posts: p.posts.filter((x) => x.id !== Number(id)) }))
+  }
+  const onDeleteComment = (postId: string | number, cmId: string | undefined, idx: number) => {
+    if (be.configured) { if (cmId) void be.deletePostComment(cmId); return }
+    setFn((p) => ({ posts: p.posts.map((x) => x.id === Number(postId) ? { ...x, comments: x.comments.filter((_c, i) => i !== idx) } : x) }))
+  }
   const toggleLike = (id: number) => setFn((p) => ({ posts: p.posts.map((x) => x.id === id ? { ...x, liked: !x.liked, likes: x.likes + (x.liked ? -1 : 1) } : x) }))
   const toggleComments = (id: number) => setFn((p) => ({ posts: p.posts.map((x) => x.id === id ? { ...x, open: !x.open } : x) }))
   const setPostDraft = (id: number, v: string) => setFn((p) => ({ posts: p.posts.map((x) => x.id === id ? { ...x, draft: v } : x) }))
@@ -163,7 +171,11 @@ export default function Portal() {
   }
   const createChallenge = () => {
     const t = (s.chTitle || '').trim() || '새 챌린지'
-    set({ showChallengeForm: false, chDone: '✓ “' + t + '” 챌린지가 생성되었어요.' })
+    if (be.configured) {
+      const weeks = parseInt(s.chPeriod, 10) || 4
+      void be.createChallenge({ title: t, metric: s.chMetric, goal: s.chGoal, weeks, scope: s.chScope === '비공개' ? 'private' : 'public' })
+    }
+    set({ showChallengeForm: false, chTitle: '', chDone: '✓ “' + t + '” 챌린지가 생성되었어요.' })
   }
 
   // auth: real Supabase when configured, else the local mock gate
@@ -325,7 +337,7 @@ export default function Portal() {
   const feedbackThread = be.configured ? (be.coachFeedback ?? []) : s.coachFeedback
   const mentionNames = [...new Set([...(be.configured ? (be.members ?? []) : s.members).map((m) => m.name), '코치 하늘'])]
   const postsSource = be.configured ? (be.posts ?? []) : s.posts
-  const postsDisp = postsSource.map((p) => ({ ...p, tag: p.role === 'trainer' ? '코치' : (p.role === 'me' ? '나' : '회원'), tagBg: p.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF', ring: p.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none', likeColor: p.liked ? '#E0A06A' : 'rgba(231,239,234,.6)', likeFill: p.liked ? '#E0A06A' : 'none', commentCount: p.comments.length }))
+  const postsDisp = postsSource.map((p) => ({ ...p, isOwn: be.configured ? (p as { isOwn?: boolean }).isOwn === true : p.role === 'me', tag: p.role === 'trainer' ? '코치' : (p.role === 'me' ? '나' : '회원'), tagBg: p.role === 'trainer' ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', tagFg: '#67D7DF', ring: p.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none', likeColor: p.liked ? '#E0A06A' : 'rgba(231,239,234,.6)', likeFill: p.liked ? '#E0A06A' : 'none', commentCount: p.comments.length }))
 
   const P = s.profile
   const genders = ['남성', '여성', '기타'].map((g) => ({ label: g, bg: P.gender === g ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: P.gender === g ? '#060B17' : '#9DAFCB', border: P.gender === g ? 'transparent' : 'rgba(255,255,255,.12)' }))
@@ -781,10 +793,31 @@ export default function Portal() {
                 </div>
                 <div style={{ position: 'relative', fontSize: 11.5, color: 'rgba(231,239,234,.4)', marginTop: 11 }}>닉네임은 익명으로 표시되며, 공개 설정한 지표만 집계돼요.</div>
               </section>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
                 <button onClick={() => set({ showChallengeForm: true, chDone: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '11px 20px', borderRadius: 22 }}>+ 챌린지 만들기</button>
                 <span style={{ fontSize: 12, color: '#67D7DF' }}>{s.chDone}</span>
               </div>
+
+              {be.configured && be.challenges && be.challenges.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                  {be.challenges.map((c) => (
+                    <div key={c.id} style={{ ...card, borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: '#EAF3F1' }}>{c.title}</span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#67D7DF', background: 'rgba(103,215,223,.14)', borderRadius: 8, padding: '1px 7px' }}>D-{c.daysLeft}</span>
+                        </div>
+                        <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)', marginTop: 2 }}>목표 {c.goal} · {c.metric}</div>
+                      </div>
+                      {c.isOwn && (
+                        <button onClick={() => { if (confirm('이 챌린지를 삭제할까요?')) void be.deleteChallenge(c.id) }} title="삭제" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(224,160,106,.8)' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {s.showChallengeForm && (
                 <div onClick={() => set({ showChallengeForm: false })} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,12,10,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'hwl-fade .25s ease both' }}>
@@ -830,6 +863,11 @@ export default function Portal() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 700, fontSize: 14.5, color: '#EAF3F1' }}>{p.author}</span><span style={{ fontSize: 10, fontWeight: 600, color: p.tagFg, background: p.tagBg, padding: '1px 8px', borderRadius: 10 }}>{p.tag}</span></div>
                       <div style={{ fontSize: 12, color: 'rgba(231,239,234,.4)' }}>{p.time}</div>
                     </div>
+                    {p.isOwn && (
+                      <button onClick={() => { if (confirm('이 게시물을 삭제할까요?')) onDeletePost(p.id) }} title="삭제" style={{ all: 'unset', cursor: 'pointer', marginLeft: 'auto', width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(157,175,203,.6)' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                    )}
                   </div>
                   <div style={{ fontSize: 15, lineHeight: 1.65, color: 'rgba(231,239,234,.85)', margin: '14px 2px 4px', whiteSpace: 'pre-wrap' }}>{renderMentions(p.text)}</div>
                   {p.hasMetric && (
@@ -854,7 +892,12 @@ export default function Portal() {
                           <Avatar initials={cm.initials} color={cm.color} size={30} fontSize={10.5} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px' }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{cm.author}</span> <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{renderMentions(cm.text)}</span></div>
-                            <button onClick={() => { onPostDraftChange(p.id, `@${cm.author} `); document.getElementById(`cmt-${p.id}`)?.focus() }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(157,175,203,.8)', marginTop: 4, marginLeft: 4 }}>답글</button>
+                            <div style={{ display: 'flex', gap: 12, marginTop: 4, marginLeft: 4 }}>
+                              <button onClick={() => { onPostDraftChange(p.id, `@${cm.author} `); document.getElementById(`cmt-${p.id}`)?.focus() }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(157,175,203,.8)' }}>답글</button>
+                              {(be.configured ? (cm as { isOwn?: boolean }).isOwn : cm.author === ME.name) && (
+                                <button onClick={() => { if (confirm('댓글을 삭제할까요?')) onDeleteComment(p.id, (cm as { id?: string }).id, i) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(224,160,106,.8)' }}>삭제</button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -883,7 +926,14 @@ export default function Portal() {
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)' }} />
                   <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3' }}>{roomTitle}</div>
                   {activeRoom?.isPrivate && <span style={{ fontSize: 10.5, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 10, padding: '2px 8px' }}>비공개</span>}
-                  <div style={{ marginLeft: 'auto', fontSize: 11.5, color: 'rgba(231,239,234,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>{be.configured ? (activeRoom ? `${messages.length}개 메시지` : '') : '5명 접속'}</div>
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {activeRoom?.isOwn && (
+                      <button onClick={() => { if (confirm(`'${activeRoom.name}' 방을 삭제할까요? 메시지도 모두 사라져요.`)) void be.deleteRoom(activeRoom.id) }} title="방 삭제" style={{ all: 'unset', cursor: 'pointer', width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(224,160,106,.8)' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                    )}
+                    <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>{be.configured ? (activeRoom ? `${messages.length}개 메시지` : '') : '5명 접속'}</div>
+                  </div>
                 </div>
                 {chatRooms != null && (
                   <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>

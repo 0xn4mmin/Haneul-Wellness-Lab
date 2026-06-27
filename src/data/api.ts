@@ -154,6 +154,12 @@ export async function addPostComment(postId: string, text: string) {
   const me = await uid()
   return requireSupabase().from('post_comments').insert({ post_id: postId, author_id: me, text })
 }
+export async function deletePost(postId: string) {
+  return requireSupabase().from('posts').delete().eq('id', postId)
+}
+export async function deletePostComment(commentId: string) {
+  return requireSupabase().from('post_comments').delete().eq('id', commentId)
+}
 
 // ───────────────────────── chat ─────────────────────────
 export async function fetchMessages(roomId: string) {
@@ -179,14 +185,14 @@ export function subscribeMessages(roomId: string, onInsert: (row: unknown) => vo
   return () => { sb.removeChannel(channel) }
 }
 
-export interface RoomRow { id: string; name: string; is_private: boolean; join_code: string | null }
+export interface RoomRow { id: string; name: string; is_private: boolean; join_code: string | null; created_by: string | null }
 
 /** Rooms the current user is a member of (default lounge first). */
 export async function fetchMyRooms(): Promise<RoomRow[]> {
   const sb = requireSupabase()
   const me = await uid()
   const { data } = await sb.from('room_members')
-    .select('room:chat_rooms!room_members_room_id_fkey(id, name, is_private, join_code)')
+    .select('room:chat_rooms!room_members_room_id_fkey(id, name, is_private, join_code, created_by)')
     .eq('user_id', me)
   const rooms = ((data ?? []) as unknown[])
     .map((r) => {
@@ -214,12 +220,17 @@ export async function createRoom(name: string, isPrivate: boolean): Promise<Room
   const me = await uid()
   const join_code = isPrivate ? genCode() : null
   const { data, error } = await sb.from('chat_rooms')
-    .insert({ name: name.trim() || '새 채팅방', is_private: isPrivate, join_code })
-    .select('id, name, is_private, join_code').single()
+    .insert({ name: name.trim() || '새 채팅방', is_private: isPrivate, join_code, created_by: me })
+    .select('id, name, is_private, join_code, created_by').single()
   if (error) throw error
   const room = data as RoomRow
   await sb.from('room_members').upsert({ room_id: room.id, user_id: me })
   return room
+}
+
+/** Deletes a room the current user created (RLS enforces creator-only). */
+export async function deleteRoom(roomId: string) {
+  return requireSupabase().from('chat_rooms').delete().eq('id', roomId)
 }
 
 /** Joins a (possibly private) room by its code. */
@@ -227,6 +238,30 @@ export async function joinRoomByCode(code: string): Promise<{ ok: boolean; reaso
   const { data, error } = await requireSupabase().rpc('join_room_by_code', { p_code: code })
   if (error) return { ok: false, reason: error.message }
   return data as { ok: boolean; reason?: string; room_id?: string; name?: string }
+}
+
+export interface ChallengeRow {
+  id: string; title: string; metric_key: string; goal: string; starts_at: string; ends_at: string
+  scope: 'public' | 'private'; created_by: string | null
+}
+export async function fetchChallenges(): Promise<ChallengeRow[]> {
+  const { data } = await requireSupabase().from('challenges')
+    .select('id, title, metric_key, goal, starts_at, ends_at, scope, created_by')
+    .order('created_at', { ascending: false })
+  return (data ?? []) as ChallengeRow[]
+}
+export async function createChallengeRow(c: { title: string; metric: string; goal: string; weeks: number; scope: 'public' | 'private' }) {
+  const me = await uid()
+  const start = new Date()
+  const end = new Date(start.getTime() + c.weeks * 7 * 86400 * 1000)
+  const iso = (d: Date) => d.toISOString().slice(0, 10)
+  return requireSupabase().from('challenges').insert({
+    title: c.title.trim() || '새 챌린지', metric_key: c.metric, goal: c.goal,
+    starts_at: iso(start), ends_at: iso(end), scope: c.scope, created_by: me,
+  })
+}
+export async function deleteChallenge(id: string) {
+  return requireSupabase().from('challenges').delete().eq('id', id)
 }
 
 export interface RoomMember { name: string; initials: string; color: string; role: 'client' | 'trainer' }

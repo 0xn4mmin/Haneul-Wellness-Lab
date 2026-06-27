@@ -33,14 +33,15 @@ export interface BackendProfile {
   name: string; initials: string; color: string; role: 'client' | 'trainer'
   birth: string | null; gender: string | null; phone: string | null; photoUrl: string | null
 }
-export interface PostComment { author: string; initials: string; color: string; text: string }
+export interface PostComment { id?: string; author: string; initials: string; color: string; text: string; isOwn?: boolean }
 export interface PostView {
   id: string; author: string; initials: string; color: string; role: Role; time: string; text: string
-  likes: number; liked: boolean; open: boolean; draft: string; comments: PostComment[]
+  likes: number; liked: boolean; open: boolean; draft: string; comments: PostComment[]; isOwn: boolean
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
 export interface MessageView { id: string; author: string; initials: string; color: string; role: Role; time: string; text: string }
-export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null }
+export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null; isOwn: boolean }
+export interface ChallengeView { id: string; title: string; metric: string; goal: string; daysLeft: number; isOwn: boolean }
 export interface MemberView { id: string; name: string; initials: string; color: string; bio: string; bio2: string; score: number; pub: string[] }
 export interface ActiveMemberDetail {
   id: string; name: string; initials: string; color: string; bio2: string; score: number
@@ -71,6 +72,8 @@ export interface Backend {
   // social
   posts: PostView[] | null
   createPost: (text: string) => Promise<void>
+  deletePost: (id: string) => Promise<void>
+  deletePostComment: (id: string) => Promise<void>
   toggleLike: (id: string) => void
   toggleComments: (id: string) => void
   setPostDraft: (id: string, text: string) => void
@@ -84,6 +87,11 @@ export interface Backend {
   selectRoom: (id: string) => void
   createRoom: (name: string, isPrivate: boolean) => Promise<void>
   joinRoom: (code: string) => Promise<{ ok: boolean; reason?: string }>
+  deleteRoom: (id: string) => Promise<void>
+  // challenges
+  challenges: ChallengeView[] | null
+  createChallenge: (c: { title: string; metric: string; goal: string; weeks: number; scope: 'public' | 'private' }) => Promise<void>
+  deleteChallenge: (id: string) => Promise<void>
   // members
   members: MemberView[] | null
   activeMember: ActiveMemberDetail | null
@@ -125,6 +133,7 @@ export function useBackend(): Backend {
   const [activeMember, setActiveMember] = useState<ActiveMemberDetail | null>(null)
   const [chartComments, setChartComments] = useState<ChartCommentView[] | null>(null)
   const [coachFeedback, setCoachFeedback] = useState<FeedbackItem[] | null>(null)
+  const [challenges, setChallenges] = useState<ChallengeView[] | null>(null)
   const [roster, setRoster] = useState<RosterRow[] | null>(null)
   const [briefing, setBriefing] = useState<{ focus: string; summary: string; actions: string[] } | null>(null)
   const [briefingBusy, setBriefingBusy] = useState(false)
@@ -157,8 +166,8 @@ export function useBackend(): Backend {
         role: roleOf(r.author_id, a.role), time: relTime(r.created_at), text: r.text,
         likes: (r.post_likes ?? []).length,
         liked: (r.post_likes ?? []).some((l: { user_id: string }) => l.user_id === meId),
-        open: ui.open, draft: ui.draft,
-        comments: (r.post_comments ?? []).map((c: any) => ({ author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, text: c.text })),
+        open: ui.open, draft: ui.draft, isOwn: r.author_id === meId,
+        comments: (r.post_comments ?? []).map((c: any) => ({ id: c.id, author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, text: c.text, isOwn: c.author_id === meId })),
         hasMetric: !!sm, metricVal: sm?.val, metricLabel: sm?.label, metricSub: sm?.sub,
       }
     })
@@ -175,6 +184,16 @@ export function useBackend(): Backend {
     }))
   }, [meId])
 
+  const reloadChallenges = useCallback(async () => {
+    const rows = await api.fetchChallenges()
+    const dayMs = 86400 * 1000
+    setChallenges(rows.map((c) => ({
+      id: c.id, title: c.title, metric: c.metric_key, goal: c.goal,
+      daysLeft: Math.max(0, Math.ceil((Date.parse(c.ends_at) - Date.now()) / dayMs)),
+      isOwn: c.created_by === meId,
+    })))
+  }, [meId])
+
   const reloadCoachFeedback = useCallback(async () => {
     if (!meId) return
     const rows = await api.fetchChartComments(meId, 'overall')
@@ -186,9 +205,9 @@ export function useBackend(): Backend {
 
   const reloadRooms = useCallback(async () => {
     const rows = await api.fetchMyRooms()
-    setRooms(rows.map((r) => ({ id: r.id, name: r.name, isPrivate: r.is_private, joinCode: r.join_code })))
+    setRooms(rows.map((r) => ({ id: r.id, name: r.name, isPrivate: r.is_private, joinCode: r.join_code, isOwn: r.created_by === meId })))
     return rows
-  }, [])
+  }, [meId])
 
   const reloadMembers = useCallback(async () => {
     const cards = await api.fetchMemberCards()
@@ -201,7 +220,7 @@ export function useBackend(): Backend {
       setRemoteMetrics(null); setRemoteDates(null); setPrivacyState(null); setProfile(null)
       setPosts(null); setMessages(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
-      setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null)
+      setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null)
       roomId.current = null
       return
     }
@@ -234,6 +253,7 @@ export function useBackend(): Backend {
         setBriefing(latestBrief ? { focus: latestBrief.focus, summary: latestBrief.summary, actions: latestBrief.actions } : null)
         setBriefingUsed(used)
         await reloadCoachFeedback()
+        await reloadChallenges()
         await Promise.all([reloadPosts(), reloadMembers()])
         const myRooms = await reloadRooms()   // no auto-created lounge — empty until the user makes/joins one
         const first = myRooms[0]?.id ?? null
@@ -246,7 +266,7 @@ export function useBackend(): Backend {
       }
     })()
     return () => { cancelled = true }
-  }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages, reloadRooms, reloadCoachFeedback])
+  }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages, reloadRooms, reloadCoachFeedback, reloadChallenges])
 
   // realtime: a new briefing finished → show it, clear busy, count manual usage
   useEffect(() => {
@@ -301,6 +321,8 @@ export function useBackend(): Backend {
 
   // ── posts ──
   const createPost = useCallback(async (text: string) => { await api.createPost(text); await reloadPosts() }, [reloadPosts])
+  const deletePost = useCallback(async (id: string) => { await api.deletePost(id); await reloadPosts() }, [reloadPosts])
+  const deletePostComment = useCallback(async (id: string) => { await api.deletePostComment(id); await reloadPosts() }, [reloadPosts])
   const toggleLike = useCallback((id: string) => {
     const liked = posts?.find((p) => p.id === id)?.liked ?? false
     setPosts((ps) => ps?.map((p) => p.id === id ? { ...p, liked: !liked, likes: p.likes + (liked ? -1 : 1) } : p) ?? ps)
@@ -352,6 +374,26 @@ export function useBackend(): Backend {
     }
     return res
   }, [reloadRooms, selectRoom])
+
+  const deleteRoom = useCallback(async (id: string) => {
+    await api.deleteRoom(id)
+    const left = await reloadRooms()
+    const next = left[0]?.id ?? null
+    roomId.current = next
+    setActiveRoomId(next)
+    if (next) { await reloadMessages(next); setRoomMembers(await api.fetchRoomMembers(next)) }
+    else { setMessages([]); setRoomMembers([]) }
+  }, [reloadRooms, reloadMessages])
+
+  // ── challenges ──
+  const createChallenge = useCallback(async (c: { title: string; metric: string; goal: string; weeks: number; scope: 'public' | 'private' }) => {
+    await api.createChallengeRow(c)
+    await reloadChallenges()
+  }, [reloadChallenges])
+  const deleteChallenge = useCallback(async (id: string) => {
+    await api.deleteChallenge(id)
+    await reloadChallenges()
+  }, [reloadChallenges])
 
   // ── members ──
   const openMember = useCallback((id: string) => {
@@ -454,8 +496,9 @@ export function useBackend(): Backend {
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, updateProfile, uploadAvatar,
-    posts, createPost, toggleLike, toggleComments, setPostDraft, submitPostComment,
-    messages, sendMessage, rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom,
+    posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, submitPostComment,
+    messages, sendMessage, rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom,
+    challenges, createChallenge, deleteChallenge,
     members, activeMember, openMember, closeMember, addMemberCheer,
     chartComments, loadChartComments, addChartComment, coachFeedback, addCoachFeedback,
     roster, addCoachNote,

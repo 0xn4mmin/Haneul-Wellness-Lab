@@ -40,9 +40,11 @@ export interface PostView {
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
 export interface MessageView { id: string; author: string; initials: string; color: string; role: Role; time: string; text: string }
+export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null }
 export interface MemberView { id: string; name: string; initials: string; color: string; bio: string; bio2: string; score: number; pub: string[] }
 export interface ActiveMemberDetail {
   id: string; name: string; initials: string; color: string; bio2: string; score: number
+  measureCount: number; lastDate: string | null; publicCount: number; lockedCount: number
   metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]
   comments: PostComment[]
 }
@@ -75,6 +77,11 @@ export interface Backend {
   // chat
   messages: MessageView[] | null
   sendMessage: (text: string) => Promise<void>
+  rooms: RoomView[] | null
+  activeRoomId: string | null
+  selectRoom: (id: string) => void
+  createRoom: (name: string, isPrivate: boolean) => Promise<void>
+  joinRoom: (code: string) => Promise<{ ok: boolean; reason?: string }>
   // members
   members: MemberView[] | null
   activeMember: ActiveMemberDetail | null
@@ -106,6 +113,8 @@ export function useBackend(): Backend {
   const [profile, setProfile] = useState<BackendProfile | null>(null)
   const [posts, setPosts] = useState<PostView[] | null>(null)
   const [messages, setMessages] = useState<MessageView[] | null>(null)
+  const [rooms, setRooms] = useState<RoomView[] | null>(null)
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
   const [members, setMembers] = useState<MemberView[] | null>(null)
   const [activeMember, setActiveMember] = useState<ActiveMemberDetail | null>(null)
   const [chartComments, setChartComments] = useState<ChartCommentView[] | null>(null)
@@ -149,14 +158,21 @@ export function useBackend(): Backend {
     setPosts(shaped)
   }, [meId])
 
-  const reloadMessages = useCallback(async () => {
-    if (!roomId.current) return
-    const rows = await api.fetchMessages(roomId.current)
+  const reloadMessages = useCallback(async (room?: string | null) => {
+    const rid = room ?? roomId.current
+    if (!rid) return
+    const rows = await api.fetchMessages(rid)
     setMessages((rows as any[]).map((r) => {
       const a = (r.author ?? {}) as Author & { id?: string }
       return { id: r.id, author: a.name, initials: a.initials, color: a.avatar_color, role: roleOf(a.id, a.role), time: clockTime(r.created_at), text: r.text }
     }))
   }, [meId])
+
+  const reloadRooms = useCallback(async () => {
+    const rows = await api.fetchMyRooms()
+    setRooms(rows.map((r) => ({ id: r.id, name: r.name, isPrivate: r.is_private, joinCode: r.join_code })))
+    return rows
+  }, [])
 
   const reloadMembers = useCallback(async () => {
     const cards = await api.fetchMemberCards()
@@ -169,6 +185,7 @@ export function useBackend(): Backend {
       setRemoteMetrics(null); setRemoteDates(null); setPrivacyState(null); setProfile(null)
       setPosts(null); setMessages(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
+      setRooms(null); setActiveRoomId(null)
       roomId.current = null
       return
     }
@@ -201,14 +218,18 @@ export function useBackend(): Backend {
         setBriefing(latestBrief ? { focus: latestBrief.focus, summary: latestBrief.summary, actions: latestBrief.actions } : null)
         setBriefingUsed(used)
         await Promise.all([reloadPosts(), reloadMembers()])
-        roomId.current = await api.getOrCreateDefaultRoom()
-        await reloadMessages()
+        await api.getOrCreateDefaultRoom()   // ensure the shared lounge exists + joined
+        const myRooms = await reloadRooms()
+        const first = myRooms[0]?.id ?? null
+        roomId.current = first
+        setActiveRoomId(first)
+        await reloadMessages(first)
       } catch (e) {
         console.warn('[backend] load failed', e)
       }
     })()
     return () => { cancelled = true }
-  }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages])
+  }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages, reloadRooms])
 
   // realtime: a new briefing finished → show it, clear busy, count manual usage
   useEffect(() => {
@@ -222,12 +243,12 @@ export function useBackend(): Backend {
     return unsub
   }, [meId])
 
-  // realtime chat
+  // realtime chat — re-subscribes when the active room changes
   useEffect(() => {
-    if (!supabase || !meId || !roomId.current) return
-    const unsub = api.subscribeMessages(roomId.current, () => { void reloadMessages() })
+    if (!supabase || !meId || !activeRoomId) return
+    const unsub = api.subscribeMessages(activeRoomId, () => { void reloadMessages(activeRoomId) })
     return unsub
-  }, [meId, messages === null, reloadMessages])
+  }, [meId, activeRoomId, reloadMessages])
 
   // ── auth actions ──
   const signIn = useCallback(async (email: string, password: string) => {
@@ -287,16 +308,38 @@ export function useBackend(): Backend {
 
   // ── chat ──
   const sendMessage = useCallback(async (text: string) => {
-    if (!roomId.current) return
-    await api.sendMessage(roomId.current, text)
-    await reloadMessages()
+    if (!activeRoomId) return
+    await api.sendMessage(activeRoomId, text)
+    await reloadMessages(activeRoomId)
+  }, [activeRoomId, reloadMessages])
+
+  const selectRoom = useCallback((id: string) => {
+    roomId.current = id
+    setActiveRoomId(id)
+    setMessages(null)
+    void reloadMessages(id)
   }, [reloadMessages])
+
+  const createRoom = useCallback(async (name: string, isPrivate: boolean) => {
+    const room = await api.createRoom(name, isPrivate)
+    await reloadRooms()
+    selectRoom(room.id)
+  }, [reloadRooms, selectRoom])
+
+  const joinRoom = useCallback(async (code: string): Promise<{ ok: boolean; reason?: string }> => {
+    const res = await api.joinRoomByCode(code)
+    if (res.ok && res.room_id) {
+      await reloadRooms()
+      selectRoom(res.room_id)
+    }
+    return res
+  }, [reloadRooms, selectRoom])
 
   // ── members ──
   const openMember = useCallback((id: string) => {
     void (async () => {
       try {
-        const { series } = await api.fetchMetricSeries(id)
+        const { dates, series } = await api.fetchMetricSeries(id)
         const priv = await api.fetchPrivacy(id)
         const cheers = await api.fetchMemberCheers(id)
         const prof = await api.fetchMemberProfile(id)
@@ -308,9 +351,13 @@ export function useBackend(): Backend {
             value: sv && sv.length ? sv[sv.length - 1] : 0, spark: sv && sv.length ? buildSpark(sv) : '',
           }
         })
+        const publicCount = mc.filter((m) => m.shown).length
+        const scorePublic = priv.score === 'public' && !!series.score?.length
         setActiveMember({
           id, name: prof?.name ?? '', initials: prof?.initials ?? '', color: prof?.avatar_color ?? '#5E97A0',
-          bio2: prof?.bio2 ?? '', score: series.score?.length ? series.score[series.score.length - 1] : 0,
+          bio2: prof?.bio2 ?? '', score: scorePublic ? series.score![series.score!.length - 1] : 0,
+          measureCount: dates.length, lastDate: dates.length ? fmtDate(dates[dates.length - 1]) : null,
+          publicCount, lockedCount: METRIC_CARD_KEYS.length - publicCount,
           metrics: mc,
           comments: (cheers as any[]).map((c) => ({ author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, text: c.text })),
         })
@@ -384,7 +431,7 @@ export function useBackend(): Backend {
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, updateProfile, uploadAvatar,
     posts, createPost, toggleLike, toggleComments, setPostDraft, submitPostComment,
-    messages, sendMessage,
+    messages, sendMessage, rooms, activeRoomId, selectRoom, createRoom, joinRoom,
     members, activeMember, openMember, closeMember, addMemberCheer,
     chartComments, loadChartComments, addChartComment,
     roster, addCoachNote,

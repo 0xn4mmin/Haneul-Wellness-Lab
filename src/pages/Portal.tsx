@@ -35,6 +35,13 @@ export default function Portal() {
 
   const be = useBackend()
 
+  // chat-room UI (backend mode)
+  const [chatModal, setChatModal] = useState<'none' | 'create' | 'join'>('none')
+  const [roomName, setRoomName] = useState('')
+  const [roomPrivate, setRoomPrivate] = useState(false)
+  const [joinCode, setJoinCode] = useState('')
+  const [chatErr, setChatErr] = useState('')
+
   const mount3d = useRef<HTMLDivElement | null>(null)
   const figure = useRef<FigureHandle | null>(null)
   const chatRef = useRef<HTMLDivElement | null>(null)
@@ -107,6 +114,19 @@ export default function Portal() {
     if (be.configured) { void be.sendMessage(t); set({ newMsg: '' }); return }
     const msg = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t }
     setFn((p) => ({ newMsg: '', messages: [...p.messages, msg] }))
+  }
+  const submitCreateRoom = () => {
+    setChatErr('')
+    void be.createRoom(roomName, roomPrivate).then(() => {
+      setChatModal('none'); setRoomName(''); setRoomPrivate(false)
+    }).catch((e) => setChatErr(e instanceof Error ? e.message : '생성 실패'))
+  }
+  const submitJoinRoom = () => {
+    setChatErr('')
+    void be.joinRoom(joinCode).then((res) => {
+      if (res.ok) { setChatModal('none'); setJoinCode('') }
+      else setChatErr(res.reason === 'not_found' ? '코드를 찾을 수 없어요.' : (res.reason || '입장 실패'))
+    })
   }
   const openMember = (id: string) => { if (be.configured) be.openMember(id); else set({ activeMember: id }) }
   const closeMember = () => { if (be.configured) be.closeMember(); else set({ activeMember: null }) }
@@ -223,8 +243,11 @@ export default function Portal() {
   ]
 
   const cmpKeys: MetricKey[] = ['weight', 'smm', 'pbf', 'bmi', 'tbw', 'score']
+  // clamp to the actual number of measurements (real data length varies)
+  const cmpFromIdx = Math.min(Math.max(0, s.cmpFrom), Math.max(0, D.length - 1))
+  const cmpToIdx = Math.min(Math.max(0, s.cmpTo), Math.max(0, D.length - 1))
   const compare = cmpKeys.map((k) => {
-    const m = M[k]; const a = m.series[s.cmpFrom]; const b = m.series[s.cmpTo]; const d = +(b - a).toFixed(1)
+    const m = M[k]; const a = m.series[cmpFromIdx]; const b = m.series[cmpToIdx]; const d = +(b - a).toFixed(1)
     const improved = (m.good === 'up') ? d >= 0 : d <= 0
     return { label: m.label, unit: m.unit, before: a, after: b, delta: (d > 0 ? '+' : '') + d, deltaColor: improved ? '#67D7DF' : '#E0A06A', deltaBg: improved ? 'rgba(46,155,166,.16)' : 'rgba(224,138,94,.18)' }
   })
@@ -234,14 +257,14 @@ export default function Portal() {
   const metricKeysForCard: MetricKey[] = ['score', 'weight', 'smm', 'pbf', 'bmi', 'tbw']
   const membersSource = be.configured ? (be.members ?? []) : s.members
   const membersDisp = membersSource.map((m) => ({ ...m, publicCount: m.pub.length, lockedCount: metricKeysForCard.length - m.pub.filter((k) => metricKeysForCard.includes(k as MetricKey)).length }))
-  type ActiveMember = { id: string; name: string; initials: string; color: string; bio2: string; score: number; metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]; comments: { author: string; initials: string; color: string; text: string }[] }
+  type ActiveMember = { id: string; name: string; initials: string; color: string; bio2: string; score: number; measureCount?: number; lastDate?: string | null; metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]; comments: { author: string; initials: string; color: string; text: string }[] }
   let activeMember: ActiveMember | null = null
   if (be.configured) {
     activeMember = be.activeMember
   } else if (s.activeMember) {
     const m = s.members.find((x) => x.id === s.activeMember)!
     const mc = metricKeysForCard.map((k) => { const open = m.pub.includes(k); const met = metrics[k]; return { label: met.label, unit: met.unit, locked: !open, shown: open, value: met.series[met.series.length - 1], spark: buildSpark(met.series) } })
-    activeMember = { id: m.id, name: m.name, initials: m.initials, color: m.color, bio2: m.bio2, score: m.score, metrics: mc, comments: s.memberComments[m.id] || [] }
+    activeMember = { id: m.id, name: m.name, initials: m.initials, color: m.color, bio2: m.bio2, score: m.score, measureCount: dates.length, lastDate: dates[dates.length - 1], metrics: mc, comments: s.memberComments[m.id] || [] }
   }
   const memberOpen = be.configured ? !!be.activeMember : !!s.activeMember
 
@@ -257,6 +280,9 @@ export default function Portal() {
 
   const messagesSource = be.configured ? (be.messages ?? []) : s.messages
   const messages = messagesSource.map((m) => { const isMe = m.role === 'me'; return { ...m, dir: (isMe ? 'row-reverse' : 'row') as React.CSSProperties['flexDirection'], justify: isMe ? 'flex-end' : 'flex-start', radius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px', bubbleBg: isMe ? 'linear-gradient(135deg,#2E9BA6,#1E6E78)' : (m.role === 'trainer' ? 'rgba(46,155,166,.14)' : 'rgba(255,255,255,.06)'), bubbleFg: isMe ? '#060B17' : '#E7EFEA', bubbleBorder: isMe ? 'transparent' : (m.role === 'trainer' ? 'rgba(103,215,223,.25)' : 'rgba(255,255,255,.1)'), ring: m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none' } })
+  const chatRooms = be.configured ? (be.rooms ?? []) : null
+  const activeRoom = chatRooms?.find((r) => r.id === be.activeRoomId) ?? null
+  const roomTitle = activeRoom ? activeRoom.name : '하늘 라운지'
   const onlineMembers = [
     { name: '코치 하늘', initials: '하늘', color: '#234B47', role: '트레이너', statusColor: '#2E9BA6' },
     { name: '이민서', initials: '민서', color: '#BE7A57', role: '회원', statusColor: '#2E9BA6' },
@@ -280,8 +306,9 @@ export default function Portal() {
   const chMetrics = ['체지방률', '골격근량', '체중', '인바디 점수'].map((m) => ({ label: m, bg: s.chMetric === m ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chMetric === m ? '#060B17' : '#9DAFCB' }))
   const chPeriods = ['2주', '4주', '8주'].map((pp) => ({ label: pp, bg: s.chPeriod === pp ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chPeriod === pp ? '#060B17' : '#9DAFCB' }))
   const chScopes = ['전체 공개', '비공개'].map((pp) => ({ label: pp, bg: s.chScope === pp ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: s.chScope === pp ? '#060B17' : '#9DAFCB' }))
-  const fromChips = D.map((dt, i) => ({ label: dt.split(' ')[0], bg: i === s.cmpFrom ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: i === s.cmpFrom ? '#060B17' : '#9DAFCB' }))
-  const toChips = D.map((dt, i) => ({ label: dt.split(' ')[0], bg: i === s.cmpTo ? '#67D7DF' : 'rgba(255,255,255,.05)', fg: i === s.cmpTo ? '#060B17' : '#9DAFCB' }))
+  // full date labels so multiple measurements within the same month are distinguishable
+  const fromChips = D.map((dt, i) => ({ label: dt, bg: i === cmpFromIdx ? '#2E9BA6' : 'rgba(255,255,255,.05)', fg: i === cmpFromIdx ? '#060B17' : '#9DAFCB' }))
+  const toChips = D.map((dt, i) => ({ label: dt, bg: i === cmpToIdx ? '#67D7DF' : 'rgba(255,255,255,.05)', fg: i === cmpToIdx ? '#060B17' : '#9DAFCB' }))
 
   const titles: Record<View, [string, string]> = {
     profile: ['프로필 설정', '사진·생년월일·성별·연락처를 관리하세요'],
@@ -633,11 +660,11 @@ export default function Portal() {
                 <div style={eyebrow}>Compare</div><div style={cardTitle}>변화 비교</div>
                 <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', margin: '14px 0 16px' }}>
                   <div>
-                    <div style={{ fontSize: 11, color: 'rgba(231,239,234,.5)', marginBottom: 6 }}>기준 · {D[s.cmpFrom]}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(231,239,234,.5)', marginBottom: 6 }}>기준 · {D[cmpFromIdx]}</div>
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{fromChips.map((c, i) => <button key={i} onClick={() => set({ cmpFrom: i })} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '5px 9px', borderRadius: 8, background: c.bg, color: c.fg }}>{c.label}</button>)}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: 'rgba(231,239,234,.5)', marginBottom: 6 }}>비교 · {D[s.cmpTo]}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(231,239,234,.5)', marginBottom: 6 }}>비교 · {D[cmpToIdx]}</div>
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{toChips.map((c, i) => <button key={i} onClick={() => set({ cmpTo: i })} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '5px 9px', borderRadius: 8, background: c.bg, color: c.fg }}>{c.label}</button>)}</div>
                   </div>
                 </div>
@@ -805,11 +832,27 @@ export default function Portal() {
           {s.view === 'chat' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 224px', gap: 20, animation: 'hwl-rise .4s ease both' }}>
               <section style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)', overflow: 'hidden' }}>
-                <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)' }} />
-                  <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3' }}>하늘 라운지 · 그룹 채팅</div>
-                  <div style={{ marginLeft: 'auto', fontSize: 11.5, color: 'rgba(231,239,234,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>5명 접속</div>
+                  <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3' }}>{roomTitle}</div>
+                  {activeRoom?.isPrivate && <span style={{ fontSize: 10.5, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 10, padding: '2px 8px' }}>비공개</span>}
+                  <div style={{ marginLeft: 'auto', fontSize: 11.5, color: 'rgba(231,239,234,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>{be.configured ? `${messages.length}개 메시지` : '5명 접속'}</div>
                 </div>
+                {chatRooms && chatRooms.length > 0 && (
+                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+                    {chatRooms.map((r) => {
+                      const sel = r.id === be.activeRoomId
+                      return (
+                        <button key={r.id} onClick={() => be.selectRoom(r.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 16, background: sel ? CTA : 'rgba(255,249,238,.05)', color: sel ? '#060B17' : '#9DAFCB', border: `1px solid ${sel ? 'transparent' : 'rgba(255,247,232,.12)'}` }}>
+                          {r.isPrivate && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={sel ? '#060B17' : '#9DAFCB'} strokeWidth="2"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
+                          {r.name}
+                        </button>
+                      )
+                    })}
+                    <button onClick={() => { setChatErr(''); setChatModal('create') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 16, background: 'rgba(46,155,166,.14)', color: '#67D7DF', border: '1px solid rgba(103,215,223,.3)' }}>+ 방 만들기</button>
+                    <button onClick={() => { setChatErr(''); setChatModal('join') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 16, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>코드로 입장</button>
+                  </div>
+                )}
                 <div ref={chatRef} style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {messages.map((m) => (
                     <div key={m.id} style={{ display: 'flex', gap: 11, flexDirection: m.dir, animation: 'hwl-rise .3s ease both' }}>
@@ -827,6 +870,13 @@ export default function Portal() {
                 </div>
               </section>
               <aside style={{ ...card, borderRadius: 22, padding: 18, height: 'fit-content' }}>
+                {activeRoom?.isPrivate && activeRoom.joinCode && (
+                  <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid rgba(255,247,232,.1)' }}>
+                    <div style={{ fontSize: 10.5, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 7 }}>입장 코드</div>
+                    <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 20, letterSpacing: '3px', color: '#67D7DF', background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.25)', borderRadius: 12, padding: '9px 0', textAlign: 'center' }}>{activeRoom.joinCode}</div>
+                    <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginTop: 6 }}>이 코드를 공유해 초대하세요.</div>
+                  </div>
+                )}
                 <div style={{ fontSize: 10.5, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 13 }}>접속 중</div>
                 {onlineMembers.map((o, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 13 }}>
@@ -835,6 +885,43 @@ export default function Portal() {
                   </div>
                 ))}
               </aside>
+
+              {/* 방 만들기 / 코드로 입장 모달 */}
+              {chatModal !== 'none' && (
+                <div onClick={() => setChatModal('none')} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,9,18,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'hwl-fade .25s ease both' }}>
+                  <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                    <div style={eyebrow}>{chatModal === 'create' ? 'New Room' : 'Join Room'}</div>
+                    <div style={cardTitle}>{chatModal === 'create' ? '채팅방 만들기' : '코드로 입장'}</div>
+                    {chatModal === 'create' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 18 }}>
+                        <div>
+                          <label style={labelStyle}>방 이름</label>
+                          <input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder="예) 7월 챌린지 라운지" style={inputStyle} />
+                        </div>
+                        <div>
+                          <label style={labelStyle}>공개 범위</label>
+                          <div style={{ display: 'flex', gap: 7 }}>
+                            {[{ v: false, l: '공개' }, { v: true, l: '비공개(코드)' }].map((o) => (
+                              <button key={o.l} onClick={() => setRoomPrivate(o.v)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: roomPrivate === o.v ? '#2E9BA6' : 'rgba(255,249,238,.05)', color: roomPrivate === o.v ? '#060B17' : '#9DAFCB' }}>{o.l}</button>
+                            ))}
+                          </div>
+                          {roomPrivate && <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 7 }}>비공개 방은 입장 코드가 자동 생성돼요. 만든 뒤 사이드바에서 확인·공유하세요.</div>}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 18 }}>
+                        <label style={labelStyle}>입장 코드</label>
+                        <input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="예) K7P2Q9" maxLength={6} style={{ ...inputStyle, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '3px', fontSize: 18, textAlign: 'center' }} />
+                      </div>
+                    )}
+                    {chatErr && <div style={{ fontSize: 12, color: '#E0A06A', marginTop: 10 }}>{chatErr}</div>}
+                    <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+                      <button onClick={() => setChatModal('none')} style={{ all: 'unset', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9FBCB5', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.15)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
+                      <button onClick={chatModal === 'create' ? submitCreateRoom : submitJoinRoom} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>{chatModal === 'create' ? '만들기' : '입장'}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -847,8 +934,14 @@ export default function Portal() {
                   <section style={{ ...card, padding: 24 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 15, marginBottom: 6 }}>
                       <Avatar initials={activeMember.initials} color={activeMember.color} size={58} fontSize={17} />
-                      <div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#F2F7F3' }}>{activeMember.name}</div><div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)' }}>{activeMember.bio2}</div></div>
-                      <div style={{ marginLeft: 'auto', textAlign: 'right' }}><div style={{ fontSize: 10.5, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B' }}>점수</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 30, color: '#67D7DF' }}>{activeMember.score}</div></div>
+                      <div>
+                        <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#F2F7F3' }}>{activeMember.name}</div>
+                        <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)' }}>{activeMember.bio2}</div>
+                        {activeMember.measureCount != null && activeMember.measureCount > 0 && (
+                          <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.4)', marginTop: 3, fontFamily: "'IBM Plex Mono',monospace" }}>측정 {activeMember.measureCount}회{activeMember.lastDate ? ` · 최근 ${activeMember.lastDate}` : ''}</div>
+                        )}
+                      </div>
+                      <div style={{ marginLeft: 'auto', textAlign: 'right' }}><div style={{ fontSize: 10.5, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B' }}>점수</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 30, color: '#67D7DF' }}>{activeMember.score > 0 ? activeMember.score : '—'}</div></div>
                     </div>
                     <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', margin: '14px 0 6px' }}>{activeMember.name}님이 공개한 차트</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 13 }}>
@@ -890,7 +983,7 @@ export default function Portal() {
                         <div><div style={{ fontWeight: 700, fontSize: 15, color: '#EAF3F1' }}>{m.name}</div><div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)' }}>{m.bio}</div></div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                        <div><div style={{ fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>점수</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 26, color: '#67D7DF' }}>{m.score}</div></div>
+                        <div><div style={{ fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>점수</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 26, color: '#67D7DF' }}>{m.score > 0 ? m.score : '—'}</div></div>
                         <div style={{ textAlign: 'right' }}><div style={{ fontSize: 11, color: '#67D7DF', fontWeight: 600 }}>공개 {m.publicCount}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>비공개 {m.lockedCount}</div></div>
                       </div>
                     </button>

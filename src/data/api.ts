@@ -179,6 +179,56 @@ export function subscribeMessages(roomId: string, onInsert: (row: unknown) => vo
   return () => { sb.removeChannel(channel) }
 }
 
+export interface RoomRow { id: string; name: string; is_private: boolean; join_code: string | null }
+
+/** Rooms the current user is a member of (default lounge first). */
+export async function fetchMyRooms(): Promise<RoomRow[]> {
+  const sb = requireSupabase()
+  const me = await uid()
+  const { data } = await sb.from('room_members')
+    .select('room:chat_rooms!room_members_room_id_fkey(id, name, is_private, join_code)')
+    .eq('user_id', me)
+  const rooms = ((data ?? []) as unknown[])
+    .map((r) => {
+      const room = (r as { room: RoomRow | RoomRow[] | null }).room
+      return Array.isArray(room) ? room[0] : room
+    })
+    .filter(Boolean) as RoomRow[]
+  rooms.sort((a, b) => (a.name === '하늘 라운지' ? -1 : b.name === '하늘 라운지' ? 1 : a.name.localeCompare(b.name)))
+  return rooms
+}
+
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+function genCode(): string {
+  // deterministic-enough randomness without Math.random in workflows; fine here in the app
+  let s = ''
+  const a = new Uint8Array(6)
+  crypto.getRandomValues(a)
+  for (const n of a) s += CODE_CHARS[n % CODE_CHARS.length]
+  return s
+}
+
+/** Creates a room (private rooms get a join code), joins it, returns it. */
+export async function createRoom(name: string, isPrivate: boolean): Promise<RoomRow> {
+  const sb = requireSupabase()
+  const me = await uid()
+  const join_code = isPrivate ? genCode() : null
+  const { data, error } = await sb.from('chat_rooms')
+    .insert({ name: name.trim() || '새 채팅방', is_private: isPrivate, join_code })
+    .select('id, name, is_private, join_code').single()
+  if (error) throw error
+  const room = data as RoomRow
+  await sb.from('room_members').upsert({ room_id: room.id, user_id: me })
+  return room
+}
+
+/** Joins a (possibly private) room by its code. */
+export async function joinRoomByCode(code: string): Promise<{ ok: boolean; reason?: string; room_id?: string; name?: string }> {
+  const { data, error } = await requireSupabase().rpc('join_room_by_code', { p_code: code })
+  if (error) return { ok: false, reason: error.message }
+  return data as { ok: boolean; reason?: string; room_id?: string; name?: string }
+}
+
 // ───────────────────── profile / uploads ────────────────
 export async function updateProfile(patch: Partial<Pick<ProfileRow, 'name' | 'birth' | 'gender' | 'phone'>>) {
   const me = await uid()

@@ -12,6 +12,7 @@ body{background:#060B17;font-family:'Pretendard',system-ui,sans-serif;color:#E7E
 @keyframes hwl-fade{0%{opacity:0}100%{opacity:1}}
 @keyframes hwl-pulse{0%,100%{box-shadow:0 0 0 0 rgba(22,192,206,.45),0 18px 40px -16px rgba(22,192,206,.7)}50%{box-shadow:0 0 0 13px rgba(22,192,206,0),0 18px 40px -16px rgba(22,192,206,.7)}}
 @keyframes hwl-cue{0%,100%{transform:translateY(0);opacity:.45}50%{transform:translateY(7px);opacity:1}}
+@keyframes hwl-spin{to{transform:rotate(360deg)}}
 
 /* intro responsive helpers */
 .hwl-pill{display:none}

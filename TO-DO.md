@@ -197,8 +197,9 @@ OCR 엔진은 **Claude 비전(Sonnet 4.6) + Structured Outputs** 로 결정. 워
 - [ ] 👤 `ocr_jobs` 마이그레이션 적용(SQL Editor 또는 `db push`)
 - [ ] 👤 Railway 프로젝트 생성(Root = `worker`) + Variables 등록:
   `SUPABASE_URL`, **`SUPABASE_SERVICE_ROLE_KEY`**(Settings→API Keys, 비밀), `ANTHROPIC_API_KEY`
-- [ ] 🤖 앱 연동 — 결과지 업로드(Storage `inbody-results`) + `ocr_jobs` insert,
-  realtime 구독 → status `review` 시 추출값 미리보기 + 확인 → measurement 커밋
+- [x] 🤖 앱 연동 — 대시보드 "측정 기록" 카드에 "+ 결과지로 추가" → Storage 업로드 +
+  `ocr_jobs` insert → realtime 진행표시 → 추출값 검수 폼(날짜 포함) → measurement 커밋 + 차트 갱신
+  (`src/components/OcrUpload.tsx`, `api.ts` 의 upload/subscribe/commit)
 
 > ⚠️ `service_role` 키는 워커(Railway) 환경변수에만. 절대 프론트/깃 X. 자세한 절차는 `worker/README.md`.
 

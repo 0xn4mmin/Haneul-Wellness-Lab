@@ -57,6 +57,7 @@ export interface Backend {
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  reload: () => void
   metrics: Record<MetricKey, Metric>
   dates: string[]
   privacy: Record<string, 'public' | 'private'> | null
@@ -103,6 +104,7 @@ export function useBackend(): Backend {
   const [activeMember, setActiveMember] = useState<ActiveMemberDetail | null>(null)
   const [chartComments, setChartComments] = useState<ChartCommentView[] | null>(null)
   const [roster, setRoster] = useState<RosterRow[] | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const roomId = useRef<string | null>(null)
   const postUi = useRef<Record<string, { open: boolean; draft: string }>>({})
 
@@ -189,7 +191,7 @@ export function useBackend(): Backend {
       }
     })()
     return () => { cancelled = true }
-  }, [meId, reloadPosts, reloadMembers, reloadMessages])
+  }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages])
 
   // realtime chat
   useEffect(() => {
@@ -328,8 +330,10 @@ export function useBackend(): Backend {
     return error ? error.message : ''
   }, [])
 
+  const reload = useCallback(() => setReloadKey((k) => k + 1), [])
+
   return {
-    configured: isSupabaseConfigured, ready, session, loginError, signIn, signUp, signOut,
+    configured: isSupabaseConfigured, ready, session, loginError, signIn, signUp, signOut, reload,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, updateProfile, uploadAvatar,
     posts, createPost, toggleLike, toggleComments, setPostDraft, submitPostComment,

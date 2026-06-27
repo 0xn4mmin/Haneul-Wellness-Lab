@@ -270,3 +270,75 @@ export async function getOrCreateDefaultRoom(): Promise<string | null> {
   if (roomId) await sb.from('room_members').upsert({ room_id: roomId, user_id: me })
   return roomId ?? null
 }
+
+// ───────────────────── InBody result OCR ─────────────────
+export type OcrStatus = 'pending' | 'processing' | 'review' | 'committed' | 'error'
+export interface SegVal { kg: number; pct: number }
+export interface OcrResult {
+  date: string
+  score: number; weight: number; smm: number; pbf: number; bodyFatMass: number
+  bmi: number; bmr: number; visceral: number; tbw: number
+  segmental: Record<'rightArm' | 'leftArm' | 'trunk' | 'rightLeg' | 'leftLeg', SegVal>
+  detail: { phaseAngle: number; smi: number; protein: number; mineral: number; idealWeight: number }
+  confidence: number
+}
+export interface OcrJob {
+  id: string; status: OcrStatus; image_path: string; result: OcrResult | null; error: string | null
+}
+
+/** Uploads a result-sheet image and enqueues an OCR job. Returns the job id. */
+export async function uploadResultSheet(file: File): Promise<string> {
+  const sb = requireSupabase()
+  const me = await uid()
+  const path = `${me}/${Date.now()}-${file.name}`
+  const { error: upErr } = await sb.storage.from('inbody-results').upload(path, file, { upsert: true })
+  if (upErr) throw upErr
+  const { data, error } = await sb.from('ocr_jobs').insert({ user_id: me, image_path: path }).select('id').single()
+  if (error) throw error
+  return (data as { id: string }).id
+}
+
+/** Subscribe to one OCR job's status changes. Returns an unsubscribe fn. */
+export function subscribeOcrJob(jobId: string, onChange: (job: OcrJob) => void) {
+  const sb = requireSupabase()
+  const channel = sb
+    .channel(`ocr:${jobId}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ocr_jobs', filter: `id=eq.${jobId}` },
+      (payload) => onChange(payload.new as OcrJob))
+    .subscribe()
+  return () => { sb.removeChannel(channel) }
+}
+
+export async function fetchOcrJob(jobId: string): Promise<OcrJob | null> {
+  const { data } = await requireSupabase().from('ocr_jobs').select('id, status, image_path, result, error').eq('id', jobId).single()
+  return (data as OcrJob) ?? null
+}
+
+/**
+ * Commits a reviewed OCR result as a measurement + its metric_readings,
+ * then marks the job 'committed'. `r` is the (possibly user-edited) result.
+ */
+export async function commitOcrMeasurement(jobId: string, r: OcrResult): Promise<void> {
+  const sb = requireSupabase()
+  const me = await uid()
+  const { data: m, error: mErr } = await sb.from('measurements').upsert({
+    user_id: me, date: r.date, source: 'ocr',
+    segmental: r.segmental,
+    detail: r.detail,
+  }, { onConflict: 'user_id,date' }).select('id').single()
+  if (mErr) throw mErr
+  const measurementId = (m as { id: string }).id
+
+  const metricVals: Record<MetricKey, number> = {
+    score: r.score, weight: r.weight, smm: r.smm, pbf: r.pbf, bodyFatMass: r.bodyFatMass,
+    bmi: r.bmi, bmr: r.bmr, visceral: r.visceral, tbw: r.tbw,
+  }
+  // replace any existing readings for this date, then insert the new set
+  await sb.from('metric_readings').delete().eq('user_id', me).eq('date', r.date)
+  const rows = (Object.keys(metricVals) as MetricKey[]).map((k) => ({
+    user_id: me, measurement_id: measurementId, metric_key: k, date: r.date, value: metricVals[k],
+  }))
+  const { error: rErr } = await sb.from('metric_readings').insert(rows)
+  if (rErr) throw rErr
+  await sb.from('ocr_jobs').update({ status: 'committed' }).eq('id', jobId)
+}

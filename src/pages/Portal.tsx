@@ -7,6 +7,7 @@ import {
 import { initialState, type PortalState, type View } from '../data/portalState'
 import { createFigure, type FigureHandle } from '../lib/threeFigure'
 import { useBackend } from '../data/useBackend'
+import OcrUpload from '../components/OcrUpload'
 
 const CTA = 'linear-gradient(110deg,#67D7DF,#2E9BA6)'
 const card: React.CSSProperties = {
@@ -610,6 +611,7 @@ export default function Portal() {
                     </button>
                   ))}
                 </div>
+                {be.configured && be.session && <OcrUpload onCommitted={be.reload} />}
               </section>
             </div>
 

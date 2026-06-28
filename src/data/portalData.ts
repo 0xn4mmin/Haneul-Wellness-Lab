@@ -40,13 +40,21 @@ export const gconf: Record<string, { disp: [number, number]; norm: [number, numb
   tbw: { disp: [30, 50], norm: [38, 46] },
 }
 
+export type RangeMap = Record<string, { min: number; max: number } | null | undefined> | null | undefined
+/** Resolve the normal range for a metric: the person's own range from their
+ *  InBody sheet if present, else the generic standard. */
+export function normFor(key: MetricKey, ranges?: RangeMap): [number, number] | null {
+  const r = ranges?.[key]
+  if (r && typeof r.min === 'number' && typeof r.max === 'number') return [r.min, r.max]
+  return gconf[key]?.norm ?? null
+}
 /** Judge a value against its standard range, factoring in whether higher or
  *  lower is better. Returns Good/Bad only when outside the range. */
-export function assess(key: MetricKey, val: number, md: Record<MetricKey, Metric> = metrics):
+export function assess(key: MetricKey, val: number, md: Record<MetricKey, Metric> = metrics, ranges?: RangeMap):
   { state: 'good' | 'bad' | 'normal'; label: string; color: string } {
-  const c = gconf[key]
-  if (!c) return { state: 'normal', label: '', color: '#fff' }
-  const [nMin, nMax] = c.norm
+  const norm = normFor(key, ranges)
+  if (!norm) return { state: 'normal', label: '', color: '#fff' }
+  const [nMin, nMax] = norm
   if (val >= nMin && val <= nMax) return { state: 'normal', label: '', color: '#fff' }
   const above = val > nMax
   const isGood = above ? md[key].good === 'up' : md[key].good === 'down'
@@ -179,13 +187,15 @@ export interface GaugeGeom {
   status: string; statusColor: string; verdict: '' | 'Good' | 'Bad'
   markerPct: number; underW: number; normW: number; overW: number
 }
-export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics): GaugeGeom[] {
+export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics, ranges?: RangeMap): GaugeGeom[] {
   return Object.keys(gconf).map((key) => {
     const m = metricsData[key as MetricKey]
     const c = gconf[key]
     const val = m.series[m.series.length - 1]
-    const [dMin, dMax] = c.disp
-    const [nMin, nMax] = c.norm
+    const [nMin, nMax] = normFor(key as MetricKey, ranges) ?? c.norm
+    // widen the display range so a personalized normal band still fits the bar
+    const dMin = Math.min(c.disp[0], nMin, val)
+    const dMax = Math.max(c.disp[1], nMax, val)
     const dr = dMax - dMin
     const markerPct = Math.max(2, Math.min(98, ((val - dMin) / dr) * 100))
     const underW = ((nMin - dMin) / dr) * 100

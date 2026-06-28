@@ -8,6 +8,7 @@ const MODEL = process.env.OCR_MODEL || 'claude-sonnet-4-6'
 const anthropic = new Anthropic() // reads ANTHROPIC_API_KEY
 
 const Seg = z.object({ kg: z.number(), pct: z.number() })
+const Range = z.object({ min: z.number(), max: z.number() })
 
 // Validated shape for one InBody result sheet.
 export const InBodySchema = z.object({
@@ -31,6 +32,15 @@ export const InBodySchema = z.object({
     mineral: z.number(),       // 무기질 kg
     idealWeight: z.number(),   // 적정체중 kg
   }),
+  // 결과지에 인쇄된 개인별 표준(정상) 범위. 항목별로 있으면 채우고 없으면 null.
+  ranges: z.object({
+    weight: Range.nullable().optional(),
+    smm: Range.nullable().optional(),
+    pbf: Range.nullable().optional(),
+    bodyFatMass: Range.nullable().optional(),
+    bmi: Range.nullable().optional(),
+    tbw: Range.nullable().optional(),
+  }).optional(),
   confidence: z.number(),      // 0~1
 })
 
@@ -42,6 +52,7 @@ const SYSTEM = [
   '값이 흐릿하면 가장 가능성 높은 판독값을 넣되 confidence 를 낮추세요.',
   '반드시 아래 JSON 객체 하나만 출력하세요 — 코드펜스(```)나 설명 문장 없이.',
   '숫자는 단위 없이 숫자만(예: 체지방률 20.0% → 20.0). 모르는 값은 0.',
+  '각 항목의 막대그래프에 표시된 개인별 표준(정상) 범위(밝게 칠해진 구간의 좌/우 경계 숫자)를 ranges 에 {min,max} 로 넣으세요. 해당 범위가 결과지에 없으면 그 항목은 null.',
 ].join(' ')
 
 const SHAPE = `{
@@ -53,6 +64,11 @@ const SHAPE = `{
     "trunk": {"kg": ., "pct": .}, "rightLeg": {"kg": ., "pct": .}, "leftLeg": {"kg": ., "pct": .}
   },
   "detail": {"phaseAngle": 위상각, "smi": SMI, "protein": 단백질kg, "mineral": 무기질kg, "idealWeight": 적정체중kg},
+  "ranges": {
+    "weight": {"min": 체중표준하한, "max": 체중표준상한} 또는 null,
+    "smm": {"min": ., "max": .} 또는 null, "pbf": {"min": ., "max": .} 또는 null,
+    "bodyFatMass": {"min": ., "max": .} 또는 null, "bmi": {"min": ., "max": .} 또는 null, "tbw": {"min": ., "max": .} 또는 null
+  },
   "confidence": 0.0~1.0
 }`
 

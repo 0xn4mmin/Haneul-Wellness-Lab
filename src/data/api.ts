@@ -78,11 +78,12 @@ export async function fetchMetricSeries(
 export interface MeasurementRow {
   id: string; date: string; segmental: Record<string, { kg: number; pct: number }>
   detail: Record<string, number>; result_sheet_path: string | null
+  ranges: Record<string, { min: number; max: number } | null> | null
 }
 export async function fetchMeasurements(userId: string): Promise<MeasurementRow[]> {
   const { data, error } = await requireSupabase()
     .from('measurements')
-    .select('id, date, segmental, detail, result_sheet_path')
+    .select('id, date, segmental, detail, result_sheet_path, ranges')
     .eq('user_id', userId)
     .order('date', { ascending: false })
   if (error) throw error
@@ -439,12 +440,15 @@ export async function getOrCreateDefaultRoom(): Promise<string | null> {
 // ───────────────────── InBody result OCR ─────────────────
 export type OcrStatus = 'pending' | 'processing' | 'review' | 'committed' | 'error'
 export interface SegVal { kg: number; pct: number }
+export interface MetricRange { min: number; max: number }
+export type MetricRanges = Partial<Record<'weight' | 'smm' | 'pbf' | 'bodyFatMass' | 'bmi' | 'tbw', MetricRange | null>>
 export interface OcrResult {
   date: string
   score: number; weight: number; smm: number; pbf: number; bodyFatMass: number
   bmi: number; bmr: number; visceral: number; tbw: number
   segmental: Record<'rightArm' | 'leftArm' | 'trunk' | 'rightLeg' | 'leftLeg', SegVal>
   detail: { phaseAngle: number; smi: number; protein: number; mineral: number; idealWeight: number }
+  ranges?: MetricRanges
   confidence: number
 }
 export interface OcrJob {
@@ -499,6 +503,7 @@ export async function commitOcrMeasurement(jobId: string, r: OcrResult): Promise
     user_id: me, date: r.date, source: 'ocr',
     segmental: r.segmental,
     detail: r.detail,
+    ranges: r.ranges ?? null,
     result_sheet_path: sheetPath,
   }, { onConflict: 'user_id,date' }).select('id').single()
   if (mErr) throw mErr

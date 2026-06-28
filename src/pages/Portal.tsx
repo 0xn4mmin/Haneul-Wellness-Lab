@@ -219,6 +219,8 @@ export default function Portal() {
   const privacyMap = be.privacy ?? s.privacy
   // signed-in user with no measurements yet → show an empty state, not mock data
   const noData = be.configured && !!be.session && !be.hasData
+  // personal standard ranges from the latest InBody sheet (backend only)
+  const measureRanges = be.configured ? (be.measurements?.[0]?.ranges ?? undefined) : undefined
 
   const meDisp = {
     name: isTrainer ? COACH.name : (be.profile?.name ?? s.profile.name),
@@ -243,7 +245,7 @@ export default function Portal() {
     return { ...base, pts, tip }
   }, [s.selectedMetric, s.hoverIdx, M, D])
 
-  const gauges = buildGauges(M)
+  const gauges = buildGauges(M, measureRanges)
   const radar = useMemo(() => {
     const base = buildRadar(M)
     const rh = s.radarHover
@@ -589,7 +591,7 @@ export default function Portal() {
                     ['기초대사량', 'bmr', 'kcal', 0],
                   ] as [string, MetricKey, string, number][]).map(([label, key, unit, fix]) => {
                     const val = M[key].series[M[key].series.length - 1]
-                    const a = assess(key, val, M)
+                    const a = assess(key, val, M, measureRanges)
                     return (
                       <div key={label}>
                         <div style={{ fontSize: 11, color: '#9DAFCB', display: 'flex', alignItems: 'center', gap: 5 }}>{label}{a.label && <span style={{ fontSize: 8.5, fontWeight: 700, color: '#06110F', background: a.color, padding: '0 5px', borderRadius: 6, letterSpacing: '.3px' }}>{a.label}</span>}</div>

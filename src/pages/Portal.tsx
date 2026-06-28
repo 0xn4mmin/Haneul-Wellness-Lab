@@ -61,6 +61,14 @@ export default function Portal() {
   const [cgMode, setCgMode] = useState<'absolute' | 'relative'>('relative')
   const [cgTarget, setCgTarget] = useState('')
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [msgActions, setMsgActions] = useState<string | null>(null)
+  const [replyTarget, setReplyTarget] = useState<{ id: string; author: string; text: string } | null>(null)
+  const [readModal, setReadModal] = useState<string[] | null>(null)
+  const [aliasModal, setAliasModal] = useState(false)
+  const [anonOn, setAnonOn] = useState(false)
+  const [anonName, setAnonName] = useState('')
+  const [anonPhoto, setAnonPhoto] = useState<File | null>(null)
+  const swipeRef = useRef<{ x: number; id: string } | null>(null)
   const [gaugeTip, setGaugeTip] = useState<{ key: string; side: 'min' | 'max' } | null>(null)
   const [gaugeInfo, setGaugeInfo] = useState<string | null>(null)
 
@@ -191,9 +199,9 @@ export default function Portal() {
   const onCancelReply = (id: string | number) => (be.configured ? be.setReplyTo(String(id), null) : setReplyToMock(Number(id), null))
   const sendMsg = () => {
     const t = s.newMsg.trim(); if (!t && !chatImg) return
-    if (be.configured) { void be.sendMessage(t, chatImg); set({ newMsg: '' }); setChatImg(null); return }
+    if (be.configured) { void be.sendMessage(t, chatImg, replyTarget?.id ?? null); set({ newMsg: '' }); setChatImg(null); setReplyTarget(null); return }
     const msg = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t, image: chatImg ? URL.createObjectURL(chatImg) : null }
-    setChatImg(null)
+    setChatImg(null); setReplyTarget(null)
     setFn((p) => ({ newMsg: '', messages: [...p.messages, msg] }))
   }
   const submitCreateRoom = () => {
@@ -403,7 +411,9 @@ export default function Portal() {
     { name: '김아리', initials: '아리', color: '#5E97A0', photo: null, role: '회원', statusColor: '#D6B25A' },
   ]
   const onlineMembers = be.configured
-    ? be.roomMembers.map((m) => ({ name: m.name, initials: m.initials, color: m.color, photo: m.photo ?? null, role: m.role === 'trainer' ? '트레이너' : '회원', statusColor: '#2E9BA6' }))
+    ? be.roomMembers.map((m) => m.anonymous
+        ? { name: m.aliasName || '익명', initials: (m.aliasName || '익').slice(0, 2), color: '#5E6B85', photo: m.aliasPhoto, role: '익명', statusColor: '#9DAFCB' }
+        : { name: m.name, initials: m.initials, color: m.color, photo: m.photo ?? null, role: m.role === 'trainer' ? '트레이너' : '회원', statusColor: '#2E9BA6' })
     : mockOnline
 
   // segmental: real from the latest measurement when signed in, else demo
@@ -1184,6 +1194,11 @@ export default function Portal() {
                   <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3' }}>{roomTitle}</div>
                   {activeRoom?.isPrivate && <span style={{ fontSize: 10.5, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 10, padding: '2px 8px' }}>비공개</span>}
                   <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {be.configured && activeRoom && (
+                      <button onClick={() => { setAnonOn(be.myRoomAlias?.anonymous ?? false); setAnonName(be.myRoomAlias?.aliasName ?? ''); setAnonPhoto(null); setAliasModal(true) }} title="입장 설정" style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: be.myRoomAlias?.anonymous ? '#C9A24B' : '#9DAFCB', background: be.myRoomAlias?.anonymous ? 'rgba(201,162,75,.14)' : 'rgba(255,249,238,.05)', border: `1px solid ${be.myRoomAlias?.anonymous ? 'rgba(201,162,75,.3)' : 'rgba(255,247,232,.12)'}`, borderRadius: 14, padding: '5px 10px' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" strokeLinecap="round" /></svg>{be.myRoomAlias?.anonymous ? '익명' : '프로필'}
+                      </button>
+                    )}
                     {activeRoom?.isOwn && (
                       <button onClick={() => { if (confirm(`'${activeRoom.name}' 방을 삭제할까요? 메시지도 모두 사라져요.`)) void be.deleteRoom(activeRoom.id) }} title="방 삭제" style={{ all: 'unset', cursor: 'pointer', width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(224,160,106,.8)' }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -1218,19 +1233,61 @@ export default function Portal() {
                         <button onClick={() => { setChatErr(''); setChatModal('join') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', padding: '10px 18px', borderRadius: 22 }}>코드로 입장</button>
                       </div>
                     </div>
-                  ) : messages.map((m) => (
-                    <div key={m.id} style={{ display: 'flex', gap: 11, flexDirection: m.dir, animation: 'hwl-rise .3s ease both' }}>
+                  ) : messages.map((m) => {
+                    const mid = String(m.id)
+                    const deleted = (m as { deleted?: boolean }).deleted
+                    const reactions = (m as { reactions?: { emoji: string; count: number; mine: boolean; users: string[] }[] }).reactions ?? []
+                    const reply = (m as { replyTo?: { author: string; text: string } | null }).replyTo
+                    const readCount = (m as { readCount?: number }).readCount ?? 0
+                    const readBy = (m as { readBy?: string[] }).readBy ?? []
+                    const isMine = m.role === 'me' || (m as { isMine?: boolean }).isMine
+                    const img = (m as { image?: string | null }).image
+                    const open = msgActions === mid
+                    return (
+                    <div key={m.id}
+                      onTouchStart={(e) => { if (be.configured && !deleted) swipeRef.current = { x: e.touches[0].clientX, id: mid } }}
+                      onTouchEnd={(e) => { const s = swipeRef.current; if (s && s.id === mid && e.changedTouches[0].clientX - s.x > 55 && !deleted) setReplyTarget({ id: mid, author: m.author, text: m.text || '사진' }); swipeRef.current = null }}
+                      style={{ display: 'flex', gap: 11, flexDirection: m.dir, animation: 'hwl-rise .3s ease both' }}>
                       <Avatar initials={m.initials} color={m.color} photo={m.photo} size={34} fontSize={11} ring={m.ring} />
-                      <div style={{ maxWidth: '74%' }}>
+                      <div style={{ maxWidth: '76%', display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3, justifyContent: m.justify }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{m.author}</span><span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)' }}>{m.time}</span></div>
-                        <div style={{ borderRadius: m.radius, background: m.bubbleBg, border: `1px solid ${m.bubbleBorder}`, overflow: 'hidden' }}>
-                          {(m as { image?: string | null }).image && <img src={(m as { image?: string | null }).image as string} alt="" style={{ width: '100%', maxWidth: 240, display: 'block' }} />}
-                          {m.text && <div style={{ fontSize: 14, lineHeight: 1.5, padding: '10px 14px', color: m.bubbleFg }}>{m.text}</div>}
-                        </div>
+                        {deleted ? (
+                          <div style={{ fontSize: 13, fontStyle: 'italic', color: 'rgba(231,239,234,.4)', padding: '8px 13px', borderRadius: m.radius, border: '1px dashed rgba(255,255,255,.14)' }}>메시지가 삭제되었습니다</div>
+                        ) : (
+                          <div onClick={() => be.configured && setMsgActions(open ? null : mid)} style={{ cursor: be.configured ? 'pointer' : 'default', borderRadius: m.radius, background: m.bubbleBg, border: `1px solid ${m.bubbleBorder}`, overflow: 'hidden' }}>
+                            {reply && <div style={{ fontSize: 11.5, padding: '7px 12px 0', color: isMine ? 'rgba(6,17,15,.7)' : 'rgba(231,239,234,.6)' }}><b>{reply.author}</b><div style={{ opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200, borderLeft: '2px solid currentColor', paddingLeft: 7, marginTop: 2 }}>{reply.text}</div></div>}
+                            {img && <img src={img} alt="" style={{ width: '100%', maxWidth: 240, display: 'block', marginTop: reply ? 6 : 0 }} />}
+                            {m.text && <div style={{ fontSize: 14, lineHeight: 1.5, padding: '10px 14px', color: m.bubbleFg }}>{m.text}</div>}
+                          </div>
+                        )}
+                        {reactions.length > 0 && (
+                          <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                            {reactions.map((r) => (
+                              <button key={r.emoji} onClick={() => be.toggleReaction(mid, r.emoji)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, fontSize: 11.5, padding: '2px 7px', borderRadius: 12, background: r.mine ? 'rgba(46,155,166,.25)' : 'rgba(255,255,255,.06)', border: `1px solid ${r.mine ? 'rgba(103,215,223,.4)' : 'rgba(255,255,255,.1)'}` }}>{r.emoji}<span style={{ color: '#9FE2E8' }}>{r.count}</span></button>
+                            ))}
+                          </div>
+                        )}
+                        {isMine && readCount > 0 && <button onClick={() => setReadModal(readBy)} style={{ all: 'unset', cursor: 'pointer', fontSize: 10, color: '#67D7DF', marginTop: 3 }}>읽음 {readCount}</button>}
+                        {open && be.configured && !deleted && (
+                          <div style={{ display: 'flex', gap: 4, marginTop: 5, background: '#0E1A38', border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, padding: '4px 6px' }}>
+                            {['👍', '❤️', '😂', '😢', '😮', '😡'].map((e) => <button key={e} onClick={() => { be.toggleReaction(mid, e); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 16, padding: '2px 3px' }}>{e}</button>)}
+                            <button onClick={() => { setReplyTarget({ id: mid, author: m.author, text: m.text || '사진' }); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#9DAFCB', padding: '0 6px', alignSelf: 'center' }}>답글</button>
+                            {isMine && <button onClick={() => { if (confirm('메시지를 삭제할까요?')) be.deleteMessage(mid); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(224,135,92,.9)', padding: '0 6px', alignSelf: 'center' }}>삭제</button>}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  ) })}
                 </div>
+                {replyTarget && (
+                  <div style={{ padding: '8px 18px 0', display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <div style={{ flex: 1, minWidth: 0, borderLeft: '2px solid #67D7DF', paddingLeft: 9 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#67D7DF' }}>{replyTarget.author}에게 답글</div>
+                      <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{replyTarget.text}</div>
+                    </div>
+                    <button onClick={() => setReplyTarget(null)} style={{ all: 'unset', cursor: 'pointer', fontSize: 16, color: 'rgba(231,239,234,.5)' }}>×</button>
+                  </div>
+                )}
                 {chatImg && (
                   <div style={{ padding: '10px 18px 0', position: 'relative', display: 'inline-block' }}>
                     <img src={URL.createObjectURL(chatImg)} alt="" style={{ maxHeight: 90, borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', display: 'block' }} />
@@ -1302,6 +1359,54 @@ export default function Portal() {
                     <button onClick={chatModal === 'create' ? submitCreateRoom : submitJoinRoom} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>{chatModal === 'create' ? '만들기' : '입장'}</button>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* 채팅 입장 설정(프로필/익명) 모달 */}
+          {aliasModal && (
+            <div onClick={() => setAliasModal(false)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 122, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                <div style={eyebrow}>Identity</div><div style={cardTitle}>채팅 입장 설정</div>
+                <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.55)', lineHeight: 1.6, margin: '8px 0 16px' }}>이 방에서 어떻게 보일지 선택하세요. 익명이면 닉네임과 사진을 따로 정할 수 있어요.</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  {[{ v: false, l: '내 프로필' }, { v: true, l: '익명' }].map((o) => (
+                    <button key={o.l} onClick={() => setAnonOn(o.v)} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '11px 0', borderRadius: 12, fontSize: 13.5, fontWeight: 600, border: `1px solid ${anonOn === o.v ? 'transparent' : 'rgba(255,255,255,.12)'}`, background: anonOn === o.v ? '#2E9BA6' : 'rgba(255,255,255,.05)', color: anonOn === o.v ? '#060B17' : '#9DAFCB' }}>{o.l}</button>
+                  ))}
+                </div>
+                {anonOn && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <label style={{ cursor: 'pointer', flexShrink: 0 }}>
+                        <div style={{ position: 'relative', width: 52, height: 52, borderRadius: '50%', overflow: 'hidden', background: '#5E6B85', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11 }}>
+                          {anonPhoto ? <img src={URL.createObjectURL(anonPhoto)} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : '사진'}
+                        </div>
+                        <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) setAnonPhoto(f); e.target.value = '' }} style={{ display: 'none' }} />
+                      </label>
+                      <div style={{ flex: 1 }}>
+                        <label style={labelStyle}>익명 닉네임</label>
+                        <input value={anonName} onChange={(e) => setAnonName(e.target.value)} placeholder="예) 익명의 러너" style={inputStyle} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => setAliasModal(false)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
+                  <button onClick={() => { void be.setRoomAlias(anonOn, anonName.trim() || null, anonPhoto); setAliasModal(false) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>적용</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 읽은 사람 모달 */}
+          {readModal && (
+            <div onClick={() => setReadModal(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 122, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 320, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 22, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                <div style={cardTitle}>읽음 {readModal.length}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
+                  {readModal.map((n, i) => <div key={i} style={{ fontSize: 13.5, color: '#EAF3F1' }}>{n}</div>)}
+                </div>
+                <button onClick={() => setReadModal(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', marginTop: 18, fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 12, borderRadius: 20 }}>닫기</button>
               </div>
             </div>
           )}

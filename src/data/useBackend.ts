@@ -40,7 +40,14 @@ export interface PostView {
   replyTo: string | null; replyToName: string | null; image?: string | null
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
-export interface MessageView { id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null }
+export interface MessageReaction { emoji: string; count: number; mine: boolean; users: string[] }
+export interface MessageView {
+  id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null
+  isMine: boolean; deleted: boolean; createdAt: string
+  replyTo: { author: string; text: string } | null
+  reactions: MessageReaction[]
+  readBy: string[]; readCount: number
+}
 export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null; isOwn: boolean }
 export interface ChallengeView { id: string; title: string; metrics: string[]; metricKeys: string[]; scope: string; startDate: string; endDate: string; daysLeft: number; isOwn: boolean }
 export interface ChallengeProgressItem { userId: string; name: string; initials: string; color: string; photo: string | null; metricKey: string; metricLabel: string; unit: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null; current: number | null; pct: number; weeklyPct: number; isMe: boolean }
@@ -103,10 +110,14 @@ export interface Backend {
   submitPostComment: (id: string) => void
   // chat
   messages: MessageView[] | null
-  sendMessage: (text: string, file?: File | null) => Promise<void>
+  sendMessage: (text: string, file?: File | null, replyTo?: string | null) => Promise<void>
+  deleteMessage: (id: string) => Promise<void>
+  toggleReaction: (id: string, emoji: string) => Promise<void>
+  setRoomAlias: (anonymous: boolean, aliasName: string | null, photoFile: File | null) => Promise<void>
+  myRoomAlias: { anonymous: boolean; aliasName: string | null } | null
   rooms: RoomView[] | null
   activeRoomId: string | null
-  roomMembers: { name: string; initials: string; color: string; photo?: string | null; role: 'client' | 'trainer' }[]
+  roomMembers: api.RoomMember[]
   selectRoom: (id: string) => void
   createRoom: (name: string, isPrivate: boolean) => Promise<void>
   joinRoom: (code: string) => Promise<{ ok: boolean; reason?: string }>
@@ -167,9 +178,10 @@ export function useBackend(): Backend {
   const [profile, setProfile] = useState<BackendProfile | null>(null)
   const [posts, setPosts] = useState<PostView[] | null>(null)
   const [messages, setMessages] = useState<MessageView[] | null>(null)
+  const [myRoomAlias, setMyRoomAlias] = useState<{ anonymous: boolean; aliasName: string | null } | null>(null)
   const [rooms, setRooms] = useState<RoomView[] | null>(null)
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
-  const [roomMembers, setRoomMembers] = useState<{ name: string; initials: string; color: string; photo?: string | null; role: 'client' | 'trainer' }[]>([])
+  const [roomMembers, setRoomMembers] = useState<api.RoomMember[]>([])
   const [members, setMembers] = useState<MemberView[] | null>(null)
   const [activeMember, setActiveMember] = useState<ActiveMemberDetail | null>(null)
   const [chartComments, setChartComments] = useState<ChartCommentView[] | null>(null)
@@ -228,11 +240,45 @@ export function useBackend(): Backend {
   const reloadMessages = useCallback(async (room?: string | null) => {
     const rid = room ?? roomId.current
     if (!rid) return
-    const rows = await api.fetchMessages(rid)
-    setMessages((rows as any[]).map((r) => {
+    const [rows, members] = await Promise.all([api.fetchMessages(rid), api.fetchRoomMembers(rid)])
+    setRoomMembers(members)
+    // per-room display identity: anonymous alias overrides the profile
+    const disp = new Map(members.map((m) => [m.userId, m.anonymous
+      ? { name: m.aliasName || '익명', initials: (m.aliasName || '익').slice(0, 2), color: '#5E6B85', photo: m.aliasPhoto }
+      : { name: m.name, initials: m.initials, color: m.color, photo: m.photo }]))
+    const dispOf = (id: string, fallback: { name: string; initials: string; color: string; photo: string | null }) => disp.get(id) ?? fallback
+    const byId = new Map((rows as any[]).map((r) => [r.id, r]))
+    const shaped: MessageView[] = (rows as any[]).map((r) => {
       const a = (r.author ?? {}) as Author & { id?: string }
-      return { id: r.id, author: a.name, initials: a.initials, color: a.avatar_color, photo: api.avatarUrl(a.photo_path), role: roleOf(a.id, a.role), time: clockTime(r.created_at), text: r.text, image: api.postMediaUrl(r.image_path) }
-    }))
+      const d = dispOf(r.author_id, { name: a.name, initials: a.initials, color: a.avatar_color, photo: api.avatarUrl(a.photo_path) })
+      // reactions grouped by emoji
+      const rmap = new Map<string, { count: number; mine: boolean; users: string[] }>()
+      for (const x of (r.message_reactions ?? []) as { emoji: string; user_id: string }[]) {
+        const g = rmap.get(x.emoji) ?? { count: 0, mine: false, users: [] }
+        g.count++; if (x.user_id === meId) g.mine = true
+        g.users.push(dispOf(x.user_id, { name: '회원', initials: '', color: '', photo: null }).name)
+        rmap.set(x.emoji, g)
+      }
+      const reactions = [...rmap.entries()].map(([emoji, g]) => ({ emoji, ...g }))
+      // reply preview
+      let replyTo: { author: string; text: string } | null = null
+      if (r.reply_to && byId.has(r.reply_to)) {
+        const rep = byId.get(r.reply_to)
+        const rd = dispOf(rep.author_id, { name: '회원', initials: '', color: '', photo: null })
+        replyTo = { author: rd.name, text: rep.deleted ? '삭제된 메시지' : (rep.text || (rep.image_path ? '사진' : '')) }
+      }
+      // read receipts: other members whose last_read >= this message time
+      const t = Date.parse(r.created_at)
+      const readers = members.filter((m) => m.userId !== r.author_id && m.lastReadAt && Date.parse(m.lastReadAt) >= t)
+        .map((m) => dispOf(m.userId, { name: m.name, initials: '', color: '', photo: null }).name)
+      return {
+        id: r.id, author: d.name, initials: d.initials, color: d.color, photo: d.photo,
+        role: roleOf(r.author_id, a.role), time: clockTime(r.created_at), text: r.text, image: api.postMediaUrl(r.image_path),
+        isMine: r.author_id === meId, deleted: !!r.deleted, createdAt: r.created_at,
+        replyTo, reactions, readBy: readers, readCount: readers.length,
+      }
+    })
+    setMessages(shaped)
   }, [meId])
 
   const reloadChallenges = useCallback(async () => {
@@ -283,7 +329,7 @@ export function useBackend(): Backend {
     if (!supabase || !meId) {
       setRemoteMetrics(null); setRemoteDates(null); setPrivacyState(null); setProfile(null)
       setLastMeasureISO(null); setCycleDays(28); setSleepLogs(null); setMeasurements(null); setGoals(null)
-      setPosts(null); setMessages(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
+      setPosts(null); setMessages(null); setMyRoomAlias(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
       setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null); setChallengeDetail(null); setNotifications(null)
       roomId.current = null
@@ -331,7 +377,7 @@ export function useBackend(): Backend {
         const first = myRooms[0]?.id ?? null
         roomId.current = first
         setActiveRoomId(first)
-        if (first) { await reloadMessages(first); setRoomMembers(await api.fetchRoomMembers(first)) }
+        if (first) { await reloadMessages(first); setMyRoomAlias(await api.fetchMyRoomMembership(first)) }
         else { setMessages([]); setRoomMembers([]) }
       } catch (e) {
         console.warn('[backend] load failed', e)
@@ -363,7 +409,11 @@ export function useBackend(): Backend {
   // realtime chat — re-subscribes when the active room changes
   useEffect(() => {
     if (!supabase || !meId || !activeRoomId) return
-    const unsub = api.subscribeMessages(activeRoomId, () => { void reloadMessages(activeRoomId) })
+    const unsub = api.subscribeMessages(activeRoomId, () => {
+      // viewing the room → mark read so others see my read receipt, then refresh
+      void api.markRoomRead(activeRoomId).catch(() => {})
+      void reloadMessages(activeRoomId)
+    })
     return unsub
   }, [meId, activeRoomId, reloadMessages])
 
@@ -474,10 +524,27 @@ export function useBackend(): Backend {
   }, [reloadPosts])
 
   // ── chat ──
-  const sendMessage = useCallback(async (text: string, file?: File | null) => {
+  const sendMessage = useCallback(async (text: string, file?: File | null, replyTo?: string | null) => {
     if (!activeRoomId) return
     const imagePath = file ? await api.uploadPostMedia(file) : null
-    await api.sendMessage(activeRoomId, text, imagePath)
+    await api.sendMessage(activeRoomId, text, imagePath, replyTo ?? null)
+    await api.markRoomRead(activeRoomId).catch(() => {})
+    await reloadMessages(activeRoomId)
+  }, [activeRoomId, reloadMessages])
+  const deleteMessage = useCallback(async (id: string) => {
+    await api.deleteMessage(id)
+    if (activeRoomId) await reloadMessages(activeRoomId)
+  }, [activeRoomId, reloadMessages])
+  const toggleReaction = useCallback(async (id: string, emoji: string) => {
+    const mine = messages?.find((m) => m.id === id)?.reactions.find((r) => r.emoji === emoji)?.mine
+    await (mine ? api.removeReaction(id, emoji) : api.addReaction(id, emoji))
+    if (activeRoomId) await reloadMessages(activeRoomId)
+  }, [messages, activeRoomId, reloadMessages])
+  const setRoomAlias = useCallback(async (anonymous: boolean, aliasName: string | null, photoFile: File | null) => {
+    if (!activeRoomId) return
+    const path = photoFile ? await api.uploadPostMedia(photoFile) : null
+    await api.setRoomAlias(activeRoomId, anonymous, aliasName, path)
+    setMyRoomAlias({ anonymous, aliasName: anonymous ? (aliasName || '익명') : null })
     await reloadMessages(activeRoomId)
   }, [activeRoomId, reloadMessages])
 
@@ -485,8 +552,9 @@ export function useBackend(): Backend {
     roomId.current = id
     setActiveRoomId(id)
     setMessages(null)
+    void api.markRoomRead(id).catch(() => {})
     void reloadMessages(id)
-    void api.fetchRoomMembers(id).then(setRoomMembers).catch(() => setRoomMembers([]))
+    void api.fetchMyRoomMembership(id).then(setMyRoomAlias).catch(() => setMyRoomAlias(null))
     // viewing the room clears its chat notifications
     setNotifications((ns) => ns?.map((n) => (n.type === 'chat' ? { ...n, read: true } : n)) ?? ns)
     void api.markRoomNotificationsRead(id).catch(() => {})
@@ -699,7 +767,8 @@ export function useBackend(): Backend {
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, updateProfile, uploadAvatar,
     posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
-    messages, sendMessage, rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom,
+    messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
+    rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom,
     challenges, createChallenge, deleteChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal,
     members, activeMember, openMember, closeMember, addMemberCheer,

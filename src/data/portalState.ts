@@ -10,7 +10,13 @@ export interface Post {
   likes: number; liked: boolean; open: boolean; comments: PostComment[]; draft: string; replyTo?: number | null; replyToName?: string | null
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
-export interface Message { id: number; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null }
+export interface Message {
+  id: number; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null
+  isMine?: boolean; deleted?: boolean; createdAt?: string
+  replyTo?: { author: string; text: string } | null
+  reactions?: { emoji: string; count: number; mine: boolean; users: string[] }[]
+  readBy?: string[]; readCount?: number
+}
 export interface Member { id: string; name: string; initials: string; color: string; photo?: string | null; bio: string; bio2: string; score: number; pub: string[] }
 export interface Profile { name: string; birth: string; gender: string; phone: string; photo: string | null }
 

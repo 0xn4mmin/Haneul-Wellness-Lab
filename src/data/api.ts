@@ -182,22 +182,46 @@ export async function deletePostComment(commentId: string) {
 export async function fetchMessages(roomId: string) {
   const { data, error } = await requireSupabase()
     .from('messages')
-    .select('id, text, image_path, created_at, author:profiles!messages_author_id_fkey(id, name, initials, avatar_color, role, photo_path)')
+    .select('id, author_id, text, image_path, deleted, reply_to, created_at, author:profiles!messages_author_id_fkey(id, name, initials, avatar_color, role, photo_path), message_reactions(emoji, user_id)')
     .eq('room_id', roomId).order('created_at', { ascending: true })
   if (error) throw error
   return data ?? []
 }
-export async function sendMessage(roomId: string, text: string, imagePath?: string | null) {
+export async function sendMessage(roomId: string, text: string, imagePath?: string | null, replyTo?: string | null) {
   const me = await uid()
-  return requireSupabase().from('messages').insert({ room_id: roomId, author_id: me, text, image_path: imagePath ?? null })
+  return requireSupabase().from('messages').insert({ room_id: roomId, author_id: me, text, image_path: imagePath ?? null, reply_to: replyTo ?? null })
 }
-/** Subscribe to new messages in a room. Returns an unsubscribe fn. */
-export function subscribeMessages(roomId: string, onInsert: (row: unknown) => void) {
+export async function deleteMessage(messageId: string) {
+  const me = await uid()
+  return requireSupabase().from('messages').update({ deleted: true, text: '', image_path: null }).eq('id', messageId).eq('author_id', me)
+}
+export async function addReaction(messageId: string, emoji: string) {
+  const me = await uid()
+  return requireSupabase().from('message_reactions').upsert({ message_id: messageId, user_id: me, emoji }, { onConflict: 'message_id,user_id,emoji' })
+}
+export async function removeReaction(messageId: string, emoji: string) {
+  const me = await uid()
+  return requireSupabase().from('message_reactions').delete().eq('message_id', messageId).eq('user_id', me).eq('emoji', emoji)
+}
+/** Per-room identity: profile, or anonymous nickname + photo. */
+export async function setRoomAlias(roomId: string, anonymous: boolean, aliasName: string | null, aliasPhotoPath: string | null) {
+  const me = await uid()
+  return requireSupabase().from('room_members')
+    .update({ anonymous, alias_name: anonymous ? (aliasName || '익명') : null, alias_photo: anonymous ? aliasPhotoPath : null })
+    .eq('room_id', roomId).eq('user_id', me)
+}
+export async function markRoomRead(roomId: string) {
+  const me = await uid()
+  return requireSupabase().from('room_members').update({ last_read_at: new Date().toISOString() }).eq('room_id', roomId).eq('user_id', me)
+}
+/** Subscribe to message inserts/updates + reactions in a room. */
+export function subscribeMessages(roomId: string, onChange: (row: unknown) => void) {
   const sb = requireSupabase()
   const channel = sb
     .channel(`room:${roomId}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
-      (payload) => onInsert(payload.new))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, (p) => onChange(p.new))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, (p) => onChange(p.new))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: `room_id=eq.${roomId}` }, (p) => onChange(p.new))
     .subscribe()
   return () => { sb.removeChannel(channel) }
 }
@@ -358,17 +382,30 @@ export function subscribeNotifications(userId: string, onChange: () => void) {
   return () => { sb.removeChannel(channel) }
 }
 
-export interface RoomMember { name: string; initials: string; color: string; photo: string | null; role: 'client' | 'trainer' }
-/** Members of a room (for the "접속 중" list). */
+export interface RoomMember {
+  userId: string; name: string; initials: string; color: string; photo: string | null; role: 'client' | 'trainer'
+  anonymous: boolean; aliasName: string | null; aliasPhoto: string | null; lastReadAt: string | null
+}
+/** Members of a room, with each member's per-room alias + read marker. */
 export async function fetchRoomMembers(roomId: string): Promise<RoomMember[]> {
   const { data } = await requireSupabase().from('room_members')
-    .select('profile:profiles!room_members_user_id_fkey(name, initials, avatar_color, role, photo_path)')
+    .select('user_id, anonymous, alias_name, alias_photo, last_read_at, profile:profiles!room_members_user_id_fkey(name, initials, avatar_color, role, photo_path)')
     .eq('room_id', roomId)
   return ((data ?? []) as unknown[]).map((r) => {
-    const p = (r as { profile: any }).profile
-    const prof = Array.isArray(p) ? p[0] : p
-    return prof ? { name: prof.name, initials: prof.initials, color: prof.avatar_color, photo: avatarUrl(prof.photo_path), role: prof.role } : null
+    const row = r as { user_id: string; anonymous: boolean; alias_name: string | null; alias_photo: string | null; last_read_at: string | null; profile: any }
+    const p = Array.isArray(row.profile) ? row.profile[0] : row.profile
+    if (!p) return null
+    return {
+      userId: row.user_id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), role: p.role,
+      anonymous: !!row.anonymous, aliasName: row.alias_name, aliasPhoto: postMediaUrl(row.alias_photo), lastReadAt: row.last_read_at,
+    }
   }).filter(Boolean) as RoomMember[]
+}
+/** My membership row for a room (to know if I've set an alias yet). */
+export async function fetchMyRoomMembership(roomId: string): Promise<{ anonymous: boolean; aliasName: string | null } | null> {
+  const me = await uid()
+  const { data } = await requireSupabase().from('room_members').select('anonymous, alias_name').eq('room_id', roomId).eq('user_id', me).maybeSingle()
+  return data ? { anonymous: !!data.anonymous, aliasName: data.alias_name } : null
 }
 
 // ───────────────────── profile / uploads ────────────────

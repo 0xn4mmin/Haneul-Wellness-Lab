@@ -57,6 +57,10 @@ export default function Portal() {
   const [chEnd, setChEnd] = useState('')
   const [postImg, setPostImg] = useState<File | null>(null)
   const [chatImg, setChatImg] = useState<File | null>(null)
+  const [cgMetric, setCgMetric] = useState('')
+  const [cgMode, setCgMode] = useState<'absolute' | 'relative'>('relative')
+  const [cgTarget, setCgTarget] = useState('')
+  const [inviteOpen, setInviteOpen] = useState(false)
   const [gaugeTip, setGaugeTip] = useState<{ key: string; side: 'min' | 'max' } | null>(null)
   const [gaugeInfo, setGaugeInfo] = useState<string | null>(null)
 
@@ -1041,16 +1045,18 @@ export default function Portal() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
                   {be.challenges.map((c) => (
                     <div key={c.id} style={{ ...card, borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <button onClick={() => { setCgMetric(''); setCgTarget(''); setCgMode('relative'); setInviteOpen(false); be.openChallenge(c) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 14, fontWeight: 700, color: '#EAF3F1' }}>{c.title}</span>
                           <span style={{ fontSize: 10, fontWeight: 600, color: '#67D7DF', background: 'rgba(103,215,223,.14)', borderRadius: 8, padding: '1px 7px' }}>D-{c.daysLeft}</span>
+                          {c.scope === 'private' && <span style={{ fontSize: 9.5, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 8, padding: '0 6px' }}>비공개</span>}
                         </div>
                         <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)', marginTop: 3, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
                           {c.metrics.map((m) => <span key={m} style={{ fontSize: 10.5, fontWeight: 600, color: '#9FE2E8', background: 'rgba(46,155,166,.14)', borderRadius: 7, padding: '1px 7px' }}>{m}</span>)}
                           <span>{c.startDate.slice(5).replace('-', '.')} ~ {c.endDate.slice(5).replace('-', '.')}</span>
                         </div>
-                      </div>
+                      </button>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.5)" strokeWidth="2" style={{ flexShrink: 0 }}><path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       {c.isOwn && (
                         <button onClick={() => { if (confirm('이 챌린지를 삭제할까요?')) void be.deleteChallenge(c.id) }} title="삭제" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(224,160,106,.8)' }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -1379,6 +1385,113 @@ export default function Portal() {
               </div>
             </div>
           )}
+
+          {/* 챌린지 상세 모달: 참여자별 목표 + 주간 성취도 비교 */}
+          {be.challengeDetail && (() => {
+            const cd = be.challengeDetail
+            const fmtN = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(1)
+            const goalText = (p: typeof cd.progress[number]) => p.mode === 'relative'
+              ? `${p.metricLabel} ${p.target > 0 ? '+' : ''}${fmtN(p.target)}${p.unit}`
+              : `${p.metricLabel} ${fmtN(p.target)}${p.unit} 달성`
+            const ranked = [...cd.progress].sort((a, b) => b.pct - a.pct)
+            const memberIds = new Set(cd.members.map((m) => m.userId))
+            const invitable = (be.members ?? []).filter((m) => !memberIds.has(m.id))
+            return (
+            <div onClick={be.closeChallenge} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 121, background: 'rgba(4,12,10,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                      <div style={eyebrow}>Challenge</div>
+                      {cd.scope === 'private' && <span style={{ fontSize: 9.5, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 8, padding: '0 6px' }}>비공개</span>}
+                    </div>
+                    <div style={cardTitle}>{cd.title}</div>
+                    <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)', marginTop: 4 }}>{cd.startDate.slice(5).replace('-', '.')} ~ {cd.endDate.slice(5).replace('-', '.')} · D-{cd.daysLeft} · 지표 {cd.metricLabels.join(', ')}</div>
+                  </div>
+                  <button onClick={be.closeChallenge} style={{ all: 'unset', cursor: 'pointer', fontSize: 20, color: 'rgba(231,239,234,.5)', lineHeight: 1 }}>×</button>
+                </div>
+
+                {/* 주간 성취도 비교 (리더보드) */}
+                <div style={{ marginTop: 18 }}>
+                  <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 10 }}>이번 주 성취도</div>
+                  {ranked.length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '4px 0 8px' }}>아직 목표를 설정한 참여자가 없어요.</div>}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                    {ranked.map((p, i) => (
+                      <div key={p.userId} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                        <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: i === 0 ? '#C9A24B' : 'rgba(231,239,234,.4)', width: 16, flexShrink: 0 }}>{i + 1}</span>
+                        <Avatar initials={p.initials} color={p.color} photo={p.photo} size={32} fontSize={11} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#EAF3F1' }}>{p.name}{p.isMe ? ' (나)' : ''}</span>
+                            <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: p.pct >= 100 ? '#7BD88F' : '#67D7DF' }}>{p.pct}%</span>
+                          </div>
+                          <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${p.pct}%`, background: p.pct >= 100 ? '#7BD88F' : 'linear-gradient(90deg,#2E9BA6,#67D7DF)' }} /></div>
+                          <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>{goalText(p)} · 현재 {p.current != null ? fmtN(p.current) + p.unit : '—'}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 내 목표 설정 */}
+                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+                  <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 10 }}>내 목표</div>
+                  {cd.myGoals.map((g) => (
+                    <div key={g.metricKey} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#EAF3F1', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '8px 12px', marginBottom: 7 }}>
+                      <span style={{ flex: 1 }}>{METRIC_INFO[g.metricKey] ? '' : ''}<b style={{ color: '#9FE2E8' }}>{cd.metricLabels[cd.metricKeys.indexOf(g.metricKey)] ?? g.metricKey}</b> {g.mode === 'relative' ? `${g.target > 0 ? '+' : ''}${g.target}` : `${g.target} 달성`}</span>
+                      <button onClick={() => void be.deleteChallengeGoal(g.metricKey)} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, color: 'rgba(224,135,92,.8)' }}>삭제</button>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+                    <select value={cgMetric} onChange={(e) => setCgMetric(e.target.value)} style={{ ...inputStyle, width: 'auto', flex: '1 1 110px', padding: '9px 10px', fontSize: 12.5 }}>
+                      <option value="">지표 선택</option>
+                      {cd.metricKeys.map((k, i) => <option key={k} value={k}>{cd.metricLabels[i]}</option>)}
+                    </select>
+                    <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,.12)' }}>
+                      {([['relative', '변화'], ['absolute', '달성']] as const).map(([m, l]) => (
+                        <button key={m} onClick={() => setCgMode(m)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '9px 11px', background: cgMode === m ? '#2E9BA6' : 'transparent', color: cgMode === m ? '#060B17' : '#9DAFCB' }}>{l}</button>
+                      ))}
+                    </div>
+                    <input value={cgTarget} onChange={(e) => setCgTarget(e.target.value)} type="number" step="0.1" placeholder={cgMode === 'relative' ? '예) -3' : '예) 35'} style={{ ...inputStyle, width: 78, flex: '0 0 78px', padding: '9px 10px', fontSize: 12.5 }} />
+                    <button onClick={() => { const t = parseFloat(cgTarget); if (cgMetric && !isNaN(t)) { void be.setChallengeGoal(cgMetric, cgMode, t); setCgMetric(''); setCgTarget('') } }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '9px 14px', borderRadius: 10 }}>저장</button>
+                  </div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginTop: 6, lineHeight: 1.5 }}>변화 = 현재 대비 증감(예: 체지방 -3), 달성 = 절대 목표값(예: 골격근 35). 시작 시점 수치를 기준으로 성취도를 계산해요.</div>
+                </div>
+
+                {/* 참여 멤버 + 초대 */}
+                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>참여 멤버 {cd.members.length}</div>
+                    {cd.isOwn && invitable.length > 0 && <button onClick={() => setInviteOpen((v) => !v)} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 16, padding: '5px 11px' }}>＋ 회원 초대</button>}
+                  </div>
+                  {inviteOpen && cd.isOwn && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, maxHeight: 160, overflowY: 'auto' }}>
+                      {invitable.map((m) => (
+                        <button key={m.id} onClick={() => void be.inviteToChallenge(m.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                          <Avatar initials={m.initials} color={m.color} photo={m.photo} size={28} fontSize={10} />
+                          <span style={{ flex: 1, fontSize: 12.5, color: '#EAF3F1' }}>{m.name}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#67D7DF' }}>초대</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                    {cd.members.map((m) => (
+                      <div key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 16, padding: '4px 9px 4px 4px' }}>
+                        <Avatar initials={m.initials} color={m.color} photo={m.photo} size={24} fontSize={9} />
+                        <span style={{ fontSize: 12, color: '#EAF3F1' }}>{m.name}{m.isMe ? ' (나)' : ''}</span>
+                        {cd.isOwn && !m.isMe && <button onClick={() => void be.removeChallengeMember(m.userId)} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: 'rgba(224,135,92,.7)' }}>×</button>}
+                      </div>
+                    ))}
+                  </div>
+                  {!cd.isOwn && (
+                    <button onClick={() => { if (confirm('이 챌린지에서 나갈까요?')) void be.leaveChallenge() }} style={{ all: 'unset', cursor: 'pointer', marginTop: 14, fontSize: 12.5, fontWeight: 600, color: 'rgba(224,135,92,.8)' }}>챌린지 나가기</button>
+                  )}
+                </div>
+              </div>
+            </div>
+            )
+          })()}
 
           {/* ============ 멤버 ============ */}
           {s.view === 'members' && (

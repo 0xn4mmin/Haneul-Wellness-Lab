@@ -279,6 +279,52 @@ export async function deleteChallenge(id: string) {
   return requireSupabase().from('challenges').delete().eq('id', id)
 }
 
+// ───────────── challenge participation / goals / progress ─────────
+export interface ChallengeMemberRow { user_id: string; name: string; initials: string; color: string; photo: string | null; status: string }
+export async function fetchChallengeMembers(challengeId: string): Promise<ChallengeMemberRow[]> {
+  const { data } = await requireSupabase().from('challenge_members')
+    .select('user_id, status, profile:profiles!challenge_members_user_id_fkey(name, initials, avatar_color, photo_path)')
+    .eq('challenge_id', challengeId)
+  return ((data ?? []) as any[]).map((r) => {
+    const p = Array.isArray(r.profile) ? r.profile[0] : r.profile
+    return { user_id: r.user_id, status: r.status, name: p?.name ?? '', initials: p?.initials ?? '', color: p?.avatar_color ?? '#5E97A0', photo: avatarUrl(p?.photo_path) }
+  })
+}
+export async function inviteToChallenge(challengeId: string, userId: string) {
+  return requireSupabase().from('challenge_members').upsert({ challenge_id: challengeId, user_id: userId, status: 'joined' }, { onConflict: 'challenge_id,user_id' })
+}
+export async function leaveChallenge(challengeId: string) {
+  const me = await uid()
+  return requireSupabase().from('challenge_members').delete().eq('challenge_id', challengeId).eq('user_id', me)
+}
+export async function removeChallengeMember(challengeId: string, userId: string) {
+  return requireSupabase().from('challenge_members').delete().eq('challenge_id', challengeId).eq('user_id', userId)
+}
+export interface ChallengeGoalRow { metric_key: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null }
+export async function fetchMyChallengeGoals(challengeId: string): Promise<ChallengeGoalRow[]> {
+  const me = await uid()
+  const { data } = await requireSupabase().from('challenge_goals')
+    .select('metric_key, mode, target, baseline').eq('challenge_id', challengeId).eq('user_id', me)
+  return (data ?? []) as ChallengeGoalRow[]
+}
+export async function setChallengeGoal(challengeId: string, metricKey: string, mode: 'absolute' | 'relative', target: number, baseline: number | null) {
+  const me = await uid()
+  return requireSupabase().from('challenge_goals')
+    .upsert({ challenge_id: challengeId, user_id: me, metric_key: metricKey, mode, target, baseline }, { onConflict: 'challenge_id,user_id,metric_key' })
+}
+export async function deleteChallengeGoal(challengeId: string, metricKey: string) {
+  const me = await uid()
+  return requireSupabase().from('challenge_goals').delete().eq('challenge_id', challengeId).eq('user_id', me).eq('metric_key', metricKey)
+}
+export interface ChallengeProgressRow {
+  user_id: string; name: string; initials: string; color: string; photo_path: string | null
+  metric_key: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null; current: number | null
+}
+export async function fetchChallengeProgress(challengeId: string): Promise<ChallengeProgressRow[]> {
+  const { data } = await requireSupabase().rpc('get_challenge_progress', { p_challenge: challengeId })
+  return (data ?? []) as ChallengeProgressRow[]
+}
+
 export interface NotificationRow {
   id: string; type: string; text: string; read: boolean; created_at: string
   actor: { name: string; initials: string; color: string; photo: string | null } | null

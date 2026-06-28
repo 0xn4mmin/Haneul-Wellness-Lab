@@ -42,7 +42,14 @@ export interface PostView {
 }
 export interface MessageView { id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null }
 export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null; isOwn: boolean }
-export interface ChallengeView { id: string; title: string; metrics: string[]; startDate: string; endDate: string; daysLeft: number; isOwn: boolean }
+export interface ChallengeView { id: string; title: string; metrics: string[]; metricKeys: string[]; scope: string; startDate: string; endDate: string; daysLeft: number; isOwn: boolean }
+export interface ChallengeProgressItem { userId: string; name: string; initials: string; color: string; photo: string | null; metricKey: string; metricLabel: string; unit: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null; current: number | null; pct: number; isMe: boolean }
+export interface ChallengeDetail {
+  id: string; title: string; metricKeys: string[]; metricLabels: string[]; startDate: string; endDate: string; scope: string; daysLeft: number; isOwn: boolean
+  members: { userId: string; name: string; initials: string; color: string; photo: string | null; isMe: boolean }[]
+  myGoals: { metricKey: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null }[]
+  progress: ChallengeProgressItem[]
+}
 const METRIC_LABEL: Record<string, string> = { weight: '체중', smm: '골격근량', pbf: '체지방률', bodyFatMass: '체지방량', bmi: 'BMI', bmr: '기초대사량', visceral: '내장지방', tbw: '체수분', score: '인바디 점수' }
 export interface NotificationView { id: string; type: string; text: string; read: boolean; time: string; actorInitials: string; actorColor: string; actorPhoto?: string | null }
 export interface MemberView { id: string; name: string; initials: string; color: string; photo?: string | null; bio: string; bio2: string; score: number; pub: string[] }
@@ -108,6 +115,14 @@ export interface Backend {
   challenges: ChallengeView[] | null
   createChallenge: (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => Promise<void>
   deleteChallenge: (id: string) => Promise<void>
+  challengeDetail: ChallengeDetail | null
+  openChallenge: (cv: ChallengeView) => void
+  closeChallenge: () => void
+  inviteToChallenge: (userId: string) => Promise<void>
+  removeChallengeMember: (userId: string) => Promise<void>
+  leaveChallenge: () => Promise<void>
+  setChallengeGoal: (metricKey: string, mode: 'absolute' | 'relative', target: number) => Promise<void>
+  deleteChallengeGoal: (metricKey: string) => Promise<void>
   // members
   members: MemberView[] | null
   activeMember: ActiveMemberDetail | null
@@ -160,6 +175,7 @@ export function useBackend(): Backend {
   const [chartComments, setChartComments] = useState<ChartCommentView[] | null>(null)
   const [coachFeedback, setCoachFeedback] = useState<FeedbackItem[] | null>(null)
   const [challenges, setChallenges] = useState<ChallengeView[] | null>(null)
+  const [challengeDetail, setChallengeDetail] = useState<ChallengeDetail | null>(null)
   const [notifications, setNotifications] = useState<NotificationView[] | null>(null)
   const [roster, setRoster] = useState<RosterRow[] | null>(null)
   const [briefing, setBriefing] = useState<{ focus: string; summary: string; actions: string[] } | null>(null)
@@ -226,7 +242,7 @@ export function useBackend(): Backend {
       const keys = (c.metric_keys && c.metric_keys.length ? c.metric_keys : (c.metric_key ? [c.metric_key] : []))
       return {
         id: c.id, title: c.title,
-        metrics: keys.map((k) => METRIC_LABEL[k] ?? k),
+        metrics: keys.map((k) => METRIC_LABEL[k] ?? k), metricKeys: keys, scope: c.scope,
         startDate: c.starts_at, endDate: c.ends_at,
         daysLeft: Math.max(0, Math.ceil((Date.parse(c.ends_at) - Date.now()) / dayMs)),
         isOwn: c.created_by === meId,
@@ -269,7 +285,7 @@ export function useBackend(): Backend {
       setLastMeasureISO(null); setCycleDays(28); setSleepLogs(null); setMeasurements(null); setGoals(null)
       setPosts(null); setMessages(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
-      setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null); setNotifications(null)
+      setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null); setChallengeDetail(null); setNotifications(null)
       roomId.current = null
       setLoaded(false)
       return
@@ -511,6 +527,61 @@ export function useBackend(): Backend {
     await reloadChallenges()
   }, [reloadChallenges])
 
+  const loadChallengeDetail = useCallback(async (cv: ChallengeView) => {
+    const [members, myGoals, progress] = await Promise.all([
+      api.fetchChallengeMembers(cv.id), api.fetchMyChallengeGoals(cv.id), api.fetchChallengeProgress(cv.id),
+    ])
+    const prog: ChallengeProgressItem[] = progress.map((r) => {
+      const m = MOCK_METRICS[r.metric_key as MetricKey]
+      const base = r.baseline ?? r.current ?? 0
+      const goalDelta = r.mode === 'relative' ? Number(r.target) : (Number(r.target) - base)
+      const actual = (r.current ?? base) - base
+      let pct = goalDelta === 0 ? (actual === 0 ? 100 : 0) : (actual / goalDelta) * 100
+      pct = Math.max(0, Math.min(100, Math.round(pct)))
+      return {
+        userId: r.user_id, name: r.name, initials: r.initials, color: r.color, photo: api.avatarUrl(r.photo_path),
+        metricKey: r.metric_key, metricLabel: m?.label ?? r.metric_key, unit: m?.unit ?? '',
+        mode: r.mode, target: Number(r.target), baseline: r.baseline, current: r.current, pct, isMe: r.user_id === meId,
+      }
+    })
+    setChallengeDetail({
+      id: cv.id, title: cv.title, metricKeys: cv.metricKeys, metricLabels: cv.metrics,
+      startDate: cv.startDate, endDate: cv.endDate, scope: cv.scope, daysLeft: cv.daysLeft, isOwn: cv.isOwn,
+      members: members.map((m) => ({ userId: m.user_id, name: m.name, initials: m.initials, color: m.color, photo: m.photo, isMe: m.user_id === meId })),
+      myGoals: myGoals.map((g) => ({ metricKey: g.metric_key, mode: g.mode, target: Number(g.target), baseline: g.baseline })),
+      progress: prog,
+    })
+  }, [meId])
+  const openChallenge = useCallback((cv: ChallengeView) => { void loadChallengeDetail(cv) }, [loadChallengeDetail])
+  const closeChallenge = useCallback(() => setChallengeDetail(null), [])
+  const inviteToChallenge = useCallback(async (userId: string) => {
+    if (!challengeDetail) return
+    await api.inviteToChallenge(challengeDetail.id, userId)
+    const cv = (challenges ?? []).find((c) => c.id === challengeDetail.id); if (cv) await loadChallengeDetail(cv)
+  }, [challengeDetail, challenges, loadChallengeDetail])
+  const removeChallengeMember = useCallback(async (userId: string) => {
+    if (!challengeDetail) return
+    await api.removeChallengeMember(challengeDetail.id, userId)
+    const cv = (challenges ?? []).find((c) => c.id === challengeDetail.id); if (cv) await loadChallengeDetail(cv)
+  }, [challengeDetail, challenges, loadChallengeDetail])
+  const leaveChallenge = useCallback(async () => {
+    if (!challengeDetail) return
+    await api.leaveChallenge(challengeDetail.id)
+    setChallengeDetail(null); await reloadChallenges()
+  }, [challengeDetail, reloadChallenges])
+  const setChallengeGoal = useCallback(async (metricKey: string, mode: 'absolute' | 'relative', target: number) => {
+    if (!challengeDetail) return
+    const sv = remoteMetrics?.[metricKey as MetricKey]?.series
+    const baseline = sv && sv.length ? sv[sv.length - 1] : null
+    await api.setChallengeGoal(challengeDetail.id, metricKey, mode, target, baseline)
+    const cv = (challenges ?? []).find((c) => c.id === challengeDetail.id); if (cv) await loadChallengeDetail(cv)
+  }, [challengeDetail, challenges, remoteMetrics, loadChallengeDetail])
+  const deleteChallengeGoal = useCallback(async (metricKey: string) => {
+    if (!challengeDetail) return
+    await api.deleteChallengeGoal(challengeDetail.id, metricKey)
+    const cv = (challenges ?? []).find((c) => c.id === challengeDetail.id); if (cv) await loadChallengeDetail(cv)
+  }, [challengeDetail, challenges, loadChallengeDetail])
+
   // ── members ──
   const openMember = useCallback((id: string) => {
     void (async () => {
@@ -628,6 +699,7 @@ export function useBackend(): Backend {
     posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom,
     challenges, createChallenge, deleteChallenge,
+    challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal,
     members, activeMember, openMember, closeMember, addMemberCheer,
     chartComments, loadChartComments, addChartComment, coachFeedback, addCoachFeedback,
     roster, addCoachNote,

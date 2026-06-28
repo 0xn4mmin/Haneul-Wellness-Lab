@@ -56,6 +56,7 @@ export default function Portal() {
   const [chStart, setChStart] = useState('')
   const [chEnd, setChEnd] = useState('')
   const [editChallengeId, setEditChallengeId] = useState<string | null>(null)
+  const [roomMenu, setRoomMenu] = useState(false)
   const [postImg, setPostImg] = useState<File | null>(null)
   const [chatImg, setChatImg] = useState<File | null>(null)
   const [cgMetric, setCgMetric] = useState('')
@@ -1214,18 +1215,31 @@ export default function Portal() {
                   </div>
                 </div>
                 {chatRooms != null && (
-                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-                    {chatRooms.map((r) => {
-                      const sel = r.id === be.activeRoomId
-                      return (
-                        <button key={r.id} onClick={() => be.selectRoom(r.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 16, background: sel ? CTA : 'rgba(255,249,238,.05)', color: sel ? '#060B17' : '#9DAFCB', border: `1px solid ${sel ? 'transparent' : 'rgba(255,247,232,.12)'}` }}>
-                          {r.isPrivate && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={sel ? '#060B17' : '#9DAFCB'} strokeWidth="2"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
-                          {r.name}
-                        </button>
-                      )
-                    })}
-                    <button onClick={() => { setChatErr(''); setChatModal('create') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 16, background: 'rgba(46,155,166,.14)', color: '#67D7DF', border: '1px solid rgba(103,215,223,.3)' }}>+ 방 만들기</button>
-                    <button onClick={() => { setChatErr(''); setChatModal('join') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 16, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>코드로 입장</button>
+                  <div style={{ position: 'relative', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,.06)', zIndex: 5 }}>
+                    <button onClick={() => setRoomMenu((v) => !v)} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,249,238,.05)', color: '#EAF3F1', border: '1px solid rgba(255,247,232,.12)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#67D7DF" strokeWidth="1.8"><path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" /></svg>
+                      <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeRoom ? activeRoom.name : '채팅방 선택'}</span>
+                      <span style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>{chatRooms.length}개</span>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.7)" strokeWidth="2" style={{ transform: roomMenu ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                    {roomMenu && (
+                      <>
+                        <div onClick={() => setRoomMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
+                        <div style={{ position: 'absolute', top: '100%', left: 20, right: 20, marginTop: 4, zIndex: 10, background: '#0E1A38', border: '1px solid rgba(255,247,232,.14)', borderRadius: 14, boxShadow: '0 24px 50px -20px rgba(0,0,0,.8)', overflow: 'hidden', maxHeight: 280, overflowY: 'auto' }}>
+                          {chatRooms.map((r) => { const sel = r.id === be.activeRoomId; return (
+                            <button key={r.id} onClick={() => { be.selectRoom(r.id); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, width: '100%', boxSizing: 'border-box', fontSize: 13, fontWeight: 600, padding: '11px 14px', background: sel ? 'rgba(46,155,166,.16)' : 'transparent', color: sel ? '#67D7DF' : '#EAF3F1', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+                              {r.isPrivate && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
+                              <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
+                              {sel && <span style={{ fontSize: 10.5 }}>현재</span>}
+                            </button>
+                          ) })}
+                          <div style={{ display: 'flex', gap: 8, padding: 10 }}>
+                            <button onClick={() => { setChatErr(''); setChatModal('create'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(46,155,166,.14)', color: '#67D7DF', border: '1px solid rgba(103,215,223,.3)' }}>＋ 방 만들기</button>
+                            <button onClick={() => { setChatErr(''); setChatModal('join'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>코드로 입장</button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
                 <div ref={chatRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>

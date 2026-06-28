@@ -1349,7 +1349,7 @@ export default function Portal() {
                       .then(() => { set({ profileSaved: '✓ 저장되었습니다.' }); go('health') })
                       .catch(() => set({ profileSaved: '⚠ 저장에 실패했어요. 잠시 후 다시 시도하세요.' }))
                   } else { set({ profileSaved: '✓ 저장되었습니다.' }); go('health') }
-                }} style={{ all: 'unset', cursor: 'pointer', marginTop: 24, textAlign: 'center', display: 'block', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24 }}>저장하기</button>
+                }} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', marginTop: 24, textAlign: 'center', display: 'block', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24 }}>저장하기</button>
                 <div style={{ textAlign: 'center', fontSize: 12, color: '#67D7DF', marginTop: 10 }}>{s.profileSaved}</div>
 
                 {/* 보기 모드 — 모바일에선 사이드바가 없으므로 여기서 전환 (트레이너 계정만) */}
@@ -1364,7 +1364,7 @@ export default function Portal() {
                 )}
 
                 {be.configured && be.session && (
-                  <button onClick={doLogout} style={{ all: 'unset', cursor: 'pointer', marginTop: 14, textAlign: 'center', display: 'block', width: '100%', fontSize: 13.5, fontWeight: 600, color: 'rgba(231,239,234,.6)', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: 12, borderRadius: 24 }}>로그아웃</button>
+                  <button onClick={doLogout} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', marginTop: 14, textAlign: 'center', display: 'block', width: '100%', fontSize: 13.5, fontWeight: 600, color: 'rgba(231,239,234,.6)', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: 12, borderRadius: 24 }}>로그아웃</button>
                 )}
               </section>
             </div>

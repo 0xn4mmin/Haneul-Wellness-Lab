@@ -1061,36 +1061,6 @@ export default function Portal() {
                 </div>
               )}
 
-              {s.showChallengeForm && (
-                <div onClick={() => set({ showChallengeForm: false })} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,12,10,.8)', backdropFilter: 'blur(6px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'hwl-fade .25s ease both' }}>
-                  <div style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom))' }}>
-                    <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
-                      <div style={eyebrow}>New Challenge</div><div style={cardTitle}>챌린지 만들기</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 18 }}>
-                        <div><label style={labelStyle}>제목</label><input value={s.chTitle} onChange={(e) => set({ chTitle: e.target.value })} placeholder="예) 6월 체성분 챌린지" style={inputStyle} /></div>
-                        <div>
-                          <label style={labelStyle}>지표 <span style={{ fontWeight: 500, color: 'rgba(231,239,234,.4)' }}>· 여러 개 선택 가능</span></label>
-                          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>{CH_METRIC_OPTS.map((o) => { const on = chMetricsSel.includes(o.key); return (
-                            <button key={o.key} onClick={() => setChMetricsSel((xs) => on ? xs.filter((k) => k !== o.key) : [...xs, o.key])} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: on ? '#2E9BA6' : 'rgba(255,255,255,.05)', color: on ? '#060B17' : '#9DAFCB', border: `1px solid ${on ? 'transparent' : 'rgba(255,255,255,.12)'}` }}>{on ? '✓ ' : ''}{o.label}</button>
-                          ) })}</div>
-                          <div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)', marginTop: 7, lineHeight: 1.5 }}>목표 수치는 참여하는 멤버가 각자 설정해요.</div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                          <div style={{ flex: 1, minWidth: 130 }}><label style={labelStyle}>시작일</label><input type="date" value={chStart} max={chEnd || undefined} onChange={(e) => setChStart(e.target.value)} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0 }} /></div>
-                          <div style={{ flex: 1, minWidth: 130 }}><label style={labelStyle}>종료일</label><input type="date" value={chEnd} min={chStart || undefined} onChange={(e) => setChEnd(e.target.value)} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0 }} /></div>
-                        </div>
-                        <div><label style={labelStyle}>공개 범위</label><div style={{ display: 'flex', gap: 7 }}>{chScopes.map((c, i) => <button key={i} onClick={() => set({ chScope: c.label })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: c.bg, color: c.fg, border: `1px solid ${c.bg === 'rgba(255,255,255,.05)' ? 'rgba(255,255,255,.12)' : 'transparent'}` }}>{c.label}</button>)}</div></div>
-                        {s.chDone.startsWith('⚠') && <div style={{ fontSize: 12, color: '#E0875C' }}>{s.chDone}</div>}
-                      </div>
-                      <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-                        <button onClick={() => set({ showChallengeForm: false, chDone: '' })} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
-                        <button onClick={createChallenge} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>만들기</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <section style={{ ...card, borderRadius: 22, padding: 18, marginBottom: 20 }}>
                 <div style={{ display: 'flex', gap: 12 }}>
                   <Avatar initials={meDisp.initials} color={meDisp.color} photo={meDisp.photo} size={42} fontSize={13} />
@@ -1288,41 +1258,45 @@ export default function Portal() {
               </aside>
 
               {/* 방 만들기 / 코드로 입장 모달 */}
-              {chatModal !== 'none' && (
-                <div onClick={() => setChatModal('none')} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,9,18,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'hwl-fade .25s ease both' }}>
-                  <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
-                    <div style={eyebrow}>{chatModal === 'create' ? 'New Room' : 'Join Room'}</div>
-                    <div style={cardTitle}>{chatModal === 'create' ? '채팅방 만들기' : '코드로 입장'}</div>
-                    {chatModal === 'create' ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 18 }}>
-                        <div>
-                          <label style={labelStyle}>방 이름</label>
-                          <input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder="예) 7월 챌린지 라운지" style={inputStyle} />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>공개 범위</label>
-                          <div style={{ display: 'flex', gap: 7 }}>
-                            {[{ v: false, l: '공개' }, { v: true, l: '비공개(코드)' }].map((o) => (
-                              <button key={o.l} onClick={() => setRoomPrivate(o.v)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: roomPrivate === o.v ? '#2E9BA6' : 'rgba(255,249,238,.05)', color: roomPrivate === o.v ? '#060B17' : '#9DAFCB' }}>{o.l}</button>
-                            ))}
-                          </div>
-                          {roomPrivate && <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 7 }}>비공개 방은 입장 코드가 자동 생성돼요. 만든 뒤 사이드바에서 확인·공유하세요.</div>}
-                        </div>
+            </div>
+          )}
+
+          {/* 채팅방 만들기 / 입장 모달 (뷰 div 밖) */}
+          {chatModal !== 'none' && (
+            <div onClick={() => setChatModal('none')} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'hwl-fade .25s ease both' }}>
+              <div style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom))' }}>
+                <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                  <div style={eyebrow}>{chatModal === 'create' ? 'New Room' : 'Join Room'}</div>
+                  <div style={cardTitle}>{chatModal === 'create' ? '채팅방 만들기' : '코드로 입장'}</div>
+                  {chatModal === 'create' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 18 }}>
+                      <div>
+                        <label style={labelStyle}>방 이름</label>
+                        <input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder="예) 7월 챌린지 라운지" style={inputStyle} />
                       </div>
-                    ) : (
-                      <div style={{ marginTop: 18 }}>
-                        <label style={labelStyle}>입장 코드</label>
-                        <input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="예) K7P2Q9" maxLength={6} style={{ ...inputStyle, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '3px', fontSize: 18, textAlign: 'center' }} />
+                      <div>
+                        <label style={labelStyle}>공개 범위</label>
+                        <div style={{ display: 'flex', gap: 7 }}>
+                          {[{ v: false, l: '공개' }, { v: true, l: '비공개(코드)' }].map((o) => (
+                            <button key={o.l} onClick={() => setRoomPrivate(o.v)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: roomPrivate === o.v ? '#2E9BA6' : 'rgba(255,249,238,.05)', color: roomPrivate === o.v ? '#060B17' : '#9DAFCB' }}>{o.l}</button>
+                          ))}
+                        </div>
+                        {roomPrivate && <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 7 }}>비공개 방은 입장 코드가 자동 생성돼요. 만든 뒤 사이드바에서 확인·공유하세요.</div>}
                       </div>
-                    )}
-                    {chatErr && <div style={{ fontSize: 12, color: '#E0A06A', marginTop: 10 }}>{chatErr}</div>}
-                    <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-                      <button onClick={() => setChatModal('none')} style={{ all: 'unset', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9FBCB5', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.15)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
-                      <button onClick={chatModal === 'create' ? submitCreateRoom : submitJoinRoom} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>{chatModal === 'create' ? '만들기' : '입장'}</button>
                     </div>
+                  ) : (
+                    <div style={{ marginTop: 18 }}>
+                      <label style={labelStyle}>입장 코드</label>
+                      <input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="예) K7P2Q9" maxLength={6} style={{ ...inputStyle, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '3px', fontSize: 18, textAlign: 'center' }} />
+                    </div>
+                  )}
+                  {chatErr && <div style={{ fontSize: 12, color: '#E0A06A', marginTop: 10 }}>{chatErr}</div>}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+                    <button onClick={() => setChatModal('none')} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9FBCB5', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.15)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
+                    <button onClick={chatModal === 'create' ? submitCreateRoom : submitJoinRoom} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>{chatModal === 'create' ? '만들기' : '입장'}</button>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -1370,6 +1344,37 @@ export default function Portal() {
                 <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
                   <button onClick={() => setGoalModal(false)} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', padding: 13, borderRadius: 22 }}>취소</button>
                   <button onClick={() => { ringDefs.forEach((d) => { const raw = (goalDraft[d.key] ?? '').trim(); const v = raw === '' ? null : parseFloat(raw); if (raw !== '' && (v == null || isNaN(v))) return; be.setGoal(d.key, v) }); setGoalModal(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>저장</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 챌린지 만들기 모달 (뷰 div 밖에 둬서 transform 컨테이닝 블록에 갇히지 않게) */}
+          {s.showChallengeForm && (
+            <div onClick={() => set({ showChallengeForm: false })} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,12,10,.82)', backdropFilter: 'blur(6px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'hwl-fade .25s ease both' }}>
+              <div style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom))' }}>
+                <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                  <div style={eyebrow}>New Challenge</div><div style={cardTitle}>챌린지 만들기</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 18 }}>
+                    <div><label style={labelStyle}>제목</label><input value={s.chTitle} onChange={(e) => set({ chTitle: e.target.value })} placeholder="예) 6월 체성분 챌린지" style={inputStyle} /></div>
+                    <div>
+                      <label style={labelStyle}>지표 <span style={{ fontWeight: 500, color: 'rgba(231,239,234,.4)' }}>· 여러 개 선택 가능</span></label>
+                      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>{CH_METRIC_OPTS.map((o) => { const on = chMetricsSel.includes(o.key); return (
+                        <button key={o.key} onClick={() => setChMetricsSel((xs) => on ? xs.filter((k) => k !== o.key) : [...xs, o.key])} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: on ? '#2E9BA6' : 'rgba(255,255,255,.05)', color: on ? '#060B17' : '#9DAFCB', border: `1px solid ${on ? 'transparent' : 'rgba(255,255,255,.12)'}` }}>{on ? '✓ ' : ''}{o.label}</button>
+                      ) })}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)', marginTop: 7, lineHeight: 1.5 }}>목표 수치는 참여하는 멤버가 각자 설정해요.</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 130 }}><label style={labelStyle}>시작일</label><input type="date" value={chStart} max={chEnd || undefined} onChange={(e) => setChStart(e.target.value)} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0 }} /></div>
+                      <div style={{ flex: 1, minWidth: 130 }}><label style={labelStyle}>종료일</label><input type="date" value={chEnd} min={chStart || undefined} onChange={(e) => setChEnd(e.target.value)} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0 }} /></div>
+                    </div>
+                    <div><label style={labelStyle}>공개 범위</label><div style={{ display: 'flex', gap: 7 }}>{chScopes.map((c, i) => <button key={i} onClick={() => set({ chScope: c.label })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: c.bg, color: c.fg, border: `1px solid ${c.bg === 'rgba(255,255,255,.05)' ? 'rgba(255,255,255,.12)' : 'transparent'}` }}>{c.label}</button>)}</div></div>
+                    {s.chDone.startsWith('⚠') && <div style={{ fontSize: 12, color: '#E0875C' }}>{s.chDone}</div>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+                    <button onClick={() => set({ showChallengeForm: false, chDone: '' })} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
+                    <button onClick={createChallenge} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>만들기</button>
+                  </div>
                 </div>
               </div>
             </div>

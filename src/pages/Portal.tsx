@@ -242,6 +242,7 @@ export default function Portal() {
     name: isTrainer ? COACH.name : (be.profile?.name ?? s.profile.name),
     initials: isTrainer ? COACH.initials : (be.profile?.initials ?? ME.initials),
     color: isTrainer ? COACH.color : (be.profile?.color ?? ME.color),
+    photo: isTrainer ? null : (be.configured ? be.profile?.photoUrl : s.profile.photo),
     role: isTrainer ? '트레이너 · 관리자' : ME.role,
   }
 
@@ -338,14 +339,14 @@ export default function Portal() {
   const metricKeysForCard: MetricKey[] = ['score', 'weight', 'smm', 'pbf', 'bmi', 'tbw']
   const membersSource = be.configured ? (be.members ?? []) : s.members
   const membersDisp = membersSource.map((m) => ({ ...m, publicCount: m.pub.length, lockedCount: metricKeysForCard.length - m.pub.filter((k) => metricKeysForCard.includes(k as MetricKey)).length }))
-  type ActiveMember = { id: string; name: string; initials: string; color: string; bio2: string; score: number; measureCount?: number; lastDate?: string | null; metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]; comments: { author: string; initials: string; color: string; text: string }[] }
+  type ActiveMember = { id: string; name: string; initials: string; color: string; photo?: string | null; bio2: string; score: number; measureCount?: number; lastDate?: string | null; metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]; comments: { author: string; initials: string; color: string; photo?: string | null; text: string }[] }
   let activeMember: ActiveMember | null = null
   if (be.configured) {
     activeMember = be.activeMember
   } else if (s.activeMember) {
     const m = s.members.find((x) => x.id === s.activeMember)!
     const mc = metricKeysForCard.map((k) => { const open = m.pub.includes(k); const met = metrics[k]; return { label: met.label, unit: met.unit, locked: !open, shown: open, value: met.series[met.series.length - 1], spark: buildSpark(met.series) } })
-    activeMember = { id: m.id, name: m.name, initials: m.initials, color: m.color, bio2: m.bio2, score: m.score, measureCount: dates.length, lastDate: dates[dates.length - 1], metrics: mc, comments: s.memberComments[m.id] || [] }
+    activeMember = { id: m.id, name: m.name, initials: m.initials, color: m.color, photo: null, bio2: m.bio2, score: m.score, measureCount: dates.length, lastDate: dates[dates.length - 1], metrics: mc, comments: s.memberComments[m.id] || [] }
   }
   const memberOpen = be.configured ? !!be.activeMember : !!s.activeMember
 
@@ -366,14 +367,14 @@ export default function Portal() {
   const roomTitle = activeRoom ? activeRoom.name : '그룹 채팅'
   const hasRooms = !be.configured || (chatRooms != null && chatRooms.length > 0)
   const mockOnline = [
-    { name: '코치 하늘', initials: '하늘', color: '#234B47', role: '트레이너', statusColor: '#2E9BA6' },
-    { name: '이민서', initials: '민서', color: '#BE7A57', role: '회원', statusColor: '#2E9BA6' },
-    { name: '조다온', initials: '다온', color: '#C29A4B', role: '회원', statusColor: '#2E9BA6' },
-    { name: '박지우 (나)', initials: '지우', color: '#6E9B8E', role: '회원', statusColor: '#2E9BA6' },
-    { name: '김아리', initials: '아리', color: '#5E97A0', role: '회원', statusColor: '#D6B25A' },
+    { name: '코치 하늘', initials: '하늘', color: '#234B47', photo: null as string | null, role: '트레이너', statusColor: '#2E9BA6' },
+    { name: '이민서', initials: '민서', color: '#BE7A57', photo: null, role: '회원', statusColor: '#2E9BA6' },
+    { name: '조다온', initials: '다온', color: '#C29A4B', photo: null, role: '회원', statusColor: '#2E9BA6' },
+    { name: '박지우 (나)', initials: '지우', color: '#6E9B8E', photo: null, role: '회원', statusColor: '#2E9BA6' },
+    { name: '김아리', initials: '아리', color: '#5E97A0', photo: null, role: '회원', statusColor: '#D6B25A' },
   ]
   const onlineMembers = be.configured
-    ? be.roomMembers.map((m) => ({ name: m.name, initials: m.initials, color: m.color, role: m.role === 'trainer' ? '트레이너' : '회원', statusColor: '#2E9BA6' }))
+    ? be.roomMembers.map((m) => ({ name: m.name, initials: m.initials, color: m.color, photo: m.photo ?? null, role: m.role === 'trainer' ? '트레이너' : '회원', statusColor: '#2E9BA6' }))
     : mockOnline
 
   // segmental: real from the latest measurement when signed in, else demo
@@ -554,7 +555,7 @@ export default function Portal() {
                       {(be.notifications ?? []).length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '14px 10px' }}>새 알림이 없어요.</div>}
                       {(be.notifications ?? []).map((n) => (
                         <div key={n.id} style={{ display: 'flex', gap: 10, padding: '9px 10px', borderRadius: 11, background: n.read ? 'transparent' : 'rgba(46,155,166,.1)' }}>
-                          <Avatar initials={n.actorInitials} color={n.actorColor} size={30} fontSize={10.5} />
+                          <Avatar initials={n.actorInitials} color={n.actorColor} photo={n.actorPhoto} size={30} fontSize={10.5} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 12.5, color: '#EAF3F1', lineHeight: 1.45 }}>{n.text}</div>
                             <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginTop: 2 }}>{n.time}</div>
@@ -590,7 +591,7 @@ export default function Portal() {
               <div style={{ position: 'absolute', top: '-55%', right: '7%', width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle,rgba(46,155,166,.45),transparent 65%)', filter: 'blur(38px)', pointerEvents: 'none' }} />
               <div style={{ position: 'absolute', bottom: '-65%', left: '28%', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle,rgba(184,148,85,.34),transparent 68%)', filter: 'blur(36px)', pointerEvents: 'none' }} />
               <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 16 }}>
-                <div style={{ width: 60, height: 60, borderRadius: '50%', flex: 'none', background: meDisp.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 18, boxShadow: '0 0 0 2px rgba(184,148,85,.6),0 10px 24px -10px rgba(0,0,0,.6)' }}>{meDisp.initials}</div>
+                <div style={{ position: 'relative', width: 60, height: 60, borderRadius: '50%', flex: 'none', overflow: 'hidden', background: meDisp.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 18, boxShadow: '0 0 0 2px rgba(184,148,85,.6),0 10px 24px -10px rgba(0,0,0,.6)' }}>{meDisp.initials}{meDisp.photo && <img src={meDisp.photo} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}</div>
                 <div>
                   <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#C9A24B' }}>My Wellness</div>
                   <div className="hwl-hero-name" style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, color: '#F3EFE6', marginTop: 2 }}>{meDisp.name}</div>
@@ -768,7 +769,7 @@ export default function Portal() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
                     {feedbackThread.map((c, i) => (
                       <div key={i} style={{ display: 'flex', gap: 10, animation: 'hwl-rise .3s ease both' }}>
-                        <Avatar initials={c.initials} color={c.color} size={32} fontSize={11} ring={c.isCoach ? '0 0 0 2px #2E9BA6' : undefined} />
+                        <Avatar initials={c.initials} color={c.color} photo={c.photo} size={32} fontSize={11} ring={c.isCoach ? '0 0 0 2px #2E9BA6' : undefined} />
                         <div style={{ flex: 1, minWidth: 0, background: c.isCoach ? 'rgba(46,155,166,.12)' : 'rgba(255,255,255,.05)', border: `1px solid ${c.isCoach ? 'rgba(103,215,223,.25)' : 'rgba(255,255,255,.09)'}`, borderRadius: '4px 14px 14px 14px', padding: '10px 13px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
                             <span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{c.author}</span>
@@ -781,7 +782,7 @@ export default function Portal() {
                     ))}
                   </div>
                   <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
-                    <Avatar initials={meDisp.initials} color={meDisp.color} size={32} fontSize={11} />
+                    <Avatar initials={meDisp.initials} color={meDisp.color} photo={meDisp.photo} size={32} fontSize={11} />
                     <input value={s.newComment} onChange={(e) => set({ newComment: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitFeedback() } }} placeholder={isTrainer ? '회원에게 종합 피드백을 남기세요…' : '코치 피드백에 댓글을 남기세요…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 13.5, padding: '10px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
                     <button onClick={submitFeedback} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 16px', borderRadius: 20 }}>{isTrainer ? '피드백' : '댓글'}</button>
                   </div>
@@ -1059,7 +1060,7 @@ export default function Portal() {
 
               <section style={{ ...card, borderRadius: 22, padding: 18, marginBottom: 20 }}>
                 <div style={{ display: 'flex', gap: 12 }}>
-                  <Avatar initials={meDisp.initials} color={meDisp.color} size={42} fontSize={13} />
+                  <Avatar initials={meDisp.initials} color={meDisp.color} photo={meDisp.photo} size={42} fontSize={13} />
                   <textarea value={s.newPost} onChange={(e) => set({ newPost: e.target.value })} placeholder="오늘의 성과나 궁금한 점을 나눠보세요… (@로 멘션)" style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, lineHeight: 1.5, padding: '11px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', resize: 'none', minHeight: 54, color: '#EAF3F1' }} />
                 </div>
                 {(() => { const m = s.newPost.match(/@([가-힣A-Za-z0-9_]*)$/); if (!m) return null; const q = m[1]; const hits = mentionNames.filter((n) => n.includes(q)).slice(0, 5); if (!hits.length) return null; return (
@@ -1075,7 +1076,7 @@ export default function Portal() {
               {postsDisp.map((p) => (
                 <article key={p.id} style={{ ...card, borderRadius: 22, padding: 20, marginBottom: 18, animation: 'hwl-rise .4s ease both' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Avatar initials={p.initials} color={p.color} size={44} fontSize={13} ring={p.ring} />
+                    <Avatar initials={p.initials} color={p.color} photo={p.photo} size={44} fontSize={13} ring={p.ring} />
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 700, fontSize: 14.5, color: '#EAF3F1' }}>{p.author}</span><span style={{ fontSize: 10, fontWeight: 600, color: p.tagFg, background: p.tagBg, padding: '1px 8px', borderRadius: 10 }}>{p.tag}</span></div>
                       <div style={{ fontSize: 12, color: 'rgba(231,239,234,.4)' }}>{p.time}</div>
@@ -1107,7 +1108,7 @@ export default function Portal() {
                       {p.comments.map((cm, i) => (
                         <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                           <div style={{ display: 'flex', gap: 10 }}>
-                            <Avatar initials={cm.initials} color={cm.color} size={30} fontSize={10.5} />
+                            <Avatar initials={cm.initials} color={cm.color} photo={cm.photo} size={30} fontSize={10.5} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px' }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{cm.author}</span> <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{renderMentions(cm.text)}</span></div>
                               <div style={{ display: 'flex', gap: 12, marginTop: 4, marginLeft: 4 }}>
@@ -1120,7 +1121,7 @@ export default function Portal() {
                           </div>
                           {(cm.replies ?? []).map((rp, j) => (
                             <div key={j} style={{ display: 'flex', gap: 9, marginLeft: 34 }}>
-                              <Avatar initials={rp.initials} color={rp.color} size={26} fontSize={9.5} />
+                              <Avatar initials={rp.initials} color={rp.color} photo={rp.photo} size={26} fontSize={9.5} />
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: '3px 12px 12px 12px', padding: '8px 12px' }}><span style={{ fontWeight: 700, fontSize: 12, color: '#EAF3F1' }}>{rp.author}</span> <span style={{ fontSize: 12.5, color: 'rgba(231,239,234,.78)' }}>{renderMentions(rp.text)}</span></div>
                                 {(be.configured ? (rp as { isOwn?: boolean }).isOwn : rp.author === ME.name) && (
@@ -1143,7 +1144,7 @@ export default function Portal() {
                         </div>
                       ) })()}
                       <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 2 }}>
-                        <Avatar initials={meDisp.initials} color={meDisp.color} size={30} fontSize={10.5} />
+                        <Avatar initials={meDisp.initials} color={meDisp.color} photo={meDisp.photo} size={30} fontSize={10.5} />
                         <input id={`cmt-${p.id}`} value={p.draft} onChange={(e) => onPostDraftChange(p.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onPostCommentSubmit(p.id) } }} placeholder={(p as { replyToName?: string | null }).replyToName ? `${(p as { replyToName?: string | null }).replyToName}님에게 답글…` : '댓글 · @로 멘션…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 13, padding: '9px 14px', borderRadius: 18, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
                         <button onClick={() => onPostCommentSubmit(p.id)} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 600, color: '#67D7DF' }}>{(p as { replyToName?: string | null }).replyToName ? '답글' : '댓글'}</button>
                       </div>
@@ -1199,7 +1200,7 @@ export default function Portal() {
                     </div>
                   ) : messages.map((m) => (
                     <div key={m.id} style={{ display: 'flex', gap: 11, flexDirection: m.dir, animation: 'hwl-rise .3s ease both' }}>
-                      <Avatar initials={m.initials} color={m.color} size={34} fontSize={11} ring={m.ring} />
+                      <Avatar initials={m.initials} color={m.color} photo={m.photo} size={34} fontSize={11} ring={m.ring} />
                       <div style={{ maxWidth: '74%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3, justifyContent: m.justify }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{m.author}</span><span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)' }}>{m.time}</span></div>
                         <div style={{ fontSize: 14, lineHeight: 1.5, padding: '10px 14px', borderRadius: m.radius, background: m.bubbleBg, color: m.bubbleFg, border: `1px solid ${m.bubbleBorder}` }}>{m.text}</div>
@@ -1223,7 +1224,7 @@ export default function Portal() {
                 <div style={{ fontSize: 10.5, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 13 }}>접속 중</div>
                 {onlineMembers.map((o, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 13 }}>
-                    <div style={{ position: 'relative', flex: 'none' }}><div style={{ width: 34, height: 34, borderRadius: '50%', background: o.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11 }}>{o.initials}</div><span style={{ position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: '50%', background: o.statusColor, border: '2.5px solid #0E1834' }} /></div>
+                    <div style={{ position: 'relative', flex: 'none' }}><div style={{ position: 'relative', width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', background: o.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11 }}>{o.initials}{o.photo && <img src={o.photo} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}</div><span style={{ position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: '50%', background: o.statusColor, border: '2.5px solid #0E1834' }} /></div>
                     <div style={{ lineHeight: 1.2 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#EAF3F1' }}>{o.name}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>{o.role}</div></div>
                   </div>
                 ))}
@@ -1325,7 +1326,7 @@ export default function Portal() {
                   <button onClick={closeMember} style={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'rgba(231,239,234,.6)', marginBottom: 16 }}>‹ 멤버 목록으로</button>
                   <section style={{ ...card, padding: 24 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 15, marginBottom: 6 }}>
-                      <Avatar initials={activeMember.initials} color={activeMember.color} size={58} fontSize={17} />
+                      <Avatar initials={activeMember.initials} color={activeMember.color} photo={activeMember.photo} size={58} fontSize={17} />
                       <div>
                         <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#F2F7F3' }}>{activeMember.name}</div>
                         <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)' }}>{activeMember.bio2}</div>
@@ -1357,7 +1358,7 @@ export default function Portal() {
                     <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
                       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: '#EAF3F1' }}>{activeMember.name}님 응원하기</div>
                       {activeMember.comments.map((c, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10 }}><Avatar initials={c.initials} color={c.color} size={30} fontSize={10.5} /><div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px', flex: 1 }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{c.author}</span> <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{c.text}</span></div></div>
+                        <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10 }}><Avatar initials={c.initials} color={c.color} photo={(c as { photo?: string | null }).photo} size={30} fontSize={10.5} /><div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px', flex: 1 }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{c.author}</span> <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{c.text}</span></div></div>
                       ))}
                       <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 6 }}>
                         <input value={s.memberDraft} onChange={(e) => set({ memberDraft: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitMemberComment() } }} placeholder="따뜻한 한마디를 남겨보세요…" style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 13.5, padding: '11px 15px', borderRadius: 20, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
@@ -1379,7 +1380,7 @@ export default function Portal() {
                   {membersDisp.filter((m) => m.name.includes(memberQuery.trim())).map((m) => (
                     <button key={m.id} onClick={() => openMember(m.id)} className="hwl-card-hover" style={{ all: 'unset', cursor: 'pointer', ...card, borderRadius: 22, padding: 20, display: 'flex', flexDirection: 'column', gap: 13 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <Avatar initials={m.initials} color={m.color} size={48} fontSize={15} />
+                        <Avatar initials={m.initials} color={m.color} photo={m.photo} size={48} fontSize={15} />
                         <div><div style={{ fontWeight: 700, fontSize: 15, color: '#EAF3F1' }}>{m.name}</div><div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)' }}>{m.bio}</div></div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>

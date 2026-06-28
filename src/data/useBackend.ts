@@ -27,33 +27,33 @@ function clockTime(iso: string): string {
 }
 
 type Role = 'me' | 'trainer' | 'client'
-interface Author { name: string; initials: string; avatar_color: string; role?: Role }
+interface Author { name: string; initials: string; avatar_color: string; role?: Role; photo_path?: string | null }
 
 export interface BackendProfile {
   name: string; initials: string; color: string; role: 'client' | 'trainer'
   birth: string | null; gender: string | null; phone: string | null; photoUrl: string | null
 }
-export interface PostComment { id?: string; author: string; initials: string; color: string; text: string; isOwn?: boolean; replies?: PostComment[] }
+export interface PostComment { id?: string; author: string; initials: string; color: string; photo?: string | null; text: string; isOwn?: boolean; replies?: PostComment[] }
 export interface PostView {
-  id: string; author: string; initials: string; color: string; role: Role; time: string; text: string
+  id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string
   likes: number; liked: boolean; open: boolean; draft: string; comments: PostComment[]; isOwn: boolean
   replyTo: string | null; replyToName: string | null
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
-export interface MessageView { id: string; author: string; initials: string; color: string; role: Role; time: string; text: string }
+export interface MessageView { id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string }
 export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null; isOwn: boolean }
 export interface ChallengeView { id: string; title: string; metrics: string[]; startDate: string; endDate: string; daysLeft: number; isOwn: boolean }
 const METRIC_LABEL: Record<string, string> = { weight: '체중', smm: '골격근량', pbf: '체지방률', bodyFatMass: '체지방량', bmi: 'BMI', bmr: '기초대사량', visceral: '내장지방', tbw: '체수분', score: '인바디 점수' }
-export interface NotificationView { id: string; type: string; text: string; read: boolean; time: string; actorInitials: string; actorColor: string }
-export interface MemberView { id: string; name: string; initials: string; color: string; bio: string; bio2: string; score: number; pub: string[] }
+export interface NotificationView { id: string; type: string; text: string; read: boolean; time: string; actorInitials: string; actorColor: string; actorPhoto?: string | null }
+export interface MemberView { id: string; name: string; initials: string; color: string; photo?: string | null; bio: string; bio2: string; score: number; pub: string[] }
 export interface ActiveMemberDetail {
-  id: string; name: string; initials: string; color: string; bio2: string; score: number
+  id: string; name: string; initials: string; color: string; photo: string | null; bio2: string; score: number
   measureCount: number; lastDate: string | null; publicCount: number; lockedCount: number
   metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]
   comments: PostComment[]
 }
 export interface ChartCommentView { author: string; initials: string; color: string; role: Role; text: string; time: string }
-export interface FeedbackItem { author: string; initials: string; color: string; isCoach: boolean; text: string; time: string }
+export interface FeedbackItem { author: string; initials: string; color: string; photo?: string | null; isCoach: boolean; text: string; time: string }
 export interface RosterRow { id: string; name: string; initials: string; color: string; score: number; pbf: number; smm: number }
 
 export interface Backend {
@@ -98,7 +98,7 @@ export interface Backend {
   sendMessage: (text: string) => Promise<void>
   rooms: RoomView[] | null
   activeRoomId: string | null
-  roomMembers: { name: string; initials: string; color: string; role: 'client' | 'trainer' }[]
+  roomMembers: { name: string; initials: string; color: string; photo?: string | null; role: 'client' | 'trainer' }[]
   selectRoom: (id: string) => void
   createRoom: (name: string, isPrivate: boolean) => Promise<void>
   joinRoom: (code: string) => Promise<{ ok: boolean; reason?: string }>
@@ -152,7 +152,7 @@ export function useBackend(): Backend {
   const [messages, setMessages] = useState<MessageView[] | null>(null)
   const [rooms, setRooms] = useState<RoomView[] | null>(null)
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
-  const [roomMembers, setRoomMembers] = useState<{ name: string; initials: string; color: string; role: 'client' | 'trainer' }[]>([])
+  const [roomMembers, setRoomMembers] = useState<{ name: string; initials: string; color: string; photo?: string | null; role: 'client' | 'trainer' }[]>([])
   const [members, setMembers] = useState<MemberView[] | null>(null)
   const [activeMember, setActiveMember] = useState<ActiveMemberDetail | null>(null)
   const [chartComments, setChartComments] = useState<ChartCommentView[] | null>(null)
@@ -187,14 +187,14 @@ export function useBackend(): Backend {
       const ui = postUi.current[r.id] ?? { open: false, draft: '', replyTo: null }
       const sm = r.shared_metric as { val?: string; label?: string; sub?: string } | null
       // build nested comments: top-level + their replies (one level)
-      const raw = (r.post_comments ?? []).map((c: any) => ({ id: c.id, author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, text: c.text, isOwn: c.author_id === meId, parentId: c.parent_id as string | null, ts: Date.parse(c.created_at) }))
+      const raw = (r.post_comments ?? []).map((c: any) => ({ id: c.id, author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, photo: api.avatarUrl(c.author?.photo_path), text: c.text, isOwn: c.author_id === meId, parentId: c.parent_id as string | null, ts: Date.parse(c.created_at) }))
       raw.sort((x: any, y: any) => x.ts - y.ts)
       const byParent: Record<string, PostComment[]> = {}
       raw.filter((c: any) => c.parentId).forEach((c: any) => { (byParent[c.parentId] ??= []).push(c) })
       const comments = raw.filter((c: any) => !c.parentId).map((c: any) => ({ ...c, replies: byParent[c.id] ?? [] }))
       const replyToName = ui.replyTo ? (raw.find((c: any) => c.id === ui.replyTo)?.author ?? null) : null
       return {
-        id: r.id, author: a.name, initials: a.initials, color: a.avatar_color,
+        id: r.id, author: a.name, initials: a.initials, color: a.avatar_color, photo: api.avatarUrl(a.photo_path),
         role: roleOf(r.author_id, a.role), time: relTime(r.created_at), text: r.text,
         likes: (r.post_likes ?? []).length,
         liked: (r.post_likes ?? []).some((l: { user_id: string }) => l.user_id === meId),
@@ -213,7 +213,7 @@ export function useBackend(): Backend {
     const rows = await api.fetchMessages(rid)
     setMessages((rows as any[]).map((r) => {
       const a = (r.author ?? {}) as Author & { id?: string }
-      return { id: r.id, author: a.name, initials: a.initials, color: a.avatar_color, role: roleOf(a.id, a.role), time: clockTime(r.created_at), text: r.text }
+      return { id: r.id, author: a.name, initials: a.initials, color: a.avatar_color, photo: api.avatarUrl(a.photo_path), role: roleOf(a.id, a.role), time: clockTime(r.created_at), text: r.text }
     }))
   }, [meId])
 
@@ -236,7 +236,7 @@ export function useBackend(): Backend {
     const rows = await api.fetchNotifications()
     setNotifications(rows.map((n) => ({
       id: n.id, type: n.type, text: n.text, read: n.read, time: relTime(n.created_at),
-      actorInitials: n.actor?.initials ?? '·', actorColor: n.actor?.color ?? '#5E97A0',
+      actorInitials: n.actor?.initials ?? '·', actorColor: n.actor?.color ?? '#5E97A0', actorPhoto: n.actor?.photo ?? null,
     })))
   }, [])
 
@@ -244,7 +244,7 @@ export function useBackend(): Backend {
     if (!meId) return
     const rows = await api.fetchChartComments(meId, 'overall')
     setCoachFeedback((rows as any[]).map((c) => ({
-      author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color,
+      author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, photo: api.avatarUrl(c.author?.photo_path),
       isCoach: c.author?.role === 'trainer', text: c.text, time: relTime(c.created_at),
     })))
   }, [meId])
@@ -257,7 +257,7 @@ export function useBackend(): Backend {
 
   const reloadMembers = useCallback(async () => {
     const cards = await api.fetchMemberCards()
-    setMembers(cards.map((c) => ({ id: c.id, name: c.name, initials: c.initials, color: c.color, bio: c.bio ?? '', bio2: c.bio2 ?? '', score: c.score ?? 0, pub: c.pub })))
+    setMembers(cards.map((c) => ({ id: c.id, name: c.name, initials: c.initials, color: c.color, photo: c.photo, bio: c.bio ?? '', bio2: c.bio2 ?? '', score: c.score ?? 0, pub: c.pub })))
   }, [])
 
   // load everything for the signed-in user
@@ -410,7 +410,10 @@ export function useBackend(): Backend {
   const uploadAvatar = useCallback(async (file: File) => {
     const url = await api.uploadAvatar(file)
     setProfile((p) => (p ? { ...p, photoUrl: url } : p))
-  }, [])
+    // propagate the new photo to feed/chat/members where I appear
+    void reloadPosts(); void reloadMembers()
+    if (roomId.current) void reloadMessages(roomId.current)
+  }, [reloadPosts, reloadMembers, reloadMessages])
 
   // ── posts ──
   const createPost = useCallback(async (text: string) => { await api.createPost(text); await reloadPosts() }, [reloadPosts])
@@ -518,11 +521,11 @@ export function useBackend(): Backend {
         const scorePublic = priv.score === 'public' && !!series.score?.length
         setActiveMember({
           id, name: prof?.name ?? '', initials: prof?.initials ?? '', color: prof?.avatar_color ?? '#5E97A0',
-          bio2: prof?.bio2 ?? '', score: scorePublic ? series.score![series.score!.length - 1] : 0,
+          photo: api.avatarUrl(prof?.photo_path), bio2: prof?.bio2 ?? '', score: scorePublic ? series.score![series.score!.length - 1] : 0,
           measureCount: dates.length, lastDate: dates.length ? fmtDate(dates[dates.length - 1]) : null,
           publicCount, lockedCount: METRIC_CARD_KEYS.length - publicCount,
           metrics: mc,
-          comments: (cheers as any[]).map((c) => ({ author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, text: c.text })),
+          comments: (cheers as any[]).map((c) => ({ author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, photo: api.avatarUrl(c.author?.photo_path), text: c.text })),
         })
       } catch (e) { console.warn('[backend] openMember', e) }
     })()

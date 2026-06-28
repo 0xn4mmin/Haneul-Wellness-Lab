@@ -120,7 +120,7 @@ export async function fetchMembers(): Promise<ProfileRow[]> {
 export async function fetchChartComments(ownerId: string, metricKey: string) {
   const { data, error } = await requireSupabase()
     .from('chart_comments')
-    .select('id, text, created_at, author:profiles!chart_comments_author_id_fkey(name, initials, avatar_color, role)')
+    .select('id, text, created_at, author:profiles!chart_comments_author_id_fkey(name, initials, avatar_color, role, photo_path)')
     .eq('owner_id', ownerId).eq('metric_key', metricKey)
     .order('created_at', { ascending: true })
   if (error) throw error
@@ -136,7 +136,7 @@ export async function addChartComment(ownerId: string, metricKey: string, text: 
 export async function fetchPosts() {
   const { data, error } = await requireSupabase()
     .from('posts')
-    .select('id, author_id, text, shared_metric, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role), post_likes(user_id), post_comments(id, text, author_id, parent_id, created_at, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color))')
+    .select('id, author_id, text, shared_metric, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role, photo_path), post_likes(user_id), post_comments(id, text, author_id, parent_id, created_at, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color, photo_path))')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
@@ -167,7 +167,7 @@ export async function deletePostComment(commentId: string) {
 export async function fetchMessages(roomId: string) {
   const { data, error } = await requireSupabase()
     .from('messages')
-    .select('id, text, created_at, author:profiles!messages_author_id_fkey(id, name, initials, avatar_color, role)')
+    .select('id, text, created_at, author:profiles!messages_author_id_fkey(id, name, initials, avatar_color, role, photo_path)')
     .eq('room_id', roomId).order('created_at', { ascending: true })
   if (error) throw error
   return data ?? []
@@ -266,17 +266,17 @@ export async function deleteChallenge(id: string) {
 
 export interface NotificationRow {
   id: string; type: string; text: string; read: boolean; created_at: string
-  actor: { name: string; initials: string; color: string } | null
+  actor: { name: string; initials: string; color: string; photo: string | null } | null
 }
 export async function fetchNotifications(): Promise<NotificationRow[]> {
   const me = await uid()
   const { data } = await requireSupabase().from('notifications')
-    .select('id, type, text, read, created_at, actor:profiles!notifications_actor_id_fkey(name, initials, avatar_color)')
+    .select('id, type, text, read, created_at, actor:profiles!notifications_actor_id_fkey(name, initials, avatar_color, photo_path)')
     .eq('user_id', me).order('created_at', { ascending: false }).limit(50)
   return ((data ?? []) as any[]).map((n) => {
     const a = Array.isArray(n.actor) ? n.actor[0] : n.actor
     return { id: n.id, type: n.type, text: n.text, read: n.read, created_at: n.created_at,
-      actor: a ? { name: a.name, initials: a.initials, color: a.avatar_color } : null }
+      actor: a ? { name: a.name, initials: a.initials, color: a.avatar_color, photo: avatarUrl(a.photo_path) } : null }
   })
 }
 export async function markNotificationsRead() {
@@ -297,16 +297,16 @@ export function subscribeNotifications(userId: string, onChange: () => void) {
   return () => { sb.removeChannel(channel) }
 }
 
-export interface RoomMember { name: string; initials: string; color: string; role: 'client' | 'trainer' }
+export interface RoomMember { name: string; initials: string; color: string; photo: string | null; role: 'client' | 'trainer' }
 /** Members of a room (for the "접속 중" list). */
 export async function fetchRoomMembers(roomId: string): Promise<RoomMember[]> {
   const { data } = await requireSupabase().from('room_members')
-    .select('profile:profiles!room_members_user_id_fkey(name, initials, avatar_color, role)')
+    .select('profile:profiles!room_members_user_id_fkey(name, initials, avatar_color, role, photo_path)')
     .eq('room_id', roomId)
   return ((data ?? []) as unknown[]).map((r) => {
     const p = (r as { profile: any }).profile
     const prof = Array.isArray(p) ? p[0] : p
-    return prof ? { name: prof.name, initials: prof.initials, color: prof.avatar_color, role: prof.role } : null
+    return prof ? { name: prof.name, initials: prof.initials, color: prof.avatar_color, photo: avatarUrl(prof.photo_path), role: prof.role } : null
   }).filter(Boolean) as RoomMember[]
 }
 
@@ -359,9 +359,15 @@ export async function uploadAvatar(file: File): Promise<string> {
   return sb.storage.from('avatars').getPublicUrl(path).data.publicUrl
 }
 
+/** Public URL for a stored avatar path (avatars bucket is public). */
+export function avatarUrl(path?: string | null): string | null {
+  if (!path) return null
+  return requireSupabase().storage.from('avatars').getPublicUrl(path).data.publicUrl
+}
+
 // ───────────────────────── members ──────────────────────
 export interface MemberCard {
-  id: string; name: string; initials: string; color: string
+  id: string; name: string; initials: string; color: string; photo: string | null
   bio: string | null; bio2: string | null; pub: string[]; score: number | null
 }
 /** Member roster with each member's public metric keys + score (if public). */
@@ -369,9 +375,9 @@ export async function fetchMemberCards(): Promise<MemberCard[]> {
   const sb = requireSupabase()
   const me = await uid()
   const { data: profs } = await sb.from('profiles')
-    .select('id, name, initials, avatar_color, bio, bio2').neq('id', me).eq('role', 'client')
+    .select('id, name, initials, avatar_color, bio, bio2, photo_path').neq('id', me).eq('role', 'client')
   const cards: MemberCard[] = []
-  for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null }>) {
+  for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null }>) {
     const { data: pv } = await sb.from('metric_privacy').select('metric_key, visibility').eq('user_id', p.id)
     const pub = ((pv ?? []) as { metric_key: string; visibility: string }[]).filter((r) => r.visibility === 'public').map((r) => r.metric_key)
     let score: number | null = null
@@ -379,14 +385,14 @@ export async function fetchMemberCards(): Promise<MemberCard[]> {
       const { data: sc } = await sb.from('metric_readings').select('value').eq('user_id', p.id).eq('metric_key', 'score').order('date', { ascending: false }).limit(1)
       score = (sc?.[0] as { value: number } | undefined)?.value ?? null
     }
-    cards.push({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, bio: p.bio, bio2: p.bio2, pub, score })
+    cards.push({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), bio: p.bio, bio2: p.bio2, pub, score })
   }
   return cards
 }
 
 export async function fetchMemberCheers(id: string) {
   const { data } = await requireSupabase().from('member_cheers')
-    .select('text, author:profiles!member_cheers_author_id_fkey(name, initials, avatar_color)')
+    .select('text, author:profiles!member_cheers_author_id_fkey(name, initials, avatar_color, photo_path)')
     .eq('target_user_id', id).order('created_at', { ascending: true })
   return data ?? []
 }
@@ -396,15 +402,15 @@ export async function addMemberCheer(id: string, text: string) {
 }
 export async function fetchMemberProfile(id: string) {
   const { data } = await requireSupabase().from('profiles')
-    .select('name, initials, avatar_color, bio, bio2').eq('id', id).single()
-  return data as { name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null } | null
+    .select('name, initials, avatar_color, bio, bio2, photo_path').eq('id', id).single()
+  return data as { name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null } | null
 }
 
 // ───────────────────── trainer studio ───────────────────
 export interface RosterRow { id: string; name: string; initials: string; color: string; score: number | null; pbf: number | null; smm: number | null }
 export async function fetchRoster(): Promise<RosterRow[]> {
   const sb = requireSupabase()
-  const { data: profs } = await sb.from('profiles').select('id, name, initials, avatar_color, role').eq('role', 'client')
+  const { data: profs } = await sb.from('profiles').select('id, name, initials, avatar_color, role, photo_path').eq('role', 'client')
   const rows: RosterRow[] = []
   for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string }>) {
     const latest = async (k: string) => {

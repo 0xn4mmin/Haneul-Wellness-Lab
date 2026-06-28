@@ -4,14 +4,14 @@ export type Role = 'trainer' | 'client' | 'me'
 export type View = 'health' | 'community' | 'chat' | 'members' | 'trainer' | 'profile'
 
 export interface MetricComment { author: string; initials: string; color: string; role: Role; text: string; time: string }
-export interface PostComment { author: string; initials: string; color: string; text: string; replies?: PostComment[]; isOwn?: boolean }
+export interface PostComment { author: string; initials: string; color: string; photo?: string | null; text: string; replies?: PostComment[]; isOwn?: boolean }
 export interface Post {
-  id: number; author: string; initials: string; color: string; role: Role; time: string; text: string
+  id: number; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string
   likes: number; liked: boolean; open: boolean; comments: PostComment[]; draft: string; replyTo?: number | null; replyToName?: string | null
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
-export interface Message { id: number; author: string; initials: string; color: string; role: Role; time: string; text: string }
-export interface Member { id: string; name: string; initials: string; color: string; bio: string; bio2: string; score: number; pub: string[] }
+export interface Message { id: number; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string }
+export interface Member { id: string; name: string; initials: string; color: string; photo?: string | null; bio: string; bio2: string; score: number; pub: string[] }
 export interface Profile { name: string; birth: string; gender: string; phone: string; photo: string | null }
 
 export interface PortalState {
@@ -26,7 +26,7 @@ export interface PortalState {
   newPost: string
   newMsg: string
   commentsByMetric: Record<string, MetricComment[]>
-  coachFeedback: { author: string; initials: string; color: string; isCoach: boolean; text: string; time: string }[]
+  coachFeedback: { author: string; initials: string; color: string; photo?: string | null; isCoach: boolean; text: string; time: string }[]
   posts: Post[]
   messages: Message[]
   members: Member[]

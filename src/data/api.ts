@@ -25,6 +25,7 @@ export interface ProfileRow {
   gender: string | null
   phone: string | null
   photo_path: string | null
+  measure_cycle_days: number | null
 }
 
 async function uid(): Promise<string> {
@@ -314,6 +315,23 @@ export async function fetchRoomMembers(roomId: string): Promise<RoomMember[]> {
 export async function updateProfile(patch: Partial<Pick<ProfileRow, 'name' | 'birth' | 'gender' | 'phone'>>) {
   const me = await uid()
   return requireSupabase().from('profiles').update(patch).eq('id', me)
+}
+/** Sets the user's measurement cycle (days between InBody scans). */
+export async function setMeasureCycle(days: number) {
+  const me = await uid()
+  return requireSupabase().from('profiles').update({ measure_cycle_days: days }).eq('id', me)
+}
+
+// ───────────────────────── sleep log ────────────────────
+export interface SleepRow { date: string; hours: number }
+export async function fetchSleepLogs(userId: string, limit = 14): Promise<SleepRow[]> {
+  const { data } = await requireSupabase().from('sleep_logs')
+    .select('date, hours').eq('user_id', userId).order('date', { ascending: false }).limit(limit)
+  return ((data ?? []) as SleepRow[]).map((r) => ({ date: r.date, hours: Number(r.hours) }))
+}
+export async function upsertSleepLog(date: string, hours: number) {
+  const me = await uid()
+  return requireSupabase().from('sleep_logs').upsert({ user_id: me, date, hours }, { onConflict: 'user_id,date' })
 }
 /** Uploads to avatars/<uid>/<filename> and returns the public URL. */
 export async function uploadAvatar(file: File): Promise<string> {

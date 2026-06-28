@@ -48,6 +48,8 @@ export default function Portal() {
   const [mobileNav, setMobileNav] = useState(false)
   const [memberQuery, setMemberQuery] = useState('')
   const [notifOpen, setNotifOpen] = useState(false)
+  const [cycleModal, setCycleModal] = useState(false)
+  const [sleepInput, setSleepInput] = useState('')
 
   // chat-room UI (backend mode)
   const [chatModal, setChatModal] = useState<'none' | 'create' | 'join'>('none')
@@ -296,6 +298,8 @@ export default function Portal() {
     return { label: m.label, unit: m.unit, before: a, after: b, delta: (d > 0 ? '+' : '') + d, deltaColor: improved ? '#67D7DF' : '#E0A06A', deltaBg: improved ? 'rgba(46,155,166,.16)' : 'rgba(224,138,94,.18)' }
   })
   const condition = conditionLog.map((c) => ({ w: c.w, sleep: c.sleep, workouts: c.workouts, sleepPct: Math.min(100, Math.round((c.sleep / 9) * 100)) }))
+  const todayISO = new Date().toISOString().slice(0, 10)
+  const sleepLabel = (iso: string) => { const [, m, d] = iso.split('-'); return iso === todayISO ? '오늘' : `${+m}/${+d}` }
   const board = challenge.board.map((b, i) => ({ handle: b.handle, rank: i + 1, chgText: (b.chg > 0 ? '+' : '') + b.chg + '%p', rowBg: b.me ? 'rgba(46,155,166,.16)' : 'transparent', rowBorder: b.me ? 'rgba(103,215,223,.35)' : 'rgba(255,255,255,.07)' }))
 
   const metricKeysForCard: MetricKey[] = ['score', 'weight', 'smm', 'pbf', 'bmi', 'tbw']
@@ -428,7 +432,7 @@ export default function Portal() {
             <button key={k} onClick={() => go(k)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 13, fontSize: 14.5, fontWeight: 500, transition: 'background .2s', background: ns.bg, color: ns.fg }}>
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={ns.fg} strokeWidth="1.8">{icons[k]}</svg>
               {labels[k]}
-              {k === 'chat' && <span style={{ marginLeft: 'auto', fontSize: 10, fontFamily: "'IBM Plex Mono',monospace", background: '#2E9BA6', color: '#060B17', borderRadius: 8, padding: '1px 6px', fontWeight: 600 }}>4</span>}
+              {k === 'chat' && be.configured && be.unreadChat > 0 && <span style={{ marginLeft: 'auto', fontSize: 10, fontFamily: "'IBM Plex Mono',monospace", background: '#2E9BA6', color: '#060B17', borderRadius: 8, padding: '1px 6px', fontWeight: 600 }}>{be.unreadChat}</span>}
             </button>
           )
         })}
@@ -460,11 +464,20 @@ export default function Portal() {
             <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', marginTop: 3 }}>{titles[s.view][1]}</div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-            {s.view === 'health' && (
-              <div className="hwl-header-chip" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#9FE2E8', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 11, padding: '8px 13px', whiteSpace: 'nowrap' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 3px rgba(46,155,166,.25)' }} />다음 측정까지 19일
-              </div>
-            )}
+            {s.view === 'health' && (() => {
+              const d = be.configured ? be.daysUntilNextMeasure : 19
+              const label = !be.configured ? '다음 측정까지 19일'
+                : d == null ? '측정 주기 설정'
+                : d > 0 ? `다음 측정까지 ${d}일`
+                : d === 0 ? '오늘이 측정일이에요' : `측정일 ${-d}일 지남`
+              const dot = !be.configured || d == null || d > 3 ? '#2E9BA6' : '#E0A06A'
+              return (
+                <button onClick={() => be.configured && setCycleModal(true)} className="hwl-header-chip" style={{ all: 'unset', cursor: be.configured ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#9FE2E8', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 11, padding: '8px 13px', whiteSpace: 'nowrap' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, boxShadow: `0 0 0 3px ${dot}40` }} />{label}
+                  {be.configured && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: .5 }}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>}
+                </button>
+              )
+            })()}
             {be.configured && be.session && (
               <div style={{ position: 'relative' }}>
                 <button onClick={() => { const willOpen = !notifOpen; setNotifOpen(willOpen); if (willOpen && be.unreadCount > 0) be.markNotificationsRead() }} aria-label="알림" style={{ all: 'unset', cursor: 'pointer', position: 'relative', width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)' }}>
@@ -808,17 +821,44 @@ export default function Portal() {
               </section>
               <section style={{ ...card, padding: 22 }}>
                 <div style={eyebrow}>Lifestyle</div><div style={cardTitle}>컨디션 로그</div>
-                <div style={{ fontSize: 12.5, lineHeight: 1.6, color: 'rgba(231,239,234,.6)', margin: '12px 0 14px' }}>수면이 7시간을 넘는 주에 체지방 감소 폭이 가장 컸어요. 수분 섭취도 함께 늘려보세요.</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-                  {condition.map((c, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                      <span style={{ fontSize: 11.5, color: 'rgba(231,239,234,.55)', width: 46, flex: 'none' }}>{c.w}</span>
-                      <div style={{ flex: 1, height: 9, borderRadius: 6, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${c.sleepPct}%`, background: 'linear-gradient(90deg,#2E9BA6,#67D7DF)' }} /></div>
-                      <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11.5, color: '#9FE2E8', width: 58, textAlign: 'right' }}>수면 {c.sleep}h</span>
-                      <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: 'rgba(231,239,234,.45)', width: 32, textAlign: 'right' }}>{c.workouts}회</span>
+                {be.configured ? (
+                  <>
+                    <div style={{ fontSize: 12.5, lineHeight: 1.6, color: 'rgba(231,239,234,.6)', margin: '12px 0 14px' }}>매일 수면 시간을 기록하면 컨디션 추이를 한눈에 볼 수 있어요.</div>
+                    <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginBottom: 16 }}>
+                      <span style={{ fontSize: 12.5, color: 'rgba(231,239,234,.6)', whiteSpace: 'nowrap' }}>오늘 수면</span>
+                      <input type="number" step="0.5" min="0" max="24" value={sleepInput} onChange={(e) => setSleepInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { const h = parseFloat(sleepInput); if (h >= 0 && h <= 24) { be.addSleepLog(todayISO, h); setSleepInput('') } } }} placeholder={String(be.sleepLogs?.find((l) => l.date === todayISO)?.hours ?? '7.5')} style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
+                      <span style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)' }}>시간</span>
+                      <button onClick={() => { const h = parseFloat(sleepInput); if (h >= 0 && h <= 24) { be.addSleepLog(todayISO, h); setSleepInput('') } }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 16px', borderRadius: 14 }}>저장</button>
                     </div>
-                  ))}
-                </div>
+                    {(be.sleepLogs ?? []).length === 0 ? (
+                      <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '6px 0 4px' }}>아직 기록이 없어요. 오늘 수면부터 입력해보세요.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                        {(be.sleepLogs ?? []).slice(0, 7).map((l, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                            <span style={{ fontSize: 11.5, color: l.date === todayISO ? '#9FE2E8' : 'rgba(231,239,234,.55)', fontWeight: l.date === todayISO ? 700 : 400, width: 40, flex: 'none' }}>{sleepLabel(l.date)}</span>
+                            <div style={{ flex: 1, height: 9, borderRadius: 6, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.min(100, Math.round((l.hours / 9) * 100))}%`, background: 'linear-gradient(90deg,#2E9BA6,#67D7DF)' }} /></div>
+                            <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11.5, color: '#9FE2E8', width: 52, textAlign: 'right' }}>{l.hours}h</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 12.5, lineHeight: 1.6, color: 'rgba(231,239,234,.6)', margin: '12px 0 14px' }}>수면이 7시간을 넘는 주에 체지방 감소 폭이 가장 컸어요. 수분 섭취도 함께 늘려보세요.</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                      {condition.map((c, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                          <span style={{ fontSize: 11.5, color: 'rgba(231,239,234,.55)', width: 46, flex: 'none' }}>{c.w}</span>
+                          <div style={{ flex: 1, height: 9, borderRadius: 6, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${c.sleepPct}%`, background: 'linear-gradient(90deg,#2E9BA6,#67D7DF)' }} /></div>
+                          <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11.5, color: '#9FE2E8', width: 58, textAlign: 'right' }}>수면 {c.sleep}h</span>
+                          <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: 'rgba(231,239,234,.45)', width: 32, textAlign: 'right' }}>{c.workouts}회</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </section>
             </div>
             </>
@@ -828,6 +868,7 @@ export default function Portal() {
           {/* ============ 커뮤니티 ============ */}
           {s.view === 'community' && (
             <div style={{ maxWidth: 720, margin: '0 auto', animation: 'hwl-rise .4s ease both' }}>
+              {!be.configured && (
               <section style={{ ...card, position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 22, marginBottom: 20 }}>
                 <div style={{ position: 'absolute', top: '-50%', right: '-5%', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle,rgba(46,155,166,.3),transparent 65%)', filter: 'blur(34px)', pointerEvents: 'none' }} />
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
@@ -845,6 +886,13 @@ export default function Portal() {
                 </div>
                 <div style={{ position: 'relative', fontSize: 11.5, color: 'rgba(231,239,234,.4)', marginTop: 11 }}>닉네임은 익명으로 표시되며, 공개 설정한 지표만 집계돼요.</div>
               </section>
+              )}
+              {be.configured && (be.challenges == null || be.challenges.length === 0) && (
+                <section style={{ ...card, borderRadius: 22, padding: '26px 22px', marginBottom: 16, textAlign: 'center' }}>
+                  <div style={eyebrow}>Challenge</div>
+                  <div style={{ fontSize: 14, color: 'rgba(231,239,234,.6)', marginTop: 8, lineHeight: 1.6 }}>진행 중인 챌린지가 없어요.<br />아래에서 첫 챌린지를 만들어 함께 목표를 세워보세요.</div>
+                </section>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
                 <button onClick={() => set({ showChallengeForm: true, chDone: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '11px 20px', borderRadius: 22 }}>+ 챌린지 만들기</button>
                 <span style={{ fontSize: 12, color: '#67D7DF' }}>{s.chDone}</span>
@@ -1103,6 +1151,28 @@ export default function Portal() {
             </div>
           )}
 
+          {/* 측정 주기 설정 모달 */}
+          {cycleModal && (
+            <div onClick={() => setCycleModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,9,18,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'hwl-fade .25s ease both' }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                <div style={eyebrow}>Measurement Cycle</div>
+                <div style={cardTitle}>측정 주기</div>
+                <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.55)', lineHeight: 1.6, margin: '8px 0 18px' }}>인바디 측정 간격을 정하면, 마지막 측정일을 기준으로 다음 측정일을 알려드려요.</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 9 }}>
+                  {[{ d: 7, l: '매주' }, { d: 14, l: '2주' }, { d: 28, l: '4주' }, { d: 56, l: '8주' }].map((o) => {
+                    const on = be.measureCycleDays === o.d
+                    return <button key={o.d} onClick={() => { be.setMeasureCycle(o.d); setCycleModal(false) }} style={{ all: 'unset', cursor: 'pointer', textAlign: 'center', padding: '14px 0', borderRadius: 14, fontSize: 14, fontWeight: 700, color: on ? '#060B17' : '#EAF3F1', background: on ? CTA : 'rgba(255,249,238,.05)', border: `1px solid ${on ? 'transparent' : 'rgba(255,247,232,.12)'}` }}>{o.l}<div style={{ fontSize: 10.5, fontWeight: 500, opacity: .7, marginTop: 2 }}>{o.d}일</div></button>
+                  })}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 14 }}>
+                  <label style={{ fontSize: 12.5, color: 'rgba(231,239,234,.6)', whiteSpace: 'nowrap' }}>직접 입력</label>
+                  <input type="number" min={1} max={365} defaultValue={be.measureCycleDays} id="cycle-custom" style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
+                  <button onClick={() => { const v = parseInt((document.getElementById('cycle-custom') as HTMLInputElement)?.value || '0', 10); if (v >= 1 && v <= 365) { be.setMeasureCycle(v); setCycleModal(false) } }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 16px', borderRadius: 14 }}>적용</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ============ 멤버 ============ */}
           {s.view === 'members' && (
             <div style={{ animation: 'hwl-rise .4s ease both' }}>
@@ -1260,7 +1330,7 @@ export default function Portal() {
         </div>
       </main>
 
-      {!showLogin && <TabBar view={s.view} go={go} chatBadge={be.configured ? undefined : 4} />}
+      {!showLogin && <TabBar view={s.view} go={go} chatBadge={be.configured ? (be.unreadChat || undefined) : undefined} />}
 
       {/* 결과지 라이트박스 */}
       {s.scanOpen && (

@@ -65,6 +65,12 @@ export interface Backend {
   signOut: () => Promise<void>
   reload: () => void
   hasData: boolean   // false for a signed-in user with no measurements (show empty state, not mock)
+  measureCycleDays: number
+  daysUntilNextMeasure: number | null
+  setMeasureCycle: (days: number) => void
+  sleepLogs: { date: string; hours: number }[] | null
+  addSleepLog: (date: string, hours: number) => void
+  unreadChat: number
   metrics: Record<MetricKey, Metric>
   dates: string[]
   privacy: Record<string, 'public' | 'private'> | null
@@ -130,6 +136,9 @@ export function useBackend(): Backend {
   const [loginError, setLoginError] = useState('')
   const [remoteMetrics, setRemoteMetrics] = useState<Record<MetricKey, Metric> | null>(null)
   const [remoteDates, setRemoteDates] = useState<string[] | null>(null)
+  const [lastMeasureISO, setLastMeasureISO] = useState<string | null>(null)
+  const [cycleDays, setCycleDays] = useState<number>(28)
+  const [sleepLogs, setSleepLogs] = useState<{ date: string; hours: number }[] | null>(null)
   const [privacy, setPrivacyState] = useState<Record<string, 'public' | 'private'> | null>(null)
   const [profile, setProfile] = useState<BackendProfile | null>(null)
   const [posts, setPosts] = useState<PostView[] | null>(null)
@@ -243,6 +252,7 @@ export function useBackend(): Backend {
   useEffect(() => {
     if (!supabase || !meId) {
       setRemoteMetrics(null); setRemoteDates(null); setPrivacyState(null); setProfile(null)
+      setLastMeasureISO(null); setCycleDays(28); setSleepLogs(null)
       setPosts(null); setMessages(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
       setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null); setNotifications(null)
@@ -263,14 +273,17 @@ export function useBackend(): Backend {
             built[k] = { ...MOCK_METRICS[k], series: sv && sv.length ? sv : MOCK_METRICS[k].series }
           }
           setRemoteMetrics(built); setRemoteDates(dates.map(fmtDate))
-        } else { setRemoteMetrics(null); setRemoteDates(null) }
+          setLastMeasureISO(dates[dates.length - 1])
+        } else { setRemoteMetrics(null); setRemoteDates(null); setLastMeasureISO(null) }
         setPrivacyState(priv && Object.keys(priv).length ? priv : null)
         if (prof) {
           const photoUrl = prof.photo_path
             ? supabase.storage.from('avatars').getPublicUrl(prof.photo_path).data.publicUrl
             : null
           setProfile({ name: prof.name, initials: prof.initials, color: prof.avatar_color, role: prof.role, birth: prof.birth, gender: prof.gender, phone: prof.phone, photoUrl })
+          setCycleDays(prof.measure_cycle_days ?? 28)
         }
+        setSleepLogs(await api.fetchSleepLogs(meId))
         const [latestBrief, used] = await Promise.all([
           api.fetchLatestBriefing(meId), api.manualBriefingsThisWeek(meId),
         ])
@@ -362,6 +375,14 @@ export function useBackend(): Backend {
     const { error } = await api.updateProfile(clean)
     if (error) { console.warn('[backend] updateProfile failed', error); throw error }
     setProfile((p) => (p ? { ...p, ...patch } : p))
+  }, [])
+  const setMeasureCycle = useCallback((days: number) => {
+    setCycleDays(days)
+    api.setMeasureCycle(days).catch((e) => console.warn('[backend] setMeasureCycle', e))
+  }, [])
+  const addSleepLog = useCallback((date: string, hours: number) => {
+    setSleepLogs((ls) => { const rest = (ls ?? []).filter((l) => l.date !== date); return [{ date, hours }, ...rest].sort((a, b) => (a.date < b.date ? 1 : -1)) })
+    api.upsertSleepLog(date, hours).catch((e) => console.warn('[backend] addSleepLog', e))
   }, [])
   const uploadAvatar = useCallback(async (file: File) => {
     const url = await api.uploadAvatar(file)
@@ -558,6 +579,12 @@ export function useBackend(): Backend {
   return {
     configured: isSupabaseConfigured, ready, session, loginError, signIn, signUp, signOut, reload,
     hasData: !isSupabaseConfigured || remoteMetrics !== null,
+    measureCycleDays: cycleDays,
+    daysUntilNextMeasure: lastMeasureISO
+      ? Math.ceil((Date.parse(lastMeasureISO) + cycleDays * 86400000 - Date.now()) / 86400000)
+      : null,
+    setMeasureCycle, sleepLogs, addSleepLog,
+    unreadChat: (notifications ?? []).filter((n) => n.type === 'chat' && !n.read).length,
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, updateProfile, uploadAvatar,

@@ -47,6 +47,7 @@ export default function Portal() {
 
   const [mobileNav, setMobileNav] = useState(false)
   const [memberQuery, setMemberQuery] = useState('')
+  const [notifOpen, setNotifOpen] = useState(false)
 
   // chat-room UI (backend mode)
   const [chatModal, setChatModal] = useState<'none' | 'create' | 'join'>('none')
@@ -460,6 +461,32 @@ export default function Portal() {
             {s.view === 'health' && (
               <div className="hwl-header-chip" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#9FE2E8', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 11, padding: '8px 13px', whiteSpace: 'nowrap' }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 3px rgba(46,155,166,.25)' }} />다음 측정까지 19일
+              </div>
+            )}
+            {be.configured && be.session && (
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => { const willOpen = !notifOpen; setNotifOpen(willOpen); if (willOpen && be.unreadCount > 0) be.markNotificationsRead() }} aria-label="알림" style={{ all: 'unset', cursor: 'pointer', position: 'relative', width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)' }}>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#9DAFCB" strokeWidth="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.7 21a2 2 0 0 1-3.4 0" strokeLinecap="round" /></svg>
+                  {be.unreadCount > 0 && <span style={{ position: 'absolute', top: 6, right: 7, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#E0A06A', color: '#06110F', fontSize: 9.5, fontWeight: 700, fontFamily: "'IBM Plex Mono',monospace", display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{be.unreadCount}</span>}
+                </button>
+                {notifOpen && (
+                  <>
+                    <div onClick={() => setNotifOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                    <div style={{ position: 'absolute', top: 48, right: 0, zIndex: 50, width: 300, maxHeight: 420, overflowY: 'auto', background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 16, boxShadow: '0 30px 70px -30px rgba(0,0,0,.85)', padding: 8 }}>
+                      <div style={{ fontSize: 11, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', padding: '8px 10px 6px' }}>알림</div>
+                      {(be.notifications ?? []).length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '14px 10px' }}>새 알림이 없어요.</div>}
+                      {(be.notifications ?? []).map((n) => (
+                        <div key={n.id} style={{ display: 'flex', gap: 10, padding: '9px 10px', borderRadius: 11, background: n.read ? 'transparent' : 'rgba(46,155,166,.1)' }}>
+                          <Avatar initials={n.actorInitials} color={n.actorColor} size={30} fontSize={10.5} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, color: '#EAF3F1', lineHeight: 1.45 }}>{n.text}</div>
+                            <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginTop: 2 }}>{n.time}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

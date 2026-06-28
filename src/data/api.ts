@@ -264,6 +264,33 @@ export async function deleteChallenge(id: string) {
   return requireSupabase().from('challenges').delete().eq('id', id)
 }
 
+export interface NotificationRow {
+  id: string; type: string; text: string; read: boolean; created_at: string
+  actor: { name: string; initials: string; color: string } | null
+}
+export async function fetchNotifications(): Promise<NotificationRow[]> {
+  const me = await uid()
+  const { data } = await requireSupabase().from('notifications')
+    .select('id, type, text, read, created_at, actor:profiles!notifications_actor_id_fkey(name, initials, avatar_color)')
+    .eq('user_id', me).order('created_at', { ascending: false }).limit(50)
+  return ((data ?? []) as any[]).map((n) => {
+    const a = Array.isArray(n.actor) ? n.actor[0] : n.actor
+    return { id: n.id, type: n.type, text: n.text, read: n.read, created_at: n.created_at,
+      actor: a ? { name: a.name, initials: a.initials, color: a.avatar_color } : null }
+  })
+}
+export async function markNotificationsRead() {
+  const me = await uid()
+  return requireSupabase().from('notifications').update({ read: true }).eq('user_id', me).eq('read', false)
+}
+export function subscribeNotifications(userId: string, onChange: () => void) {
+  const sb = requireSupabase()
+  const channel = sb.channel(`notif:${userId}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => onChange())
+    .subscribe()
+  return () => { sb.removeChannel(channel) }
+}
+
 export interface RoomMember { name: string; initials: string; color: string; role: 'client' | 'trainer' }
 /** Members of a room (for the "접속 중" list). */
 export async function fetchRoomMembers(roomId: string): Promise<RoomMember[]> {

@@ -43,6 +43,7 @@ export interface PostView {
 export interface MessageView { id: string; author: string; initials: string; color: string; role: Role; time: string; text: string }
 export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null; isOwn: boolean }
 export interface ChallengeView { id: string; title: string; metric: string; goal: string; daysLeft: number; isOwn: boolean }
+export interface NotificationView { id: string; type: string; text: string; read: boolean; time: string; actorInitials: string; actorColor: string }
 export interface MemberView { id: string; name: string; initials: string; color: string; bio: string; bio2: string; score: number; pub: string[] }
 export interface ActiveMemberDetail {
   id: string; name: string; initials: string; color: string; bio2: string; score: number
@@ -110,6 +111,10 @@ export interface Backend {
   // trainer
   roster: RosterRow[] | null
   addCoachNote: (memberId: string, metricKey: string, text: string) => Promise<string>
+  // notifications
+  notifications: NotificationView[] | null
+  unreadCount: number
+  markNotificationsRead: () => void
   // AI briefing (measurement-cached, manual regen ≤ 2/week)
   briefing: { focus: string; summary: string; actions: string[] } | null
   briefingBusy: boolean
@@ -136,6 +141,7 @@ export function useBackend(): Backend {
   const [chartComments, setChartComments] = useState<ChartCommentView[] | null>(null)
   const [coachFeedback, setCoachFeedback] = useState<FeedbackItem[] | null>(null)
   const [challenges, setChallenges] = useState<ChallengeView[] | null>(null)
+  const [notifications, setNotifications] = useState<NotificationView[] | null>(null)
   const [roster, setRoster] = useState<RosterRow[] | null>(null)
   const [briefing, setBriefing] = useState<{ focus: string; summary: string; actions: string[] } | null>(null)
   const [briefingBusy, setBriefingBusy] = useState(false)
@@ -204,6 +210,14 @@ export function useBackend(): Backend {
     })))
   }, [meId])
 
+  const reloadNotifications = useCallback(async () => {
+    const rows = await api.fetchNotifications()
+    setNotifications(rows.map((n) => ({
+      id: n.id, type: n.type, text: n.text, read: n.read, time: relTime(n.created_at),
+      actorInitials: n.actor?.initials ?? '·', actorColor: n.actor?.color ?? '#5E97A0',
+    })))
+  }, [])
+
   const reloadCoachFeedback = useCallback(async () => {
     if (!meId) return
     const rows = await api.fetchChartComments(meId, 'overall')
@@ -230,7 +244,7 @@ export function useBackend(): Backend {
       setRemoteMetrics(null); setRemoteDates(null); setPrivacyState(null); setProfile(null)
       setPosts(null); setMessages(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
-      setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null)
+      setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null); setNotifications(null)
       roomId.current = null
       return
     }
@@ -264,6 +278,7 @@ export function useBackend(): Backend {
         setBriefingUsed(used)
         await reloadCoachFeedback()
         await reloadChallenges()
+        await reloadNotifications()
         await Promise.all([reloadPosts(), reloadMembers()])
         const myRooms = await reloadRooms()   // no auto-created lounge — empty until the user makes/joins one
         const first = myRooms[0]?.id ?? null
@@ -276,7 +291,13 @@ export function useBackend(): Backend {
       }
     })()
     return () => { cancelled = true }
-  }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages, reloadRooms, reloadCoachFeedback, reloadChallenges])
+  }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages, reloadRooms, reloadCoachFeedback, reloadChallenges, reloadNotifications])
+
+  // realtime: new notification → reload
+  useEffect(() => {
+    if (!supabase || !meId) return
+    return api.subscribeNotifications(meId, () => { void reloadNotifications() })
+  }, [meId, reloadNotifications])
 
   // realtime: a new briefing finished → show it, clear busy, count manual usage
   useEffect(() => {
@@ -489,6 +510,11 @@ export function useBackend(): Backend {
     return error ? error.message : ''
   }, [])
 
+  const markNotificationsRead = useCallback(() => {
+    setNotifications((ns) => ns?.map((n) => ({ ...n, read: true })) ?? ns)
+    api.markNotificationsRead().catch((e) => console.warn('[backend] markRead', e))
+  }, [])
+
   const reload = useCallback(() => setReloadKey((k) => k + 1), [])
 
   const regenBriefing = useCallback(() => {
@@ -519,5 +545,6 @@ export function useBackend(): Backend {
     members, activeMember, openMember, closeMember, addMemberCheer,
     chartComments, loadChartComments, addChartComment, coachFeedback, addCoachFeedback,
     roster, addCoachNote,
+    notifications, unreadCount: (notifications ?? []).filter((n) => !n.read).length, markNotificationsRead,
   }
 }

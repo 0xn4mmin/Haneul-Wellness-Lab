@@ -50,6 +50,8 @@ export default function Portal() {
   const [notifOpen, setNotifOpen] = useState(false)
   const [cycleModal, setCycleModal] = useState(false)
   const [sleepInput, setSleepInput] = useState('')
+  const [goalModal, setGoalModal] = useState(false)
+  const [goalDraft, setGoalDraft] = useState<Record<string, string>>({})
 
   // chat-room UI (backend mode)
   const [chatModal, setChatModal] = useState<'none' | 'create' | 'join'>('none')
@@ -62,13 +64,15 @@ export default function Portal() {
   const figure = useRef<FigureHandle | null>(null)
   const chatRef = useRef<HTMLDivElement | null>(null)
 
-  // 3D figure lifecycle
+  // 3D figure lifecycle — init runs on every render but is guarded, so it
+  // attaches as soon as the canvas mounts (e.g. after the empty state clears
+  // once data loads, or after login). Dispose only on unmount.
   useEffect(() => {
     if (mount3d.current && !figure.current) {
       figure.current = createFigure(mount3d.current, (seg) => set({ selectedSegment: seg }))
     }
-    return () => { figure.current?.dispose(); figure.current = null }
-  }, [])
+  })
+  useEffect(() => () => { figure.current?.dispose(); figure.current = null }, [])
   useEffect(() => { figure.current?.setSelected(s.selectedSegment) }, [s.selectedSegment])
 
   // chat auto-scroll
@@ -274,19 +278,24 @@ export default function Portal() {
   const briefBackend = be.configured && !!be.session
   const brief = (briefBackend && be.briefing) ? be.briefing : ruleBrief
 
-  const mkRing = (label: string, cur: number, goal: number, start: number, unit: string, down: boolean, color: string) => {
-    let p = down ? (start - cur) / ((start - goal) || 1) : cur / (goal || 1)
-    p = Math.max(0, Math.min(1, p))
-    return { label, value: cur + unit, goal: '목표 ' + goal + unit, pct: Math.round(p * 100), dashArray: (ringCirc * p).toFixed(1) + ' ' + ringCirc.toFixed(1), color }
-  }
   const lastV = (k: MetricKey) => M[k].series[M[k].series.length - 1]
   const firstV = (k: MetricKey) => M[k].series[0]
-  const rings = [
-    mkRing('인바디 점수', lastV('score'), goals.score, firstV('score'), '점', false, '#67D7DF'),
-    mkRing('골격근량', lastV('smm'), goals.smm, firstV('smm'), 'kg', false, '#8FD89E'),
-    mkRing('체지방률', lastV('pbf'), goals.pbf, firstV('pbf'), '%', true, '#E0B86A'),
-    mkRing('내장지방', lastV('visceral'), goals.visceral, firstV('visceral'), '', true, '#E0A06A'),
+  const ringDefs: { key: MetricKey; label: string; unit: string; down: boolean; color: string }[] = [
+    { key: 'score', label: '인바디 점수', unit: '점', down: false, color: '#67D7DF' },
+    { key: 'smm', label: '골격근량', unit: 'kg', down: false, color: '#8FD89E' },
+    { key: 'pbf', label: '체지방률', unit: '%', down: true, color: '#E0B86A' },
+    { key: 'weight', label: '체중', unit: 'kg', down: true, color: '#E0A06A' },
   ]
+  // backend: only goals the user actually set; mock: demo goals
+  const goalsMap: Record<string, number | undefined> = be.configured ? (be.goals ?? {}) : { score: 90, smm: 34, pbf: 15, weight: 66 }
+  const rings = ringDefs.map((d) => {
+    const cur = lastV(d.key); const start = firstV(d.key); const goal = goalsMap[d.key]
+    const hasGoal = typeof goal === 'number'
+    let p = 0
+    if (hasGoal) { p = d.down ? (start - cur) / ((start - (goal as number)) || 1) : cur / ((goal as number) || 1); p = Math.max(0, Math.min(1, p)) }
+    const fix = d.unit === '점' ? 0 : 1
+    return { ...d, cur, hasGoal, goalVal: goal, value: cur.toFixed(fix) + d.unit, goalLabel: hasGoal ? '목표 ' + goal + d.unit : '목표 미설정', pct: hasGoal ? Math.round(p * 100) : null, dashArray: (ringCirc * (hasGoal ? p : 0)).toFixed(1) + ' ' + ringCirc.toFixed(1) }
+  })
 
   const cmpKeys: MetricKey[] = ['weight', 'smm', 'pbf', 'bmi', 'tbw', 'score']
   // clamp to the actual number of measurements (real data length varies)
@@ -343,8 +352,14 @@ export default function Portal() {
     ? be.roomMembers.map((m) => ({ name: m.name, initials: m.initials, color: m.color, role: m.role === 'trainer' ? '트레이너' : '회원', statusColor: '#2E9BA6' }))
     : mockOnline
 
-  const segs = segData.map((seg) => { const c = segColor(seg.pct); const selS = s.selectedSegment === seg.key; return { ...seg, color: c, border: selS ? c : 'rgba(255,255,255,.12)', chipBg: selS ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.04)' } })
-  const selSeg = (() => { const ss = segData.find((x) => x.key === s.selectedSegment) || segData[2]; const st = ss.pct >= 100 ? '표준 이상 · 우수' : (ss.pct >= 95 ? '표준 범위' : '표준 이하'); return { name: ss.name, pct: ss.pct, kg: ss.kg, color: segColor(ss.pct), status: st } })()
+  // segmental: real from the latest measurement when signed in, else demo
+  const latestMeasure = be.configured ? (be.measurements?.[0] ?? null) : null
+  const segNames: [string, string][] = [['rightArm', '오른팔'], ['leftArm', '왼팔'], ['trunk', '몸통'], ['rightLeg', '오른다리'], ['leftLeg', '왼다리']]
+  const segSource = latestMeasure
+    ? segNames.map(([key, name]) => { const v = latestMeasure.segmental?.[key]; const base = segData.find((d) => d.key === key)!; return { key, name, kg: v?.kg ?? base.kg, pct: v?.pct ?? base.pct } })
+    : segData
+  const segs = segSource.map((seg) => { const c = segColor(seg.pct); const selS = s.selectedSegment === seg.key; return { ...seg, color: c, border: selS ? c : 'rgba(255,255,255,.12)', chipBg: selS ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.04)' } })
+  const selSeg = (() => { const ss = segSource.find((x) => x.key === s.selectedSegment) || segSource[2]; const st = ss.pct >= 100 ? '표준 이상 · 우수' : (ss.pct >= 95 ? '표준 범위' : '표준 이하'); return { name: ss.name, pct: ss.pct, kg: ss.kg, color: segColor(ss.pct), status: st } })()
 
   const metricChips = (Object.keys(M) as MetricKey[]).map((k) => { const a = s.selectedMetric === k; return { key: k, label: M[k].short || M[k].label, bg: a ? CTA : 'rgba(255,255,255,.05)', fg: a ? '#060B17' : '#9DAFCB', border: a ? 'transparent' : 'rgba(255,255,255,.12)' } })
 
@@ -374,10 +389,31 @@ export default function Portal() {
   }
   const score = M.score.series[M.score.series.length - 1]
   const dateLatest = D[D.length - 1]
-  const scans = [
-    { date: '2026 · 6월 14일', has: true }, { date: '2026 · 5월 10일', has: false },
-    { date: '2026 · 4월 12일', has: false }, { date: '2026 · 3월 15일', has: false },
-  ].map((r) => ({ date: r.date, label: r.has ? '결과지 보기' : '미첨부', cursor: r.has ? 'pointer' : 'default', chipBg: r.has ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.05)', chipFg: r.has ? '#67D7DF' : 'rgba(231,239,234,.35)', has: r.has }))
+  // hero meta line: from the real profile when signed in, else the demo line
+  const heroMeta = be.configured
+    ? [s.profile.gender || null, s.profile.birth ? `${new Date().getFullYear() - +String(s.profile.birth).slice(0, 4)}세` : null, `${dateLatest} 측정`].filter(Boolean).join(' · ')
+    : `171cm · 26세 · 남성 · ${dateLatest} 측정`
+  // records: real measurements when signed in (only what the user uploaded), else demo
+  const fmtScanDate = (iso: string) => { const [y, m, d] = iso.split('-'); return `${y} · ${+m}월 ${+d}일` }
+  const scansSrc = be.configured
+    ? (be.measurements ?? []).map((m) => ({ date: fmtScanDate(m.date), has: !!m.result_sheet_path }))
+    : [
+        { date: '2026 · 6월 14일', has: true }, { date: '2026 · 5월 10일', has: false },
+        { date: '2026 · 4월 12일', has: false }, { date: '2026 · 3월 15일', has: false },
+      ]
+  const scans = scansSrc.map((r) => ({ date: r.date, label: r.has ? '결과지 보기' : '미첨부', cursor: r.has ? 'pointer' : 'default', chipBg: r.has ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.05)', chipFg: r.has ? '#67D7DF' : 'rgba(231,239,234,.35)', has: r.has }))
+  // research detail: real from the latest measurement when available, else demo
+  const researchSrc = latestMeasure
+    ? (() => { const dt = latestMeasure.detail || {}; const w = lastV('weight'); const ideal = dt.idealWeight ?? w; const adj = +(ideal - w).toFixed(1)
+        return [
+          { k: '기초대사량', v: Math.round(lastV('bmr')).toLocaleString(), u: 'kcal' },
+          { k: '내장지방 레벨', v: String(lastV('visceral')), u: '레벨' },
+          { k: '위상각', v: dt.phaseAngle != null ? Number(dt.phaseAngle).toFixed(1) : '—', u: '°' },
+          { k: 'SMI', v: dt.smi != null ? Number(dt.smi).toFixed(1) : '—', u: 'kg/m²' },
+          { k: '적정체중', v: ideal != null ? Number(ideal).toFixed(1) : '—', u: 'kg' },
+          { k: '권장 조절', v: (adj > 0 ? '+' : '') + adj, u: 'kg' },
+        ] })()
+    : research
 
   const inputStyle: React.CSSProperties = { width: '100%', fontFamily: 'inherit', fontSize: 14, padding: '12px 15px', borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }
   const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'rgba(231,239,234,.6)', marginBottom: 7, display: 'block' }
@@ -534,11 +570,12 @@ export default function Portal() {
                 <div>
                   <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '2.5px', textTransform: 'uppercase', color: '#C9A24B' }}>My Wellness</div>
                   <div className="hwl-hero-name" style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, color: '#F3EFE6', marginTop: 2 }}>{meDisp.name}</div>
-                  <div style={{ fontSize: 12.5, color: '#9DAFCB', marginTop: 3 }}>171cm · 26세 · 남성 · {dateLatest} 측정</div>
+                  <div style={{ fontSize: 12.5, color: '#9DAFCB', marginTop: 3 }}>{heroMeta}</div>
                 </div>
               </div>
               <div className="hwl-hero-stats" style={{ position: 'relative', zIndex: 2, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 26, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: 22 }}>
+                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체중</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.weight.series[M.weight.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
                   <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체지방률</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.pbf.series[M.pbf.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> %</span></div></div>
                   <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>골격근량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.smm.series[M.smm.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
                 </div>
@@ -582,18 +619,23 @@ export default function Portal() {
                 </div>
               </section>
               <section style={{ ...card, padding: 22 }}>
-                <div style={eyebrow}>Goal Rings</div><div style={cardTitle}>목표 달성률</div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                  <div><div style={eyebrow}>Goal Rings</div><div style={cardTitle}>목표 달성률</div></div>
+                  {be.configured && (
+                    <button onClick={() => { setGoalDraft(Object.fromEntries(ringDefs.map((d) => [d.key, goalsMap[d.key] != null ? String(goalsMap[d.key]) : '']))); setGoalModal(true) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '6px 12px', whiteSpace: 'nowrap' }}>목표 설정</button>
+                  )}
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
                   {rings.map((r, i) => (
                     <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
                       <div style={{ position: 'relative', width: 82, height: 82 }}>
                         <svg viewBox="0 0 80 80" style={{ width: 82, height: 82, transform: 'rotate(-90deg)' }}>
                           <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="7" />
-                          <circle cx="40" cy="40" r="34" fill="none" stroke={r.color} strokeWidth="7" strokeLinecap="round" strokeDasharray={r.dashArray} />
+                          {r.hasGoal && <circle cx="40" cy="40" r="34" fill="none" stroke={r.color} strokeWidth="7" strokeLinecap="round" strokeDasharray={r.dashArray} />}
                         </svg>
-                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Gowun Batang',serif", fontSize: 18, color: '#F2F7F3' }}>{r.pct}<span style={{ fontSize: 10, marginTop: 4 }}>%</span></div>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Gowun Batang',serif", fontSize: r.hasGoal ? 18 : 22, color: r.hasGoal ? '#F2F7F3' : '#fff' }}>{r.hasGoal ? <>{r.pct}<span style={{ fontSize: 10, marginTop: 4 }}>%</span></> : r.cur.toFixed(r.unit === '점' ? 0 : 1)}</div>
                       </div>
-                      <div style={{ textAlign: 'center' }}><div style={{ fontSize: 12, color: '#EAF3F1', fontWeight: 600 }}>{r.label}</div><div style={{ fontSize: 10, color: 'rgba(231,239,234,.45)', marginTop: 1 }}>{r.value} · {r.goal}</div></div>
+                      <div style={{ textAlign: 'center' }}><div style={{ fontSize: 12, color: '#EAF3F1', fontWeight: 600 }}>{r.label}</div><div style={{ fontSize: 10, color: r.hasGoal ? 'rgba(231,239,234,.45)' : '#C9A24B', marginTop: 1 }}>{r.hasGoal ? `${r.value} · ${r.goalLabel}` : '목표 미설정'}</div></div>
                     </div>
                   ))}
                 </div>
@@ -769,7 +811,7 @@ export default function Portal() {
                 <div style={eyebrow}>Research</div>
                 <div style={{ ...cardTitle, margin: '3px 0 16px' }}>측정 상세값</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 13 }}>
-                  {research.map((r, i) => (
+                  {researchSrc.map((r, i) => (
                     <div key={i} style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: '14px 15px' }}>
                       <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)', fontWeight: 500 }}>{r.k}</div>
                       <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#67D7DF', marginTop: 3 }}>{r.v}<span style={{ fontSize: 11, color: 'rgba(231,239,234,.4)', fontFamily: "'Pretendard'" }}> {r.u}</span></div>
@@ -1170,6 +1212,33 @@ export default function Portal() {
                   <label style={{ fontSize: 12.5, color: 'rgba(231,239,234,.6)', whiteSpace: 'nowrap' }}>직접 입력</label>
                   <input type="number" min={1} max={365} defaultValue={be.measureCycleDays} id="cycle-custom" style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
                   <button onClick={() => { const v = parseInt((document.getElementById('cycle-custom') as HTMLInputElement)?.value || '0', 10); if (v >= 1 && v <= 365) { be.setMeasureCycle(v); setCycleModal(false) } }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 16px', borderRadius: 14 }}>적용</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 목표 설정 모달 */}
+          {goalModal && (
+            <div onClick={() => setGoalModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,9,18,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'hwl-fade .25s ease both' }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                <div style={eyebrow}>Goals</div>
+                <div style={cardTitle}>목표 설정</div>
+                <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.55)', lineHeight: 1.6, margin: '8px 0 18px' }}>각 지표의 목표값을 입력하세요. 비워두면 목표가 해제됩니다.</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {ringDefs.map((d) => (
+                    <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#EAF3F1' }}>{d.label}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)' }}>현재 {lastV(d.key).toFixed(d.unit === '점' ? 0 : 1)}{d.unit}</div>
+                      </div>
+                      <input type="number" step="0.1" value={goalDraft[d.key] ?? ''} onChange={(e) => setGoalDraft((g) => ({ ...g, [d.key]: e.target.value }))} placeholder="목표" style={{ ...inputStyle, width: 92, flex: 'none' }} />
+                      <span style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', width: 28 }}>{d.unit}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+                  <button onClick={() => setGoalModal(false)} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', padding: 13, borderRadius: 22 }}>취소</button>
+                  <button onClick={() => { ringDefs.forEach((d) => { const raw = (goalDraft[d.key] ?? '').trim(); const v = raw === '' ? null : parseFloat(raw); if (raw !== '' && (v == null || isNaN(v))) return; be.setGoal(d.key, v) }); setGoalModal(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>저장</button>
                 </div>
               </div>
             </div>

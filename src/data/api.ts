@@ -322,6 +322,22 @@ export async function setMeasureCycle(days: number) {
   return requireSupabase().from('profiles').update({ measure_cycle_days: days }).eq('id', me)
 }
 
+// ───────────────────────── goals ────────────────────────
+export async function fetchGoals(userId: string): Promise<Record<string, number>> {
+  const { data } = await requireSupabase().from('metric_goals').select('metric_key, target').eq('user_id', userId)
+  const out: Record<string, number> = {}
+  for (const r of (data ?? []) as { metric_key: string; target: number }[]) out[r.metric_key] = Number(r.target)
+  return out
+}
+export async function setGoal(metricKey: string, target: number) {
+  const me = await uid()
+  return requireSupabase().from('metric_goals').upsert({ user_id: me, metric_key: metricKey, target }, { onConflict: 'user_id,metric_key' })
+}
+export async function clearGoal(metricKey: string) {
+  const me = await uid()
+  return requireSupabase().from('metric_goals').delete().eq('user_id', me).eq('metric_key', metricKey)
+}
+
 // ───────────────────────── sleep log ────────────────────
 export interface SleepRow { date: string; hours: number }
 export async function fetchSleepLogs(userId: string, limit = 14): Promise<SleepRow[]> {

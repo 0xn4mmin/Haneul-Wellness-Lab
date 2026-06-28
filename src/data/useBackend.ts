@@ -70,6 +70,9 @@ export interface Backend {
   setMeasureCycle: (days: number) => void
   sleepLogs: { date: string; hours: number }[] | null
   addSleepLog: (date: string, hours: number) => void
+  measurements: api.MeasurementRow[] | null
+  goals: Record<string, number> | null
+  setGoal: (metricKey: string, target: number | null) => void
   unreadChat: number
   metrics: Record<MetricKey, Metric>
   dates: string[]
@@ -139,6 +142,8 @@ export function useBackend(): Backend {
   const [lastMeasureISO, setLastMeasureISO] = useState<string | null>(null)
   const [cycleDays, setCycleDays] = useState<number>(28)
   const [sleepLogs, setSleepLogs] = useState<{ date: string; hours: number }[] | null>(null)
+  const [measurements, setMeasurements] = useState<api.MeasurementRow[] | null>(null)
+  const [goals, setGoals] = useState<Record<string, number> | null>(null)
   const [privacy, setPrivacyState] = useState<Record<string, 'public' | 'private'> | null>(null)
   const [profile, setProfile] = useState<BackendProfile | null>(null)
   const [posts, setPosts] = useState<PostView[] | null>(null)
@@ -252,7 +257,7 @@ export function useBackend(): Backend {
   useEffect(() => {
     if (!supabase || !meId) {
       setRemoteMetrics(null); setRemoteDates(null); setPrivacyState(null); setProfile(null)
-      setLastMeasureISO(null); setCycleDays(28); setSleepLogs(null)
+      setLastMeasureISO(null); setCycleDays(28); setSleepLogs(null); setMeasurements(null); setGoals(null)
       setPosts(null); setMessages(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
       setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null); setNotifications(null)
@@ -284,6 +289,8 @@ export function useBackend(): Backend {
           setCycleDays(prof.measure_cycle_days ?? 28)
         }
         setSleepLogs(await api.fetchSleepLogs(meId))
+        setMeasurements(await api.fetchMeasurements(meId))
+        setGoals(await api.fetchGoals(meId))
         const [latestBrief, used] = await Promise.all([
           api.fetchLatestBriefing(meId), api.manualBriefingsThisWeek(meId),
         ])
@@ -383,6 +390,10 @@ export function useBackend(): Backend {
   const addSleepLog = useCallback((date: string, hours: number) => {
     setSleepLogs((ls) => { const rest = (ls ?? []).filter((l) => l.date !== date); return [{ date, hours }, ...rest].sort((a, b) => (a.date < b.date ? 1 : -1)) })
     api.upsertSleepLog(date, hours).catch((e) => console.warn('[backend] addSleepLog', e))
+  }, [])
+  const setGoal = useCallback((metricKey: string, target: number | null) => {
+    setGoals((g) => { const next = { ...(g ?? {}) }; if (target == null) delete next[metricKey]; else next[metricKey] = target; return next })
+    ;(target == null ? api.clearGoal(metricKey) : api.setGoal(metricKey, target)).catch((e) => console.warn('[backend] setGoal', e))
   }, [])
   const uploadAvatar = useCallback(async (file: File) => {
     const url = await api.uploadAvatar(file)
@@ -583,7 +594,7 @@ export function useBackend(): Backend {
     daysUntilNextMeasure: lastMeasureISO
       ? Math.ceil((Date.parse(lastMeasureISO) + cycleDays * 86400000 - Date.now()) / 86400000)
       : null,
-    setMeasureCycle, sleepLogs, addSleepLog,
+    setMeasureCycle, sleepLogs, addSleepLog, measurements, goals, setGoal,
     unreadChat: (notifications ?? []).filter((n) => n.type === 'chat' && !n.read).length,
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,

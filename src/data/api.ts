@@ -134,7 +134,7 @@ export async function addChartComment(ownerId: string, metricKey: string, text: 
 export async function fetchPosts() {
   const { data, error } = await requireSupabase()
     .from('posts')
-    .select('id, author_id, text, shared_metric, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role), post_likes(user_id), post_comments(id, text, author_id, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color))')
+    .select('id, author_id, text, shared_metric, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role), post_likes(user_id), post_comments(id, text, author_id, parent_id, created_at, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color))')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
@@ -150,9 +150,9 @@ export async function toggleLike(postId: string, liked: boolean) {
     ? sb.from('post_likes').delete().eq('post_id', postId).eq('user_id', me)
     : sb.from('post_likes').insert({ post_id: postId, user_id: me })
 }
-export async function addPostComment(postId: string, text: string) {
+export async function addPostComment(postId: string, text: string, parentId?: string | null) {
   const me = await uid()
-  return requireSupabase().from('post_comments').insert({ post_id: postId, author_id: me, text })
+  return requireSupabase().from('post_comments').insert({ post_id: postId, author_id: me, text, parent_id: parentId ?? null })
 }
 export async function deletePost(postId: string) {
   return requireSupabase().from('posts').delete().eq('id', postId)

@@ -46,6 +46,7 @@ export default function Portal() {
   const be = useBackend()
 
   const [mobileNav, setMobileNav] = useState(false)
+  const [memberQuery, setMemberQuery] = useState('')
 
   // chat-room UI (backend mode)
   const [chatModal, setChatModal] = useState<'none' | 'create' | 'join'>('none')
@@ -128,13 +129,21 @@ export default function Portal() {
   const submitPostComment = (id: number) => setFn((p) => ({ posts: p.posts.map((x) => {
     if (x.id !== id) return x
     const t = (x.draft || '').trim(); if (!t) return x
-    return { ...x, comments: [...x.comments, { author: ME.name, initials: ME.initials, color: ME.color, text: t }], draft: '' }
+    const entry = { author: ME.name, initials: ME.initials, color: ME.color, text: t, isOwn: true }
+    if (x.replyTo != null && x.comments[x.replyTo]) {
+      const comments = x.comments.map((c, i) => i === x.replyTo ? { ...c, replies: [...(c.replies || []), entry] } : c)
+      return { ...x, comments, draft: '', replyTo: null, replyToName: null }
+    }
+    return { ...x, comments: [...x.comments, { ...entry, replies: [] }], draft: '' }
   }) }))
+  const setReplyToMock = (id: number, idx: number | null, name?: string) => setFn((p) => ({ posts: p.posts.map((x) => x.id === id ? { ...x, open: true, replyTo: idx, replyToName: name ?? null } : x) }))
   // routed post handlers (backend ids are strings, mock ids are numbers)
   const onPostLike = (id: string | number) => (be.configured ? be.toggleLike(String(id)) : toggleLike(Number(id)))
   const onPostToggle = (id: string | number) => (be.configured ? be.toggleComments(String(id)) : toggleComments(Number(id)))
   const onPostDraftChange = (id: string | number, v: string) => (be.configured ? be.setPostDraft(String(id), v) : setPostDraft(Number(id), v))
   const onPostCommentSubmit = (id: string | number) => (be.configured ? be.submitPostComment(String(id)) : submitPostComment(Number(id)))
+  const onReply = (id: string | number, commentId: string | undefined, idx: number, name: string) => (be.configured ? be.setReplyTo(String(id), commentId ?? null, name) : setReplyToMock(Number(id), idx, name))
+  const onCancelReply = (id: string | number) => (be.configured ? be.setReplyTo(String(id), null) : setReplyToMock(Number(id), null))
   const sendMsg = () => {
     const t = s.newMsg.trim(); if (!t) return
     if (be.configured) { void be.sendMessage(t); set({ newMsg: '' }); return }
@@ -888,19 +897,38 @@ export default function Portal() {
                   {p.open && (
                     <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 11 }}>
                       {p.comments.map((cm, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 10 }}>
-                          <Avatar initials={cm.initials} color={cm.color} size={30} fontSize={10.5} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px' }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{cm.author}</span> <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{renderMentions(cm.text)}</span></div>
-                            <div style={{ display: 'flex', gap: 12, marginTop: 4, marginLeft: 4 }}>
-                              <button onClick={() => { onPostDraftChange(p.id, `@${cm.author} `); document.getElementById(`cmt-${p.id}`)?.focus() }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(157,175,203,.8)' }}>답글</button>
-                              {(be.configured ? (cm as { isOwn?: boolean }).isOwn : cm.author === ME.name) && (
-                                <button onClick={() => { if (confirm('댓글을 삭제할까요?')) onDeleteComment(p.id, (cm as { id?: string }).id, i) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(224,160,106,.8)' }}>삭제</button>
-                              )}
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <div style={{ display: 'flex', gap: 10 }}>
+                            <Avatar initials={cm.initials} color={cm.color} size={30} fontSize={10.5} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px' }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{cm.author}</span> <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{renderMentions(cm.text)}</span></div>
+                              <div style={{ display: 'flex', gap: 12, marginTop: 4, marginLeft: 4 }}>
+                                <button onClick={() => { onReply(p.id, (cm as { id?: string }).id, i, cm.author); document.getElementById(`cmt-${p.id}`)?.focus() }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(157,175,203,.8)' }}>답글</button>
+                                {(be.configured ? (cm as { isOwn?: boolean }).isOwn : cm.author === ME.name) && (
+                                  <button onClick={() => { if (confirm('댓글을 삭제할까요?')) onDeleteComment(p.id, (cm as { id?: string }).id, i) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(224,160,106,.8)' }}>삭제</button>
+                                )}
+                              </div>
                             </div>
                           </div>
+                          {(cm.replies ?? []).map((rp, j) => (
+                            <div key={j} style={{ display: 'flex', gap: 9, marginLeft: 34 }}>
+                              <Avatar initials={rp.initials} color={rp.color} size={26} fontSize={9.5} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: '3px 12px 12px 12px', padding: '8px 12px' }}><span style={{ fontWeight: 700, fontSize: 12, color: '#EAF3F1' }}>{rp.author}</span> <span style={{ fontSize: 12.5, color: 'rgba(231,239,234,.78)' }}>{renderMentions(rp.text)}</span></div>
+                                {(be.configured ? (rp as { isOwn?: boolean }).isOwn : rp.author === ME.name) && (
+                                  <button onClick={() => { if (confirm('답글을 삭제할까요?')) onDeleteComment(p.id, (rp as { id?: string }).id, j) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 10.5, fontWeight: 600, color: 'rgba(224,160,106,.8)', marginTop: 3, marginLeft: 4 }}>삭제</button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ))}
+                      {(p as { replyToName?: string | null }).replyToName && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: '#9FE2E8', background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.2)', borderRadius: 10, padding: '6px 10px' }}>
+                          <span><b style={{ color: '#67D7DF' }}>{(p as { replyToName?: string | null }).replyToName}</b>님에게 답글 다는 중</span>
+                          <button onClick={() => onCancelReply(p.id)} style={{ all: 'unset', cursor: 'pointer', marginLeft: 'auto', fontSize: 14, color: 'rgba(231,239,234,.6)' }}>×</button>
+                        </div>
+                      )}
                       {(() => { const m = String(p.draft).match(/@([가-힣A-Za-z0-9_]*)$/); if (!m) return null; const q = m[1]; const hits = mentionNames.filter((n) => n.includes(q)).slice(0, 5); if (!hits.length) return null; return (
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
                           {hits.map((n) => <button key={n} onClick={() => onPostDraftChange(p.id, String(p.draft).replace(/@[가-힣A-Za-z0-9_]*$/, `@${n} `))} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 14, padding: '5px 11px' }}>@{n}</button>)}
@@ -908,8 +936,8 @@ export default function Portal() {
                       ) })()}
                       <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 2 }}>
                         <Avatar initials={meDisp.initials} color={meDisp.color} size={30} fontSize={10.5} />
-                        <input id={`cmt-${p.id}`} value={p.draft} onChange={(e) => onPostDraftChange(p.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onPostCommentSubmit(p.id) } }} placeholder="댓글 · @로 멘션…" style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 13, padding: '9px 14px', borderRadius: 18, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
-                        <button onClick={() => onPostCommentSubmit(p.id)} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 600, color: '#67D7DF' }}>댓글</button>
+                        <input id={`cmt-${p.id}`} value={p.draft} onChange={(e) => onPostDraftChange(p.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onPostCommentSubmit(p.id) } }} placeholder={(p as { replyToName?: string | null }).replyToName ? `${(p as { replyToName?: string | null }).replyToName}님에게 답글…` : '댓글 · @로 멘션…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 13, padding: '9px 14px', borderRadius: 18, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }} />
+                        <button onClick={() => onPostCommentSubmit(p.id)} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 600, color: '#67D7DF' }}>{(p as { replyToName?: string | null }).replyToName ? '답글' : '댓글'}</button>
                       </div>
                     </div>
                   )}
@@ -1082,8 +1110,16 @@ export default function Portal() {
                   </section>
                 </div>
               ) : (
+                <>
+                  <div style={{ position: 'relative', marginBottom: 16 }}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.6)" strokeWidth="1.8" style={{ position: 'absolute', left: 15, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" strokeLinecap="round" /></svg>
+                    <input value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} placeholder="이름으로 회원 검색…" style={{ width: '100%', fontFamily: 'inherit', fontSize: 14, padding: '12px 16px 12px 42px', borderRadius: 14, border: '1px solid rgba(255,247,232,.12)', background: 'rgba(255,249,238,.05)', outline: 'none', color: '#EAF3F1' }} />
+                  </div>
+                  {membersDisp.filter((m) => m.name.includes(memberQuery.trim())).length === 0 && (
+                    <div style={{ textAlign: 'center', fontSize: 13, color: 'rgba(231,239,234,.45)', padding: '32px 0' }}>“{memberQuery.trim()}”에 해당하는 회원이 없어요.</div>
+                  )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(248px,1fr))', gap: 18 }}>
-                  {membersDisp.map((m) => (
+                  {membersDisp.filter((m) => m.name.includes(memberQuery.trim())).map((m) => (
                     <button key={m.id} onClick={() => openMember(m.id)} className="hwl-card-hover" style={{ all: 'unset', cursor: 'pointer', ...card, borderRadius: 22, padding: 20, display: 'flex', flexDirection: 'column', gap: 13 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <Avatar initials={m.initials} color={m.color} size={48} fontSize={15} />
@@ -1096,6 +1132,7 @@ export default function Portal() {
                     </button>
                   ))}
                 </div>
+                </>
               )}
             </div>
           )}

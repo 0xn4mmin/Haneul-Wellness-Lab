@@ -33,10 +33,11 @@ export interface BackendProfile {
   name: string; initials: string; color: string; role: 'client' | 'trainer'
   birth: string | null; gender: string | null; phone: string | null; photoUrl: string | null
 }
-export interface PostComment { id?: string; author: string; initials: string; color: string; text: string; isOwn?: boolean }
+export interface PostComment { id?: string; author: string; initials: string; color: string; text: string; isOwn?: boolean; replies?: PostComment[] }
 export interface PostView {
   id: string; author: string; initials: string; color: string; role: Role; time: string; text: string
   likes: number; liked: boolean; open: boolean; draft: string; comments: PostComment[]; isOwn: boolean
+  replyTo: string | null; replyToName: string | null
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
 export interface MessageView { id: string; author: string; initials: string; color: string; role: Role; time: string; text: string }
@@ -77,6 +78,7 @@ export interface Backend {
   toggleLike: (id: string) => void
   toggleComments: (id: string) => void
   setPostDraft: (id: string, text: string) => void
+  setReplyTo: (id: string, commentId: string | null, name?: string) => void
   submitPostComment: (id: string) => void
   // chat
   messages: MessageView[] | null
@@ -141,7 +143,7 @@ export function useBackend(): Backend {
   const [briefingMsg, setBriefingMsg] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const roomId = useRef<string | null>(null)
-  const postUi = useRef<Record<string, { open: boolean; draft: string }>>({})
+  const postUi = useRef<Record<string, { open: boolean; draft: string; replyTo: string | null }>>({})
 
   const meId = session?.user?.id ?? null
   const roleOf = (id: string | undefined, r?: Role): Role => (id && id === meId ? 'me' : (r ?? 'client'))
@@ -159,15 +161,23 @@ export function useBackend(): Backend {
     const rows = await api.fetchPosts()
     const shaped: PostView[] = (rows as any[]).map((r) => {
       const a = (r.author ?? {}) as Author
-      const ui = postUi.current[r.id] ?? { open: false, draft: '' }
+      const ui = postUi.current[r.id] ?? { open: false, draft: '', replyTo: null }
       const sm = r.shared_metric as { val?: string; label?: string; sub?: string } | null
+      // build nested comments: top-level + their replies (one level)
+      const raw = (r.post_comments ?? []).map((c: any) => ({ id: c.id, author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, text: c.text, isOwn: c.author_id === meId, parentId: c.parent_id as string | null, ts: Date.parse(c.created_at) }))
+      raw.sort((x: any, y: any) => x.ts - y.ts)
+      const byParent: Record<string, PostComment[]> = {}
+      raw.filter((c: any) => c.parentId).forEach((c: any) => { (byParent[c.parentId] ??= []).push(c) })
+      const comments = raw.filter((c: any) => !c.parentId).map((c: any) => ({ ...c, replies: byParent[c.id] ?? [] }))
+      const replyToName = ui.replyTo ? (raw.find((c: any) => c.id === ui.replyTo)?.author ?? null) : null
       return {
         id: r.id, author: a.name, initials: a.initials, color: a.avatar_color,
         role: roleOf(r.author_id, a.role), time: relTime(r.created_at), text: r.text,
         likes: (r.post_likes ?? []).length,
         liked: (r.post_likes ?? []).some((l: { user_id: string }) => l.user_id === meId),
         open: ui.open, draft: ui.draft, isOwn: r.author_id === meId,
-        comments: (r.post_comments ?? []).map((c: any) => ({ id: c.id, author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, text: c.text, isOwn: c.author_id === meId })),
+        replyTo: ui.replyTo, replyToName,
+        comments,
         hasMetric: !!sm, metricVal: sm?.val, metricLabel: sm?.label, metricSub: sm?.sub,
       }
     })
@@ -329,20 +339,27 @@ export function useBackend(): Backend {
     api.toggleLike(id, liked).catch((e) => console.warn('[backend] like', e))
   }, [posts])
   const toggleComments = useCallback((id: string) => {
-    const ui = postUi.current[id] ?? { open: false, draft: '' }
+    const ui = postUi.current[id] ?? { open: false, draft: '', replyTo: null }
     postUi.current[id] = { ...ui, open: !ui.open }
     setPosts((ps) => ps?.map((p) => p.id === id ? { ...p, open: !p.open } : p) ?? ps)
   }, [])
   const setPostDraft = useCallback((id: string, text: string) => {
-    const ui = postUi.current[id] ?? { open: true, draft: '' }
+    const ui = postUi.current[id] ?? { open: true, draft: '', replyTo: null }
     postUi.current[id] = { ...ui, draft: text }
     setPosts((ps) => ps?.map((p) => p.id === id ? { ...p, draft: text } : p) ?? ps)
   }, [])
+  const setReplyTo = useCallback((id: string, commentId: string | null, name?: string) => {
+    const ui = postUi.current[id] ?? { open: true, draft: '', replyTo: null }
+    postUi.current[id] = { ...ui, open: true, replyTo: commentId }
+    setPosts((ps) => ps?.map((p) => p.id === id ? { ...p, replyTo: commentId, replyToName: name ?? null } : p) ?? ps)
+  }, [])
   const submitPostComment = useCallback((id: string) => {
-    const draft = (postUi.current[id]?.draft ?? '').trim()
+    const ui = postUi.current[id] ?? { open: true, draft: '', replyTo: null }
+    const draft = (ui.draft ?? '').trim()
     if (!draft) return
-    postUi.current[id] = { open: true, draft: '' }
-    api.addPostComment(id, draft).then(() => reloadPosts()).catch((e) => console.warn('[backend] comment', e))
+    const parent = ui.replyTo
+    postUi.current[id] = { open: true, draft: '', replyTo: null }
+    api.addPostComment(id, draft, parent).then(() => reloadPosts()).catch((e) => console.warn('[backend] comment', e))
   }, [reloadPosts])
 
   // ── chat ──
@@ -496,7 +513,7 @@ export function useBackend(): Backend {
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, updateProfile, uploadAvatar,
-    posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, submitPostComment,
+    posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom,
     challenges, createChallenge, deleteChallenge,
     members, activeMember, openMember, closeMember, addMemberCheer,

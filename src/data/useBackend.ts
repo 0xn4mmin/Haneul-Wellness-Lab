@@ -65,6 +65,7 @@ export interface Backend {
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   reload: () => void
+  loaded: boolean    // initial data load for the signed-in user has finished
   hasData: boolean   // false for a signed-in user with no measurements (show empty state, not mock)
   measureCycleDays: number
   daysUntilNextMeasure: number | null
@@ -139,6 +140,7 @@ export function useBackend(): Backend {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(!isSupabaseConfigured)
   const [loginError, setLoginError] = useState('')
+  const [loaded, setLoaded] = useState(false)
   const [remoteMetrics, setRemoteMetrics] = useState<Record<MetricKey, Metric> | null>(null)
   const [remoteDates, setRemoteDates] = useState<string[] | null>(null)
   const [lastMeasureISO, setLastMeasureISO] = useState<string | null>(null)
@@ -269,6 +271,7 @@ export function useBackend(): Backend {
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
       setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null); setNotifications(null)
       roomId.current = null
+      setLoaded(false)
       return
     }
     let cancelled = false
@@ -316,6 +319,8 @@ export function useBackend(): Backend {
         else { setMessages([]); setRoomMembers([]) }
       } catch (e) {
         console.warn('[backend] load failed', e)
+      } finally {
+        if (!cancelled) setLoaded(true)
       }
     })()
     return () => { cancelled = true }
@@ -609,6 +614,7 @@ export function useBackend(): Backend {
 
   return {
     configured: isSupabaseConfigured, ready, session, loginError, signIn, signUp, signOut, reload,
+    loaded,
     hasData: !isSupabaseConfigured || remoteMetrics !== null,
     measureCycleDays: cycleDays,
     daysUntilNextMeasure: lastMeasureISO

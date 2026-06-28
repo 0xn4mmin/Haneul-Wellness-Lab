@@ -105,8 +105,28 @@ export default function Portal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [be.configured, be.session, s.selectedMetric])
 
+  // on login / logout (user id changes — not on token refresh), land on the
+  // default tab with no leftover detail view, modal, or draft from before
+  const lastUserId = useRef<string | undefined>(undefined)
+  const curUserId = be.session?.user?.id
+  useEffect(() => {
+    if (lastUserId.current === curUserId) return
+    lastUserId.current = curUserId
+    set({ view: 'health', activeMember: null, scanOpen: false, showChallengeForm: false, profileSaved: '', chDone: '', newPost: '', newMsg: '', newComment: '' })
+    setNotifOpen(false); setCycleModal(false); setGoalModal(false); setChatModal('none'); setGaugeInfo(null); setMemberQuery(''); setPostImg(null); setChatImg(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curUserId])
+
   // ---- handlers -----------------------------------------------------------
-  const go = (v: View) => { set({ view: v, activeMember: null }); setMobileNav(false) }
+  // switching tabs always lands on that tab's first screen (no leftover detail
+  // view / open modal / scroll from last time)
+  const go = (v: View) => {
+    set({ view: v, activeMember: null, scanOpen: false, showChallengeForm: false, chDone: '', profileSaved: '' })
+    if (be.configured) be.closeMember()
+    setMobileNav(false); setNotifOpen(false); setCycleModal(false); setGoalModal(false); setGaugeInfo(null); setMemberQuery(''); setPostImg(null); setChatImg(null)
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0 })
+    const el = document.querySelector('.hwl-content'); if (el) el.scrollTop = 0
+  }
   const togglePrivacy = (key: string) => setFn((p) => ({ privacy: { ...p.privacy, [key]: p.privacy[key] === 'public' ? 'private' : 'public' } }))
   const onProfileField = (k: keyof PortalState['profile'], v: string) => setFn((p) => ({ profile: { ...p.profile, [k]: v } }))
   const onPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -222,6 +242,7 @@ export default function Portal() {
 
   // auth: real Supabase when configured, else the local mock gate
   const showLogin = be.configured ? !be.session : !s.authed
+  const loading = be.configured && !!be.session && !be.loaded
   const doLogin = () => { if (be.configured) void be.signIn(s.loginEmail, s.loginPw); else set({ authed: true }) }
   const doSignup = () => { if (be.configured) void be.signUp(s.loginEmail, s.loginPw); else set({ authed: true }) }
   const doLogout = () => { void be.signOut() }
@@ -470,6 +491,14 @@ export default function Portal() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {!showLogin && loading && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 190, background: 'radial-gradient(120% 90% at 50% 18%,#0E1C38 0%,#0A1326 55%,#060B17 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+          <img src="/assets/logo-mark.png" alt="" style={{ width: 52, height: 52, objectFit: 'contain', opacity: 0.9 }} />
+          <div className="hwl-spin" style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid rgba(103,215,223,.25)', borderTopColor: '#67D7DF' }} />
+          <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', letterSpacing: '.5px' }}>불러오는 중…</div>
         </div>
       )}
 
@@ -1503,7 +1532,7 @@ export default function Portal() {
         </div>
       </main>
 
-      {!showLogin && <TabBar view={s.view} go={go} chatBadge={be.configured ? (be.unreadChat || undefined) : undefined} />}
+      {!showLogin && !loading && <TabBar view={s.view} go={go} chatBadge={be.configured ? (be.unreadChat || undefined) : undefined} />}
 
       {/* 결과지 라이트박스 */}
       {s.scanOpen && (

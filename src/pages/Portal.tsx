@@ -55,6 +55,7 @@ export default function Portal() {
   const [chMetricsSel, setChMetricsSel] = useState<string[]>([])
   const [chStart, setChStart] = useState('')
   const [chEnd, setChEnd] = useState('')
+  const [editChallengeId, setEditChallengeId] = useState<string | null>(null)
   const [postImg, setPostImg] = useState<File | null>(null)
   const [chatImg, setChatImg] = useState<File | null>(null)
   const [cgMetric, setCgMetric] = useState('')
@@ -239,17 +240,23 @@ export default function Portal() {
   const openChallengeForm = () => {
     const today = new Date(); const in4w = new Date(today.getTime() + 28 * 86400 * 1000)
     const iso = (d: Date) => d.toISOString().slice(0, 10)
-    setChMetricsSel([]); setChStart(iso(today)); setChEnd(iso(in4w))
-    set({ showChallengeForm: true, chTitle: '', chDone: '' })
+    setEditChallengeId(null); setChMetricsSel([]); setChStart(iso(today)); setChEnd(iso(in4w))
+    set({ showChallengeForm: true, chTitle: '', chScope: '전체 공개', chDone: '' })
+  }
+  const editChallengeForm = () => {
+    const cd = be.challengeDetail; if (!cd) return
+    setEditChallengeId(cd.id); setChMetricsSel(cd.metricKeys); setChStart(cd.startDate); setChEnd(cd.endDate)
+    set({ showChallengeForm: true, chTitle: cd.title, chScope: cd.scope === 'private' ? '비공개' : '전체 공개', chDone: '' })
+    be.closeChallenge()
   }
   const createChallenge = () => {
     const t = (s.chTitle || '').trim() || '새 챌린지'
     if (chMetricsSel.length === 0) { set({ chDone: '⚠ 지표를 1개 이상 선택하세요.' }); return }
     if (!chStart || !chEnd || chEnd < chStart) { set({ chDone: '⚠ 기간을 올바르게 선택하세요.' }); return }
-    if (be.configured) {
-      void be.createChallenge({ title: t, metrics: chMetricsSel, startDate: chStart, endDate: chEnd, scope: s.chScope === '비공개' ? 'private' : 'public' })
-    }
-    set({ showChallengeForm: false, chTitle: '', chDone: '✓ “' + t + '” 챌린지가 생성되었어요.' })
+    const payload = { title: t, metrics: chMetricsSel, startDate: chStart, endDate: chEnd, scope: (s.chScope === '비공개' ? 'private' : 'public') as 'public' | 'private' }
+    if (be.configured) { if (editChallengeId) void be.updateChallenge(editChallengeId, payload); else void be.createChallenge(payload) }
+    set({ showChallengeForm: false, chTitle: '', chDone: editChallengeId ? '✓ 챌린지가 수정되었어요.' : '✓ “' + t + '” 챌린지가 생성되었어요.' })
+    setEditChallengeId(null)
   }
 
   // auth: real Supabase when configured, else the local mock gate
@@ -1204,7 +1211,6 @@ export default function Portal() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </button>
                     )}
-                    <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>{be.configured ? (activeRoom ? `${messages.length}개 메시지` : '') : '5명 접속'}</div>
                   </div>
                 </div>
                 {chatRooms != null && (
@@ -1222,7 +1228,7 @@ export default function Portal() {
                     <button onClick={() => { setChatErr(''); setChatModal('join') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 16, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>코드로 입장</button>
                   </div>
                 )}
-                <div ref={chatRef} style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div ref={chatRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {be.configured && !hasRooms ? (
                     <div style={{ margin: 'auto', textAlign: 'center', maxWidth: 280, padding: 20 }}>
                       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.5)" strokeWidth="1.6" style={{ margin: '0 auto 12px' }}><path d="M4 5h16v10H9l-4 4v-4H4z" strokeLinejoin="round" /></svg>
@@ -1269,10 +1275,11 @@ export default function Portal() {
                         )}
                         {isMine && readCount > 0 && <button onClick={() => setReadModal(readBy)} style={{ all: 'unset', cursor: 'pointer', fontSize: 10, color: '#67D7DF', marginTop: 3 }}>읽음 {readCount}</button>}
                         {open && be.configured && !deleted && (
-                          <div style={{ display: 'flex', gap: 4, marginTop: 5, background: '#0E1A38', border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, padding: '4px 6px' }}>
-                            {['👍', '❤️', '😂', '😢', '😮', '😡'].map((e) => <button key={e} onClick={() => { be.toggleReaction(mid, e); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 16, padding: '2px 3px' }}>{e}</button>)}
-                            <button onClick={() => { setReplyTarget({ id: mid, author: m.author, text: m.text || '사진' }); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#9DAFCB', padding: '0 6px', alignSelf: 'center' }}>답글</button>
-                            {isMine && <button onClick={() => { if (confirm('메시지를 삭제할까요?')) be.deleteMessage(mid); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(224,135,92,.9)', padding: '0 6px', alignSelf: 'center' }}>삭제</button>}
+                          <div style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 2, marginTop: 5, maxWidth: '100%', overflowX: 'auto', background: '#0E1A38', border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, padding: '4px 6px' }}>
+                            {['👍', '❤️', '😂', '😢', '😮', '😡'].map((e) => <button key={e} onClick={() => { be.toggleReaction(mid, e); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 15, padding: '2px 2px' }}>{e}</button>)}
+                            <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,.14)', margin: '0 3px', flexShrink: 0 }} />
+                            <button onClick={() => { setReplyTarget({ id: mid, author: m.author, text: m.text || '사진' }); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: '#9DAFCB', padding: '2px 6px', whiteSpace: 'nowrap' }}>답글</button>
+                            {isMine && <button onClick={() => { if (confirm('메시지를 삭제할까요?')) be.deleteMessage(mid); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: 'rgba(224,135,92,.9)', padding: '2px 6px', whiteSpace: 'nowrap' }}>삭제</button>}
                           </div>
                         )}
                       </div>
@@ -1465,7 +1472,7 @@ export default function Portal() {
             <div onClick={() => set({ showChallengeForm: false })} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,12,10,.82)', backdropFilter: 'blur(6px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'hwl-fade .25s ease both' }}>
               <div className="hwl-modal-wrap" style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
-                  <div style={eyebrow}>New Challenge</div><div style={cardTitle}>챌린지 만들기</div>
+                  <div style={eyebrow}>{editChallengeId ? 'Edit Challenge' : 'New Challenge'}</div><div style={cardTitle}>{editChallengeId ? '챌린지 수정' : '챌린지 만들기'}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 18 }}>
                     <div><label style={labelStyle}>제목</label><input value={s.chTitle} onChange={(e) => set({ chTitle: e.target.value })} placeholder="예) 6월 체성분 챌린지" style={inputStyle} /></div>
                     <div>
@@ -1483,8 +1490,8 @@ export default function Portal() {
                     {s.chDone.startsWith('⚠') && <div style={{ fontSize: 12, color: '#E0875C' }}>{s.chDone}</div>}
                   </div>
                   <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-                    <button onClick={() => set({ showChallengeForm: false, chDone: '' })} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
-                    <button onClick={createChallenge} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>만들기</button>
+                    <button onClick={() => { set({ showChallengeForm: false, chDone: '' }); setEditChallengeId(null) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
+                    <button onClick={createChallenge} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>{editChallengeId ? '저장' : '만들기'}</button>
                   </div>
                 </div>
               </div>
@@ -1540,7 +1547,10 @@ export default function Portal() {
                     <div style={cardTitle}>{cd.title}</div>
                     <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)', marginTop: 4 }}>{cd.startDate.slice(5).replace('-', '.')} ~ {cd.endDate.slice(5).replace('-', '.')} · D-{cd.daysLeft} · 지표 {cd.metricLabels.join(', ')}</div>
                   </div>
-                  <button onClick={be.closeChallenge} style={{ all: 'unset', cursor: 'pointer', fontSize: 20, color: 'rgba(231,239,234,.5)', lineHeight: 1 }}>×</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    {cd.isOwn && <button onClick={editChallengeForm} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 14, padding: '5px 11px' }}>수정</button>}
+                    <button onClick={be.closeChallenge} style={{ all: 'unset', cursor: 'pointer', fontSize: 20, color: 'rgba(231,239,234,.5)', lineHeight: 1 }}>×</button>
+                  </div>
                 </div>
 
                 {cd.progress.length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '14px 0 2px' }}>아직 목표를 설정한 참여자가 없어요. 아래에서 내 목표를 정해보세요.</div>}

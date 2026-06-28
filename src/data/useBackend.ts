@@ -126,6 +126,7 @@ export interface Backend {
   challenges: ChallengeView[] | null
   createChallenge: (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => Promise<void>
   deleteChallenge: (id: string) => Promise<void>
+  updateChallenge: (id: string, c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => Promise<void>
   challengeDetail: ChallengeDetail | null
   openChallenge: (cv: ChallengeView) => void
   closeChallenge: () => void
@@ -594,6 +595,10 @@ export function useBackend(): Backend {
     await api.deleteChallenge(id)
     await reloadChallenges()
   }, [reloadChallenges])
+  const updateChallenge = useCallback(async (id: string, c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => {
+    await api.updateChallengeRow(id, c)
+    await reloadChallenges()
+  }, [reloadChallenges])
 
   const loadChallengeDetail = useCallback(async (cv: ChallengeView) => {
     const [members, myGoals, progress] = await Promise.all([
@@ -769,7 +774,7 @@ export function useBackend(): Backend {
     posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom,
-    challenges, createChallenge, deleteChallenge,
+    challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal,
     members, activeMember, openMember, closeMember, addMemberCheer,
     chartComments, loadChartComments, addChartComment, coachFeedback, addCoachFeedback,

@@ -73,7 +73,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
   .hwl-hero{padding:20px 18px!important}
   .hwl-hero-stats{margin-left:0!important;width:100%}
   .hwl-roster-inner{min-width:560px}
-  .hwl-chat-panel{height:auto!important;min-height:62vh}
+  /* fixed tall block so the message list scrolls inside it (not the page) */
+  .hwl-chat-panel{height:calc(100dvh - 180px)!important;min-height:400px}
 
   /* prevent iOS zoom-on-focus: inputs must be >=16px */
   input,textarea,select{font-size:16px!important}

@@ -302,6 +302,12 @@ export async function createChallengeRow(c: { title: string; metrics: string[]; 
 export async function deleteChallenge(id: string) {
   return requireSupabase().from('challenges').delete().eq('id', id)
 }
+export async function updateChallengeRow(id: string, c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) {
+  return requireSupabase().from('challenges').update({
+    title: c.title.trim() || '새 챌린지', metric_keys: c.metrics, metric_key: c.metrics[0] ?? null,
+    starts_at: c.startDate, ends_at: c.endDate, scope: c.scope,
+  }).eq('id', id)
+}
 
 // ───────────── challenge participation / goals / progress ─────────
 export interface ChallengeMemberRow { user_id: string; name: string; initials: string; color: string; photo: string | null; status: string }

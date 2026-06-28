@@ -584,6 +584,7 @@ export default function Portal() {
                   <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체중</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.weight.series[M.weight.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
                   <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체지방률</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.pbf.series[M.pbf.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> %</span></div></div>
                   <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>골격근량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.smm.series[M.smm.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
+                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체지방량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.bodyFatMass.series[M.bodyFatMass.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
                 </div>
                 <div style={{ position: 'relative', width: 98, height: 98, flex: 'none' }}>
                   <svg viewBox="0 0 120 120" style={{ width: 98, height: 98, transform: 'rotate(-90deg)' }}>

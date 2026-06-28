@@ -22,7 +22,7 @@ const REVIEW_FIELDS: { key: MetricKey; label: string; unit: string }[] = [
 ]
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', fontFamily: 'inherit', fontSize: 13, padding: '8px 10px', borderRadius: 9,
+  width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: 13, padding: '8px 10px', borderRadius: 9,
   border: '1px solid rgba(255,247,232,.15)', background: 'rgba(255,249,238,.05)', outline: 'none', color: '#EAF3F1',
 }
 
@@ -110,7 +110,7 @@ export default function OcrUpload({ onCommitted }: { onCommitted: () => void }) 
           <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.55)', marginBottom: 10, lineHeight: 1.5 }}>인식된 값을 확인·수정하고 저장하세요. 측정일이 비어 있으면 직접 선택해 주세요.</div>
           <div style={{ marginBottom: 10 }}>
             <label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>측정일</label>
-            <input type="date" value={draft.date} onChange={(e) => setDate(e.target.value)} style={inputStyle} />
+            <input type="date" value={draft.date} onChange={(e) => setDate(e.target.value)} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
             {REVIEW_FIELDS.map((f) => (

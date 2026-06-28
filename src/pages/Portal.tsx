@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   dates, metrics, segData, research, goals, conditionLog, challenge,
-  me as ME, coach as COACH, segColor, buildSpark, buildTrend, buildGauges, buildRadar, assess,
+  me as ME, coach as COACH, segColor, buildSpark, buildTrend, buildGauges, buildRadar, assess, METRIC_INFO,
   type MetricKey,
 } from '../data/portalData'
 import { initialState, type PortalState, type View } from '../data/portalState'
@@ -52,6 +52,8 @@ export default function Portal() {
   const [sleepInput, setSleepInput] = useState('')
   const [goalModal, setGoalModal] = useState(false)
   const [goalDraft, setGoalDraft] = useState<Record<string, string>>({})
+  const [gaugeTip, setGaugeTip] = useState<{ key: string; side: 'min' | 'max' } | null>(null)
+  const [gaugeInfo, setGaugeInfo] = useState<string | null>(null)
 
   // chat-room UI (backend mode)
   const [chatModal, setChatModal] = useState<'none' | 'create' | 'join'>('none')
@@ -690,17 +692,17 @@ export default function Portal() {
               </section>
 
               <section style={{ ...card, padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div><div style={eyebrow}>Latest Scan</div><div style={cardTitle}>체성분 · {dateLatest}</div></div>
-                  <div style={{ fontSize: 11, fontFamily: "'IBM Plex Mono',monospace", color: '#8A9BC0' }}>측정 6회</div>
-                </div>
+                <div><div style={eyebrow}>Latest Scan</div><div style={cardTitle}>체성분 · {dateLatest}</div></div>
                 {gauges.map((g) => {
                   const gp = privacyMap[g.key]; const gpub = gp === 'public'
+                  const fmt = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(1)
+                  const tipOn = (side: 'min' | 'max') => gaugeTip?.key === g.key && gaugeTip.side === side
                   return (
                     <div key={g.key} style={{ display: 'flex', flexDirection: 'column', gap: 7, animation: 'hwl-rise .4s ease both' }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                           <span style={{ fontSize: 13.5, fontWeight: 600, color: '#EAF3F1' }}>{g.label}</span>
+                          <button onClick={() => setGaugeInfo((k) => k === g.key ? null : g.key)} aria-label={`${g.label} 설명`} style={{ all: 'unset', cursor: 'pointer', width: 15, height: 15, borderRadius: '50%', border: `1px solid ${gaugeInfo === g.key ? '#67D7DF' : 'rgba(157,175,203,.5)'}`, color: gaugeInfo === g.key ? '#67D7DF' : 'rgba(157,175,203,.7)', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>i</button>
                           <span style={{ fontSize: 11, fontWeight: 600, color: g.statusColor, fontFamily: "'IBM Plex Mono',monospace" }}>{g.status}</span>
                           {g.verdict && <span style={{ fontSize: 9, fontWeight: 700, color: '#06110F', background: g.statusColor, padding: '1px 6px', borderRadius: 7, letterSpacing: '.3px' }}>{g.verdict}</span>}
                         </div>
@@ -711,11 +713,30 @@ export default function Portal() {
                           </button>
                         </div>
                       </div>
-                      <div style={{ position: 'relative', height: 13, borderRadius: 8, overflow: 'visible', display: 'flex', background: 'rgba(255,255,255,.08)' }}>
-                        <div style={{ height: '100%', width: `${g.underW}%`, background: 'rgba(224,138,94,.4)', borderRadius: '8px 0 0 8px' }} />
-                        <div style={{ height: '100%', width: `${g.normW}%`, background: 'linear-gradient(90deg,#2E9BA6,#67D7DF)' }} />
-                        <div style={{ height: '100%', width: `${g.overW}%`, background: 'rgba(201,162,75,.45)', borderRadius: '0 8px 8px 0' }} />
-                        <div style={{ position: 'absolute', top: -4, bottom: -4, left: `${g.markerPct}%`, width: 3, background: '#fff', borderRadius: 3, boxShadow: '0 0 8px rgba(255,255,255,.6)' }} />
+                      {gaugeInfo === g.key && (
+                        <div style={{ fontSize: 12, lineHeight: 1.6, color: 'rgba(231,239,234,.7)', background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.2)', borderRadius: 10, padding: '9px 12px' }}>{METRIC_INFO[g.key] ?? ''} <span style={{ color: '#9FE2E8' }}>· 표준 {fmt(g.nMin)}~{fmt(g.nMax)}{g.unit ? ` ${g.unit}` : ''}</span></div>
+                      )}
+                      <div style={{ position: 'relative', height: 13, marginTop: 2 }}>
+                        {/* rounded bar (inner clip keeps both ends round regardless of segment widths) */}
+                        <div style={{ position: 'absolute', inset: 0, borderRadius: 8, overflow: 'hidden', display: 'flex', background: 'rgba(255,255,255,.08)' }}>
+                          <div style={{ height: '100%', width: `${g.underW}%`, background: 'rgba(224,138,94,.4)' }} />
+                          <div style={{ height: '100%', width: `${g.normW}%`, background: 'linear-gradient(90deg,#2E9BA6,#67D7DF)' }} />
+                          <div style={{ height: '100%', width: `${g.overW}%`, background: 'rgba(201,162,75,.45)' }} />
+                        </div>
+                        {/* value marker */}
+                        <div style={{ position: 'absolute', top: -4, bottom: -4, left: `${g.markerPct}%`, width: 3, background: '#fff', borderRadius: 3, boxShadow: '0 0 8px rgba(255,255,255,.6)', pointerEvents: 'none' }} />
+                        {/* standard-range boundary handles: hover/tap to reveal the number */}
+                        {([['min', g.underW, g.nMin], ['max', g.underW + g.normW, g.nMax]] as [('min' | 'max'), number, number][]).map(([side, pos, num]) => (
+                          <div key={side}
+                            onMouseEnter={() => setGaugeTip({ key: g.key, side })} onMouseLeave={() => setGaugeTip((t) => (t?.key === g.key && t.side === side ? null : t))}
+                            onClick={() => setGaugeTip((t) => (t?.key === g.key && t.side === side ? null : { key: g.key, side }))}
+                            style={{ position: 'absolute', top: -5, bottom: -5, left: `calc(${pos}% - 7px)`, width: 14, cursor: 'pointer', display: 'flex', justifyContent: 'center' }}>
+                            <span style={{ width: 2, height: '100%', background: 'rgba(255,255,255,.45)', borderRadius: 2 }} />
+                            {tipOn(side) && (
+                              <span style={{ position: 'absolute', bottom: 'calc(100% + 4px)', left: '50%', transform: 'translateX(-50%)', fontSize: 10, fontWeight: 700, fontFamily: "'IBM Plex Mono',monospace", color: '#06110F', background: '#9FE2E8', padding: '2px 6px', borderRadius: 6, whiteSpace: 'nowrap' }}>{fmt(num)}</span>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )

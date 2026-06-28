@@ -186,6 +186,20 @@ export interface GaugeGeom {
   key: string; label: string; unit: string; value: number
   status: string; statusColor: string; verdict: '' | 'Good' | 'Bad'
   markerPct: number; underW: number; normW: number; overW: number
+  nMin: number; nMax: number
+}
+
+// short, friendly explanation of each metric (shown via the ⓘ button)
+export const METRIC_INFO: Record<string, string> = {
+  score: '근육·체지방 균형을 종합한 InBody 점수예요. 보통 80점 이상이면 표준 이상으로 봅니다.',
+  weight: '몸 전체의 무게예요. 키 대비 적정 범위는 사람마다 달라요.',
+  smm: '팔·다리·몸통을 움직이는 골격근의 무게예요. 많을수록 대사와 체형에 유리해요.',
+  pbf: '체중에서 지방이 차지하는 비율(%)이에요. 낮을수록 좋지만 너무 낮아도 건강에 좋지 않아요.',
+  bodyFatMass: '몸에 있는 지방의 실제 무게(kg)예요.',
+  bmi: '체중(kg)을 키(m)의 제곱으로 나눈 비만도 지표예요.',
+  bmr: '가만히 있어도 소비되는 최소 에너지(kcal)예요. 근육이 많을수록 높아져요.',
+  visceral: '복부 장기 주변에 쌓인 지방 수준이에요. 보통 9 이하를 표준으로 봅니다.',
+  tbw: '몸속 수분의 양(L)이에요. 근육량과 함께 늘어나요.',
 }
 export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics, ranges?: RangeMap): GaugeGeom[] {
   return Object.keys(gconf).map((key) => {
@@ -213,6 +227,7 @@ export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics, ra
       key, label: m.label, unit: m.unit, value: val, status, statusColor: sc, verdict,
       markerPct: +markerPct.toFixed(1), underW: +underW.toFixed(1),
       normW: +normW.toFixed(1), overW: +overW.toFixed(1),
+      nMin, nMax,
     }
   })
 }

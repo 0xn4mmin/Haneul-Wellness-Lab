@@ -1179,7 +1179,13 @@ export default function Portal() {
                   <div><label style={labelStyle}>성별</label><div style={{ display: 'flex', gap: 8 }}>{genders.map((g, i) => <button key={i} onClick={() => onProfileField('gender', g.label)} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '11px 0', borderRadius: 12, fontSize: 13.5, fontWeight: 600, border: `1px solid ${g.border}`, background: g.bg, color: g.fg }}>{g.label}</button>)}</div></div>
                   <div><label style={labelStyle}>핸드폰 번호</label><input value={P.phone} onChange={(e) => onProfileField('phone', e.target.value)} placeholder="010-0000-0000" style={inputStyle} /></div>
                 </div>
-                <button onClick={() => { if (be.configured) void be.updateProfile({ name: P.name, birth: P.birth, gender: P.gender, phone: P.phone }); set({ profileSaved: '✓ 저장되었습니다.' }); go('health') }} style={{ all: 'unset', cursor: 'pointer', marginTop: 24, textAlign: 'center', display: 'block', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24 }}>저장하기</button>
+                <button onClick={() => {
+                  if (be.configured) {
+                    void be.updateProfile({ name: P.name, birth: P.birth, gender: P.gender, phone: P.phone })
+                      .then(() => { set({ profileSaved: '✓ 저장되었습니다.' }); go('health') })
+                      .catch(() => set({ profileSaved: '⚠ 저장에 실패했어요. 잠시 후 다시 시도하세요.' }))
+                  } else { set({ profileSaved: '✓ 저장되었습니다.' }); go('health') }
+                }} style={{ all: 'unset', cursor: 'pointer', marginTop: 24, textAlign: 'center', display: 'block', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24 }}>저장하기</button>
                 <div style={{ textAlign: 'center', fontSize: 12, color: '#67D7DF', marginTop: 10 }}>{s.profileSaved}</div>
 
                 {/* 보기 모드 — 모바일에선 사이드바가 없으므로 여기서 전환 (트레이너 계정만) */}

@@ -355,7 +355,11 @@ export function useBackend(): Backend {
 
   // ── profile ──
   const updateProfile = useCallback(async (patch: { name: string; birth: string; gender: string; phone: string }) => {
-    await api.updateProfile(patch)
+    // an empty date string is rejected by the `date` column and rolls back the
+    // whole update (so name wouldn't save) — coerce '' → null
+    const clean = { name: patch.name.trim(), birth: patch.birth ? patch.birth : null, gender: patch.gender || null, phone: patch.phone || null }
+    const { error } = await api.updateProfile(clean)
+    if (error) { console.warn('[backend] updateProfile failed', error); throw error }
     setProfile((p) => (p ? { ...p, ...patch } : p))
   }, [])
   const uploadAvatar = useCallback(async (file: File) => {

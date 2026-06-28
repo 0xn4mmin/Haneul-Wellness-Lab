@@ -406,7 +406,7 @@ export default function Portal() {
   const coachTargetMember = roster.find((m) => m.id === s.coachTargetId)
 
   const messagesSource = be.configured ? (be.messages ?? []) : s.messages
-  const messages = messagesSource.map((m) => { const isMe = m.role === 'me'; return { ...m, dir: (isMe ? 'row-reverse' : 'row') as React.CSSProperties['flexDirection'], justify: isMe ? 'flex-end' : 'flex-start', radius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px', bubbleBg: isMe ? 'linear-gradient(135deg,#2E9BA6,#1E6E78)' : (m.role === 'trainer' ? 'rgba(46,155,166,.14)' : 'rgba(255,255,255,.06)'), bubbleFg: isMe ? '#060B17' : '#E7EFEA', bubbleBorder: isMe ? 'transparent' : (m.role === 'trainer' ? 'rgba(103,215,223,.25)' : 'rgba(255,255,255,.1)'), ring: m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none' } })
+  const messages = messagesSource.map((m) => { const isMe = m.role === 'me'; return { ...m, dir: (isMe ? 'row-reverse' : 'row') as React.CSSProperties['flexDirection'], justify: isMe ? 'flex-end' : 'flex-start', radius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px', bubbleBg: isMe ? 'linear-gradient(135deg,#7FE0E8,#3FB2BD)' : (m.role === 'trainer' ? 'rgba(103,215,223,.2)' : 'rgba(196,212,240,.16)'), bubbleFg: isMe ? '#06222A' : '#F1F6F4', bubbleBorder: isMe ? 'transparent' : (m.role === 'trainer' ? 'rgba(103,215,223,.32)' : 'rgba(255,255,255,.16)'), ring: m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none' } })
   const chatRooms = be.configured ? (be.rooms ?? []) : null
   const activeRoom = chatRooms?.find((r) => r.id === be.activeRoomId) ?? null
   const roomTitle = activeRoom ? activeRoom.name : '그룹 채팅'

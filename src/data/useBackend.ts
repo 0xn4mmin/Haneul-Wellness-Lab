@@ -42,7 +42,8 @@ export interface PostView {
 }
 export interface MessageView { id: string; author: string; initials: string; color: string; role: Role; time: string; text: string }
 export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null; isOwn: boolean }
-export interface ChallengeView { id: string; title: string; metric: string; goal: string; daysLeft: number; isOwn: boolean }
+export interface ChallengeView { id: string; title: string; metrics: string[]; startDate: string; endDate: string; daysLeft: number; isOwn: boolean }
+const METRIC_LABEL: Record<string, string> = { weight: '체중', smm: '골격근량', pbf: '체지방률', bodyFatMass: '체지방량', bmi: 'BMI', bmr: '기초대사량', visceral: '내장지방', tbw: '체수분', score: '인바디 점수' }
 export interface NotificationView { id: string; type: string; text: string; read: boolean; time: string; actorInitials: string; actorColor: string }
 export interface MemberView { id: string; name: string; initials: string; color: string; bio: string; bio2: string; score: number; pub: string[] }
 export interface ActiveMemberDetail {
@@ -104,7 +105,7 @@ export interface Backend {
   deleteRoom: (id: string) => Promise<void>
   // challenges
   challenges: ChallengeView[] | null
-  createChallenge: (c: { title: string; metric: string; goal: string; weeks: number; scope: 'public' | 'private' }) => Promise<void>
+  createChallenge: (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => Promise<void>
   deleteChallenge: (id: string) => Promise<void>
   // members
   members: MemberView[] | null
@@ -219,11 +220,16 @@ export function useBackend(): Backend {
   const reloadChallenges = useCallback(async () => {
     const rows = await api.fetchChallenges()
     const dayMs = 86400 * 1000
-    setChallenges(rows.map((c) => ({
-      id: c.id, title: c.title, metric: c.metric_key, goal: c.goal,
-      daysLeft: Math.max(0, Math.ceil((Date.parse(c.ends_at) - Date.now()) / dayMs)),
-      isOwn: c.created_by === meId,
-    })))
+    setChallenges(rows.map((c) => {
+      const keys = (c.metric_keys && c.metric_keys.length ? c.metric_keys : (c.metric_key ? [c.metric_key] : []))
+      return {
+        id: c.id, title: c.title,
+        metrics: keys.map((k) => METRIC_LABEL[k] ?? k),
+        startDate: c.starts_at, endDate: c.ends_at,
+        daysLeft: Math.max(0, Math.ceil((Date.parse(c.ends_at) - Date.now()) / dayMs)),
+        isOwn: c.created_by === meId,
+      }
+    }))
   }, [meId])
 
   const reloadNotifications = useCallback(async () => {
@@ -483,7 +489,7 @@ export function useBackend(): Backend {
   }, [reloadRooms, reloadMessages])
 
   // ── challenges ──
-  const createChallenge = useCallback(async (c: { title: string; metric: string; goal: string; weeks: number; scope: 'public' | 'private' }) => {
+  const createChallenge = useCallback(async (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => {
     await api.createChallengeRow(c)
     await reloadChallenges()
   }, [reloadChallenges])

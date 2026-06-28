@@ -243,23 +243,21 @@ export async function joinRoomByCode(code: string): Promise<{ ok: boolean; reaso
 }
 
 export interface ChallengeRow {
-  id: string; title: string; metric_key: string; goal: string; starts_at: string; ends_at: string
+  id: string; title: string; metric_key: string | null; metric_keys: string[] | null
+  goal: string | null; starts_at: string; ends_at: string
   scope: 'public' | 'private'; created_by: string | null
 }
 export async function fetchChallenges(): Promise<ChallengeRow[]> {
   const { data } = await requireSupabase().from('challenges')
-    .select('id, title, metric_key, goal, starts_at, ends_at, scope, created_by')
+    .select('id, title, metric_key, metric_keys, goal, starts_at, ends_at, scope, created_by')
     .order('created_at', { ascending: false })
   return (data ?? []) as ChallengeRow[]
 }
-export async function createChallengeRow(c: { title: string; metric: string; goal: string; weeks: number; scope: 'public' | 'private' }) {
+export async function createChallengeRow(c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) {
   const me = await uid()
-  const start = new Date()
-  const end = new Date(start.getTime() + c.weeks * 7 * 86400 * 1000)
-  const iso = (d: Date) => d.toISOString().slice(0, 10)
   return requireSupabase().from('challenges').insert({
-    title: c.title.trim() || '새 챌린지', metric_key: c.metric, goal: c.goal,
-    starts_at: iso(start), ends_at: iso(end), scope: c.scope, created_by: me,
+    title: c.title.trim() || '새 챌린지', metric_keys: c.metrics, metric_key: c.metrics[0] ?? null, goal: null,
+    starts_at: c.startDate, ends_at: c.endDate, scope: c.scope, created_by: me,
   })
 }
 export async function deleteChallenge(id: string) {

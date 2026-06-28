@@ -52,6 +52,9 @@ export default function Portal() {
   const [sleepInput, setSleepInput] = useState('')
   const [goalModal, setGoalModal] = useState(false)
   const [goalDraft, setGoalDraft] = useState<Record<string, string>>({})
+  const [chMetricsSel, setChMetricsSel] = useState<string[]>([])
+  const [chStart, setChStart] = useState('')
+  const [chEnd, setChEnd] = useState('')
   const [gaugeTip, setGaugeTip] = useState<{ key: string; side: 'min' | 'max' } | null>(null)
   const [gaugeInfo, setGaugeInfo] = useState<string | null>(null)
 
@@ -193,11 +196,22 @@ export default function Portal() {
     if (be.configured) { void be.addCoachNote(s.coachTargetId, s.selectedMetric, t).then((err) => err ? set({ coachConfirm: '⚠ ' + err }) : done()); return }
     done()
   }
+  const CH_METRIC_OPTS = [
+    { key: 'weight', label: '체중' }, { key: 'smm', label: '골격근량' }, { key: 'pbf', label: '체지방률' },
+    { key: 'bodyFatMass', label: '체지방량' }, { key: 'bmi', label: 'BMI' }, { key: 'score', label: '인바디 점수' },
+  ]
+  const openChallengeForm = () => {
+    const today = new Date(); const in4w = new Date(today.getTime() + 28 * 86400 * 1000)
+    const iso = (d: Date) => d.toISOString().slice(0, 10)
+    setChMetricsSel([]); setChStart(iso(today)); setChEnd(iso(in4w))
+    set({ showChallengeForm: true, chTitle: '', chDone: '' })
+  }
   const createChallenge = () => {
     const t = (s.chTitle || '').trim() || '새 챌린지'
+    if (chMetricsSel.length === 0) { set({ chDone: '⚠ 지표를 1개 이상 선택하세요.' }); return }
+    if (!chStart || !chEnd || chEnd < chStart) { set({ chDone: '⚠ 기간을 올바르게 선택하세요.' }); return }
     if (be.configured) {
-      const weeks = parseInt(s.chPeriod, 10) || 4
-      void be.createChallenge({ title: t, metric: s.chMetric, goal: s.chGoal, weeks, scope: s.chScope === '비공개' ? 'private' : 'public' })
+      void be.createChallenge({ title: t, metrics: chMetricsSel, startDate: chStart, endDate: chEnd, scope: s.chScope === '비공개' ? 'private' : 'public' })
     }
     set({ showChallengeForm: false, chTitle: '', chDone: '✓ “' + t + '” 챌린지가 생성되었어요.' })
   }
@@ -985,7 +999,7 @@ export default function Portal() {
                 </section>
               )}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
-                <button onClick={() => set({ showChallengeForm: true, chDone: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '11px 20px', borderRadius: 22 }}>+ 챌린지 만들기</button>
+                <button onClick={openChallengeForm} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '11px 20px', borderRadius: 22 }}>+ 챌린지 만들기</button>
                 <span style={{ fontSize: 12, color: '#67D7DF' }}>{s.chDone}</span>
               </div>
 
@@ -998,7 +1012,10 @@ export default function Portal() {
                           <span style={{ fontSize: 14, fontWeight: 700, color: '#EAF3F1' }}>{c.title}</span>
                           <span style={{ fontSize: 10, fontWeight: 600, color: '#67D7DF', background: 'rgba(103,215,223,.14)', borderRadius: 8, padding: '1px 7px' }}>D-{c.daysLeft}</span>
                         </div>
-                        <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)', marginTop: 2 }}>목표 {c.goal} · {c.metric}</div>
+                        <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)', marginTop: 3, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                          {c.metrics.map((m) => <span key={m} style={{ fontSize: 10.5, fontWeight: 600, color: '#9FE2E8', background: 'rgba(46,155,166,.14)', borderRadius: 7, padding: '1px 7px' }}>{m}</span>)}
+                          <span>{c.startDate.slice(5).replace('-', '.')} ~ {c.endDate.slice(5).replace('-', '.')}</span>
+                        </div>
                       </div>
                       {c.isOwn && (
                         <button onClick={() => { if (confirm('이 챌린지를 삭제할까요?')) void be.deleteChallenge(c.id) }} title="삭제" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(224,160,106,.8)' }}>
@@ -1011,21 +1028,30 @@ export default function Portal() {
               )}
 
               {s.showChallengeForm && (
-                <div onClick={() => set({ showChallengeForm: false })} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,12,10,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'hwl-fade .25s ease both' }}>
-                  <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
-                    <div style={eyebrow}>New Challenge</div><div style={cardTitle}>챌린지 만들기</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 18 }}>
-                      <div><label style={labelStyle}>제목</label><input value={s.chTitle} onChange={(e) => set({ chTitle: e.target.value })} placeholder="예) 6월 체지방 챌린지" style={inputStyle} /></div>
-                      <div><label style={labelStyle}>지표</label><div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>{chMetrics.map((c, i) => <button key={i} onClick={() => set({ chMetric: c.label })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: c.bg, color: c.fg }}>{c.label}</button>)}</div></div>
-                      <div><label style={labelStyle}>목표</label><input value={s.chGoal} onChange={(e) => set({ chGoal: e.target.value })} placeholder="예) -2.0%p" style={inputStyle} /></div>
-                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                        <div><label style={labelStyle}>기간</label><div style={{ display: 'flex', gap: 7 }}>{chPeriods.map((c, i) => <button key={i} onClick={() => set({ chPeriod: c.label })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: c.bg, color: c.fg }}>{c.label}</button>)}</div></div>
-                        <div><label style={labelStyle}>공개 범위</label><div style={{ display: 'flex', gap: 7 }}>{chScopes.map((c, i) => <button key={i} onClick={() => set({ chScope: c.label })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: c.bg, color: c.fg }}>{c.label}</button>)}</div></div>
+                <div onClick={() => set({ showChallengeForm: false })} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,12,10,.8)', backdropFilter: 'blur(6px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'hwl-fade .25s ease both' }}>
+                  <div style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom))' }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                      <div style={eyebrow}>New Challenge</div><div style={cardTitle}>챌린지 만들기</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 18 }}>
+                        <div><label style={labelStyle}>제목</label><input value={s.chTitle} onChange={(e) => set({ chTitle: e.target.value })} placeholder="예) 6월 체성분 챌린지" style={inputStyle} /></div>
+                        <div>
+                          <label style={labelStyle}>지표 <span style={{ fontWeight: 500, color: 'rgba(231,239,234,.4)' }}>· 여러 개 선택 가능</span></label>
+                          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>{CH_METRIC_OPTS.map((o) => { const on = chMetricsSel.includes(o.key); return (
+                            <button key={o.key} onClick={() => setChMetricsSel((xs) => on ? xs.filter((k) => k !== o.key) : [...xs, o.key])} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: on ? '#2E9BA6' : 'rgba(255,255,255,.05)', color: on ? '#060B17' : '#9DAFCB', border: `1px solid ${on ? 'transparent' : 'rgba(255,255,255,.12)'}` }}>{on ? '✓ ' : ''}{o.label}</button>
+                          ) })}</div>
+                          <div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)', marginTop: 7, lineHeight: 1.5 }}>목표 수치는 참여하는 멤버가 각자 설정해요.</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ flex: 1, minWidth: 130 }}><label style={labelStyle}>시작일</label><input type="date" value={chStart} max={chEnd || undefined} onChange={(e) => setChStart(e.target.value)} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0 }} /></div>
+                          <div style={{ flex: 1, minWidth: 130 }}><label style={labelStyle}>종료일</label><input type="date" value={chEnd} min={chStart || undefined} onChange={(e) => setChEnd(e.target.value)} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0 }} /></div>
+                        </div>
+                        <div><label style={labelStyle}>공개 범위</label><div style={{ display: 'flex', gap: 7 }}>{chScopes.map((c, i) => <button key={i} onClick={() => set({ chScope: c.label })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '8px 13px', borderRadius: 11, background: c.bg, color: c.fg, border: `1px solid ${c.bg === 'rgba(255,255,255,.05)' ? 'rgba(255,255,255,.12)' : 'transparent'}` }}>{c.label}</button>)}</div></div>
+                        {s.chDone.startsWith('⚠') && <div style={{ fontSize: 12, color: '#E0875C' }}>{s.chDone}</div>}
                       </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-                      <button onClick={() => set({ showChallengeForm: false })} style={{ all: 'unset', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
-                      <button onClick={createChallenge} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>만들기</button>
+                      <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+                        <button onClick={() => set({ showChallengeForm: false, chDone: '' })} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
+                        <button onClick={createChallenge} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>만들기</button>
+                      </div>
                     </div>
                   </div>
                 </div>

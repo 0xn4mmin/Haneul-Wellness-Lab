@@ -55,6 +55,8 @@ export default function Portal() {
   const [chMetricsSel, setChMetricsSel] = useState<string[]>([])
   const [chStart, setChStart] = useState('')
   const [chEnd, setChEnd] = useState('')
+  const [postImg, setPostImg] = useState<File | null>(null)
+  const [chatImg, setChatImg] = useState<File | null>(null)
   const [gaugeTip, setGaugeTip] = useState<{ key: string; side: 'min' | 'max' } | null>(null)
   const [gaugeInfo, setGaugeInfo] = useState<string | null>(null)
 
@@ -128,9 +130,10 @@ export default function Portal() {
     setFn((p) => ({ newComment: '', coachFeedback: [...p.coachFeedback, item] }))
   }
   const submitPost = () => {
-    const t = s.newPost.trim(); if (!t) return
-    if (be.configured) { void be.createPost(t); set({ newPost: '' }); return }
-    const post = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t, likes: 0, liked: false, open: false, comments: [], draft: '' }
+    const t = s.newPost.trim(); if (!t && !postImg) return
+    if (be.configured) { void be.createPost(t, postImg); set({ newPost: '' }); setPostImg(null); return }
+    const post = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t, image: postImg ? URL.createObjectURL(postImg) : null, likes: 0, liked: false, open: false, comments: [], draft: '' }
+    setPostImg(null)
     setFn((p) => ({ newPost: '', posts: [post, ...p.posts] }))
   }
   const onDeletePost = (id: string | number) => {
@@ -163,9 +166,10 @@ export default function Portal() {
   const onReply = (id: string | number, commentId: string | undefined, idx: number, name: string) => (be.configured ? be.setReplyTo(String(id), commentId ?? null, name) : setReplyToMock(Number(id), idx, name))
   const onCancelReply = (id: string | number) => (be.configured ? be.setReplyTo(String(id), null) : setReplyToMock(Number(id), null))
   const sendMsg = () => {
-    const t = s.newMsg.trim(); if (!t) return
-    if (be.configured) { void be.sendMessage(t); set({ newMsg: '' }); return }
-    const msg = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t }
+    const t = s.newMsg.trim(); if (!t && !chatImg) return
+    if (be.configured) { void be.sendMessage(t, chatImg); set({ newMsg: '' }); setChatImg(null); return }
+    const msg = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t, image: chatImg ? URL.createObjectURL(chatImg) : null }
+    setChatImg(null)
     setFn((p) => ({ newMsg: '', messages: [...p.messages, msg] }))
   }
   const submitCreateRoom = () => {
@@ -1068,7 +1072,17 @@ export default function Portal() {
                     {hits.map((n) => <button key={n} onClick={() => set({ newPost: s.newPost.replace(/@[가-힣A-Za-z0-9_]*$/, `@${n} `) })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 14, padding: '5px 11px' }}>@{n}</button>)}
                   </div>
                 ) })()}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 11 }}>
+                {postImg && (
+                  <div style={{ position: 'relative', display: 'inline-block', marginTop: 11 }}>
+                    <img src={URL.createObjectURL(postImg)} alt="" style={{ maxHeight: 120, maxWidth: '100%', borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', display: 'block' }} />
+                    <button onClick={() => setPostImg(null)} style={{ all: 'unset', cursor: 'pointer', position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', background: 'rgba(6,11,23,.8)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>×</button>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 11 }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#9FE2E8', background: 'rgba(46,155,166,.12)', border: '1px solid rgba(103,215,223,.25)', borderRadius: 18, padding: '8px 13px' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" /></svg>사진
+                    <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) setPostImg(f); e.target.value = '' }} style={{ display: 'none' }} />
+                  </label>
                   <button onClick={submitPost} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 22px', borderRadius: 22 }}>피드에 올리기</button>
                 </div>
               </section>
@@ -1087,7 +1101,8 @@ export default function Portal() {
                       </button>
                     )}
                   </div>
-                  <div style={{ fontSize: 15, lineHeight: 1.65, color: 'rgba(231,239,234,.85)', margin: '14px 2px 4px', whiteSpace: 'pre-wrap' }}>{renderMentions(p.text)}</div>
+                  {p.text && <div style={{ fontSize: 15, lineHeight: 1.65, color: 'rgba(231,239,234,.85)', margin: '14px 2px 4px', whiteSpace: 'pre-wrap' }}>{renderMentions(p.text)}</div>}
+                  {(p as { image?: string | null }).image && <img src={(p as { image?: string | null }).image as string} alt="" style={{ width: '100%', borderRadius: 14, marginTop: 12, border: '1px solid rgba(255,255,255,.08)', display: 'block' }} />}
                   {p.hasMetric && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 13, background: 'rgba(46,155,166,.12)', border: '1px solid rgba(103,215,223,.25)', borderRadius: 14, padding: '13px 15px', margin: '6px 0 2px' }}>
                       <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 30, color: '#67D7DF' }}>{p.metricVal}</div>
@@ -1203,14 +1218,27 @@ export default function Portal() {
                       <Avatar initials={m.initials} color={m.color} photo={m.photo} size={34} fontSize={11} ring={m.ring} />
                       <div style={{ maxWidth: '74%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3, justifyContent: m.justify }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{m.author}</span><span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)' }}>{m.time}</span></div>
-                        <div style={{ fontSize: 14, lineHeight: 1.5, padding: '10px 14px', borderRadius: m.radius, background: m.bubbleBg, color: m.bubbleFg, border: `1px solid ${m.bubbleBorder}` }}>{m.text}</div>
+                        <div style={{ borderRadius: m.radius, background: m.bubbleBg, border: `1px solid ${m.bubbleBorder}`, overflow: 'hidden' }}>
+                          {(m as { image?: string | null }).image && <img src={(m as { image?: string | null }).image as string} alt="" style={{ width: '100%', maxWidth: 240, display: 'block' }} />}
+                          {m.text && <div style={{ fontSize: 14, lineHeight: 1.5, padding: '10px 14px', color: m.bubbleFg }}>{m.text}</div>}
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div style={{ padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 11, alignItems: 'center' }}>
+                {chatImg && (
+                  <div style={{ padding: '10px 18px 0', position: 'relative', display: 'inline-block' }}>
+                    <img src={URL.createObjectURL(chatImg)} alt="" style={{ maxHeight: 90, borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', display: 'block' }} />
+                    <button onClick={() => setChatImg(null)} style={{ all: 'unset', cursor: 'pointer', position: 'absolute', top: 4, right: 22, width: 20, height: 20, borderRadius: '50%', background: 'rgba(6,11,23,.8)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>×</button>
+                  </div>
+                )}
+                <div style={{ padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 9, alignItems: 'center' }}>
+                  <label style={{ cursor: be.configured && !activeRoom ? 'default' : 'pointer', flex: 'none', width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9FE2E8', opacity: be.configured && !activeRoom ? 0.5 : 1 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    <input type="file" accept="image/*" disabled={be.configured && !activeRoom} onChange={(e) => { const f = e.target.files?.[0]; if (f) setChatImg(f); e.target.value = '' }} style={{ display: 'none' }} />
+                  </label>
                   <input value={s.newMsg} disabled={be.configured && !activeRoom} onChange={(e) => set({ newMsg: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder={be.configured && !activeRoom ? '먼저 채팅방을 만들거나 입장하세요' : '메시지를 입력하세요…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1', opacity: be.configured && !activeRoom ? 0.5 : 1 }} />
-                  <button onClick={sendMsg} style={{ all: 'unset', cursor: 'pointer', width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg,#67D7DF,#2E9BA6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#060B17" strokeWidth="2"><path d="M4 12l16-7-7 16-2-7z" strokeLinejoin="round" /></svg></button>
+                  <button onClick={sendMsg} style={{ all: 'unset', cursor: 'pointer', flex: 'none', width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg,#67D7DF,#2E9BA6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#060B17" strokeWidth="2"><path d="M4 12l16-7-7 16-2-7z" strokeLinejoin="round" /></svg></button>
                 </div>
               </section>
               <aside style={{ ...card, borderRadius: 22, padding: 18, height: 'fit-content' }}>

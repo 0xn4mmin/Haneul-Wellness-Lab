@@ -6,11 +6,11 @@ export type View = 'health' | 'community' | 'chat' | 'members' | 'trainer' | 'pr
 export interface MetricComment { author: string; initials: string; color: string; role: Role; text: string; time: string }
 export interface PostComment { author: string; initials: string; color: string; photo?: string | null; text: string; replies?: PostComment[]; isOwn?: boolean }
 export interface Post {
-  id: number; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string
+  id: number; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null
   likes: number; liked: boolean; open: boolean; comments: PostComment[]; draft: string; replyTo?: number | null; replyToName?: string | null
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
-export interface Message { id: number; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string }
+export interface Message { id: number; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null }
 export interface Member { id: string; name: string; initials: string; color: string; photo?: string | null; bio: string; bio2: string; score: number; pub: string[] }
 export interface Profile { name: string; birth: string; gender: string; phone: string; photo: string | null }
 

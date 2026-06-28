@@ -132,18 +132,33 @@ export async function addChartComment(ownerId: string, metricKey: string, text: 
     .insert({ owner_id: ownerId, metric_key: metricKey, author_id: me, text })
 }
 
+// ───────────────────── media (feed / chat images) ───────
+/** Public URL for a stored post/chat image. */
+export function postMediaUrl(path?: string | null): string | null {
+  if (!path) return null
+  return requireSupabase().storage.from('post-media').getPublicUrl(path).data.publicUrl
+}
+export async function uploadPostMedia(file: File): Promise<string> {
+  const sb = requireSupabase()
+  const me = await uid()
+  const path = `${me}/${Date.now()}-${file.name}`
+  const { error } = await sb.storage.from('post-media').upload(path, file, { upsert: true })
+  if (error) throw error
+  return path
+}
+
 // ───────────────────────── feed ─────────────────────────
 export async function fetchPosts() {
   const { data, error } = await requireSupabase()
     .from('posts')
-    .select('id, author_id, text, shared_metric, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role, photo_path), post_likes(user_id), post_comments(id, text, author_id, parent_id, created_at, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color, photo_path))')
+    .select('id, author_id, text, shared_metric, image_path, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role, photo_path), post_likes(user_id), post_comments(id, text, author_id, parent_id, created_at, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color, photo_path))')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
 }
-export async function createPost(text: string, sharedMetric?: unknown) {
+export async function createPost(text: string, imagePath?: string | null, sharedMetric?: unknown) {
   const me = await uid()
-  return requireSupabase().from('posts').insert({ author_id: me, text, shared_metric: sharedMetric ?? null })
+  return requireSupabase().from('posts').insert({ author_id: me, text, image_path: imagePath ?? null, shared_metric: sharedMetric ?? null })
 }
 export async function toggleLike(postId: string, liked: boolean) {
   const me = await uid()
@@ -167,14 +182,14 @@ export async function deletePostComment(commentId: string) {
 export async function fetchMessages(roomId: string) {
   const { data, error } = await requireSupabase()
     .from('messages')
-    .select('id, text, created_at, author:profiles!messages_author_id_fkey(id, name, initials, avatar_color, role, photo_path)')
+    .select('id, text, image_path, created_at, author:profiles!messages_author_id_fkey(id, name, initials, avatar_color, role, photo_path)')
     .eq('room_id', roomId).order('created_at', { ascending: true })
   if (error) throw error
   return data ?? []
 }
-export async function sendMessage(roomId: string, text: string) {
+export async function sendMessage(roomId: string, text: string, imagePath?: string | null) {
   const me = await uid()
-  return requireSupabase().from('messages').insert({ room_id: roomId, author_id: me, text })
+  return requireSupabase().from('messages').insert({ room_id: roomId, author_id: me, text, image_path: imagePath ?? null })
 }
 /** Subscribe to new messages in a room. Returns an unsubscribe fn. */
 export function subscribeMessages(roomId: string, onInsert: (row: unknown) => void) {

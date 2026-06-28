@@ -37,10 +37,10 @@ export interface PostComment { id?: string; author: string; initials: string; co
 export interface PostView {
   id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string
   likes: number; liked: boolean; open: boolean; draft: string; comments: PostComment[]; isOwn: boolean
-  replyTo: string | null; replyToName: string | null
+  replyTo: string | null; replyToName: string | null; image?: string | null
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
-export interface MessageView { id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string }
+export interface MessageView { id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null }
 export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null; isOwn: boolean }
 export interface ChallengeView { id: string; title: string; metrics: string[]; startDate: string; endDate: string; daysLeft: number; isOwn: boolean }
 const METRIC_LABEL: Record<string, string> = { weight: '체중', smm: '골격근량', pbf: '체지방률', bodyFatMass: '체지방량', bmi: 'BMI', bmr: '기초대사량', visceral: '내장지방', tbw: '체수분', score: '인바디 점수' }
@@ -85,7 +85,7 @@ export interface Backend {
   uploadAvatar: (file: File) => Promise<void>
   // social
   posts: PostView[] | null
-  createPost: (text: string) => Promise<void>
+  createPost: (text: string, file?: File | null) => Promise<void>
   deletePost: (id: string) => Promise<void>
   deletePostComment: (id: string) => Promise<void>
   toggleLike: (id: string) => void
@@ -95,7 +95,7 @@ export interface Backend {
   submitPostComment: (id: string) => void
   // chat
   messages: MessageView[] | null
-  sendMessage: (text: string) => Promise<void>
+  sendMessage: (text: string, file?: File | null) => Promise<void>
   rooms: RoomView[] | null
   activeRoomId: string | null
   roomMembers: { name: string; initials: string; color: string; photo?: string | null; role: 'client' | 'trainer' }[]
@@ -199,7 +199,7 @@ export function useBackend(): Backend {
         likes: (r.post_likes ?? []).length,
         liked: (r.post_likes ?? []).some((l: { user_id: string }) => l.user_id === meId),
         open: ui.open, draft: ui.draft, isOwn: r.author_id === meId,
-        replyTo: ui.replyTo, replyToName,
+        replyTo: ui.replyTo, replyToName, image: api.postMediaUrl(r.image_path),
         comments,
         hasMetric: !!sm, metricVal: sm?.val, metricLabel: sm?.label, metricSub: sm?.sub,
       }
@@ -213,7 +213,7 @@ export function useBackend(): Backend {
     const rows = await api.fetchMessages(rid)
     setMessages((rows as any[]).map((r) => {
       const a = (r.author ?? {}) as Author & { id?: string }
-      return { id: r.id, author: a.name, initials: a.initials, color: a.avatar_color, photo: api.avatarUrl(a.photo_path), role: roleOf(a.id, a.role), time: clockTime(r.created_at), text: r.text }
+      return { id: r.id, author: a.name, initials: a.initials, color: a.avatar_color, photo: api.avatarUrl(a.photo_path), role: roleOf(a.id, a.role), time: clockTime(r.created_at), text: r.text, image: api.postMediaUrl(r.image_path) }
     }))
   }, [meId])
 
@@ -416,7 +416,11 @@ export function useBackend(): Backend {
   }, [reloadPosts, reloadMembers, reloadMessages])
 
   // ── posts ──
-  const createPost = useCallback(async (text: string) => { await api.createPost(text); await reloadPosts() }, [reloadPosts])
+  const createPost = useCallback(async (text: string, file?: File | null) => {
+    const imagePath = file ? await api.uploadPostMedia(file) : null
+    await api.createPost(text, imagePath)
+    await reloadPosts()
+  }, [reloadPosts])
   const deletePost = useCallback(async (id: string) => { await api.deletePost(id); await reloadPosts() }, [reloadPosts])
   const deletePostComment = useCallback(async (id: string) => { await api.deletePostComment(id); await reloadPosts() }, [reloadPosts])
   const toggleLike = useCallback((id: string) => {
@@ -449,9 +453,10 @@ export function useBackend(): Backend {
   }, [reloadPosts])
 
   // ── chat ──
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, file?: File | null) => {
     if (!activeRoomId) return
-    await api.sendMessage(activeRoomId, text)
+    const imagePath = file ? await api.uploadPostMedia(file) : null
+    await api.sendMessage(activeRoomId, text, imagePath)
     await reloadMessages(activeRoomId)
   }, [activeRoomId, reloadMessages])
 

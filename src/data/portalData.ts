@@ -26,11 +26,33 @@ export const metrics: Record<MetricKey, Metric> = {
   tbw: { label: '체수분', short: '체수분', unit: 'L', good: 'up', series: [39.6, 40.0, 40.4, 40.8, 41.1, 41.4] },
 }
 
+// disp = bar display range, norm = standard/normal range.
+// (general InBody standards; real sheets personalize by height/sex.)
 export const gconf: Record<string, { disp: [number, number]; norm: [number, number] }> = {
+  score: { disp: [55, 100], norm: [70, 80] },
+  weight: { disp: [50, 95], norm: [60, 73] },
   smm: { disp: [22, 40], norm: [27.5, 33.5] },
   pbf: { disp: [5, 35], norm: [10, 20] },
-  weight: { disp: [50, 95], norm: [60, 73] },
+  bodyFatMass: { disp: [5, 30], norm: [8, 16] },
   bmi: { disp: [15, 33], norm: [18.5, 25] },
+  bmr: { disp: [1200, 2100], norm: [1500, 1800] },
+  visceral: { disp: [1, 20], norm: [1, 9] },
+  tbw: { disp: [30, 50], norm: [38, 46] },
+}
+
+/** Judge a value against its standard range, factoring in whether higher or
+ *  lower is better. Returns Good/Bad only when outside the range. */
+export function assess(key: MetricKey, val: number, md: Record<MetricKey, Metric> = metrics):
+  { state: 'good' | 'bad' | 'normal'; label: string; color: string } {
+  const c = gconf[key]
+  if (!c) return { state: 'normal', label: '', color: '#fff' }
+  const [nMin, nMax] = c.norm
+  if (val >= nMin && val <= nMax) return { state: 'normal', label: '', color: '#fff' }
+  const above = val > nMax
+  const isGood = above ? md[key].good === 'up' : md[key].good === 'down'
+  return isGood
+    ? { state: 'good', label: 'Good', color: '#7BD88F' }
+    : { state: 'bad', label: 'Bad', color: '#E0875C' }
 }
 
 export interface SegDatum { key: string; name: string; pct: number; kg: number }
@@ -154,7 +176,7 @@ export function buildTrend(
 
 export interface GaugeGeom {
   key: string; label: string; unit: string; value: number
-  status: string; statusColor: string
+  status: string; statusColor: string; verdict: '' | 'Good' | 'Bad'
   markerPct: number; underW: number; normW: number; overW: number
 }
 export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics): GaugeGeom[] {
@@ -169,10 +191,16 @@ export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics): G
     const underW = ((nMin - dMin) / dr) * 100
     const normW = ((nMax - nMin) / dr) * 100
     const overW = 100 - underW - normW
-    let status = '표준', sc = '#67D7DF'
-    if (val < nMin) { status = '표준이하'; sc = '#E0A06A' } else if (val > nMax) { status = '표준이상'; sc = '#D9B45A' }
+    let status = '표준', sc = '#67D7DF', verdict: '' | 'Good' | 'Bad' = ''
+    if (val < nMin || val > nMax) {
+      const above = val > nMax
+      const isGood = above ? m.good === 'up' : m.good === 'down'
+      status = above ? '표준 이상' : '표준 이하'
+      verdict = isGood ? 'Good' : 'Bad'
+      sc = isGood ? '#7BD88F' : '#E0875C'
+    }
     return {
-      key, label: m.label, unit: m.unit, value: val, status, statusColor: sc,
+      key, label: m.label, unit: m.unit, value: val, status, statusColor: sc, verdict,
       markerPct: +markerPct.toFixed(1), underW: +underW.toFixed(1),
       normW: +normW.toFixed(1), overW: +overW.toFixed(1),
     }

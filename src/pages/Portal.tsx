@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   dates, metrics, segData, research, goals, conditionLog, challenge,
-  me as ME, coach as COACH, segColor, buildSpark, buildTrend, buildGauges, buildRadar,
+  me as ME, coach as COACH, segColor, buildSpark, buildTrend, buildGauges, buildRadar, assess,
   type MetricKey,
 } from '../data/portalData'
 import { initialState, type PortalState, type View } from '../data/portalState'
@@ -582,14 +582,21 @@ export default function Portal() {
               <div className="hwl-hero-stats" style={{ position: 'relative', zIndex: 2, marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 18, flexWrap: 'nowrap', minWidth: 0 }}>
                 <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', minWidth: 0 }}>
                   {([
-                    ['체중', M.weight, 'kg', 1],
-                    ['체지방률', M.pbf, '%', 1],
-                    ['체지방량', M.bodyFatMass, 'kg', 1],
-                    ['골격근량', M.smm, 'kg', 1],
-                    ['기초대사량', M.bmr, 'kcal', 0],
-                  ] as [string, typeof M.weight, string, number][]).map(([label, m, unit, fix]) => (
-                    <div key={label}><div style={{ fontSize: 11, color: '#9DAFCB' }}>{label}</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1, whiteSpace: 'nowrap' }}>{m.series[m.series.length - 1].toLocaleString(undefined, { minimumFractionDigits: fix, maximumFractionDigits: fix })}<span style={{ fontSize: 12, color: '#C9A24B' }}> {unit}</span></div></div>
-                  ))}
+                    ['체중', 'weight', 'kg', 1],
+                    ['체지방률', 'pbf', '%', 1],
+                    ['체지방량', 'bodyFatMass', 'kg', 1],
+                    ['골격근량', 'smm', 'kg', 1],
+                    ['기초대사량', 'bmr', 'kcal', 0],
+                  ] as [string, MetricKey, string, number][]).map(([label, key, unit, fix]) => {
+                    const val = M[key].series[M[key].series.length - 1]
+                    const a = assess(key, val, M)
+                    return (
+                      <div key={label}>
+                        <div style={{ fontSize: 11, color: '#9DAFCB', display: 'flex', alignItems: 'center', gap: 5 }}>{label}{a.label && <span style={{ fontSize: 8.5, fontWeight: 700, color: '#06110F', background: a.color, padding: '0 5px', borderRadius: 6, letterSpacing: '.3px' }}>{a.label}</span>}</div>
+                        <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: a.state === 'normal' ? '#fff' : a.color, marginTop: 1, whiteSpace: 'nowrap' }}>{val.toLocaleString(undefined, { minimumFractionDigits: fix, maximumFractionDigits: fix })}<span style={{ fontSize: 12, color: '#C9A24B' }}> {unit}</span></div>
+                      </div>
+                    )
+                  })}
                 </div>
                 <div style={{ position: 'relative', width: 98, height: 98, flex: 'none' }}>
                   <svg viewBox="0 0 120 120" style={{ width: 98, height: 98, transform: 'rotate(-90deg)' }}>
@@ -690,12 +697,13 @@ export default function Portal() {
                   return (
                     <div key={g.key} style={{ display: 'flex', flexDirection: 'column', gap: 7, animation: 'hwl-rise .4s ease both' }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                           <span style={{ fontSize: 13.5, fontWeight: 600, color: '#EAF3F1' }}>{g.label}</span>
                           <span style={{ fontSize: 11, fontWeight: 600, color: g.statusColor, fontFamily: "'IBM Plex Mono',monospace" }}>{g.status}</span>
+                          {g.verdict && <span style={{ fontSize: 9, fontWeight: 700, color: '#06110F', background: g.statusColor, padding: '1px 6px', borderRadius: 7, letterSpacing: '.3px' }}>{g.verdict}</span>}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                          <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 18, color: '#F2F7F3' }}>{g.value}<span style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', fontFamily: "'Pretendard'" }}> {g.unit}</span></span>
+                          <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 18, color: g.verdict ? g.statusColor : '#F2F7F3' }}>{g.value}<span style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', fontFamily: "'Pretendard'" }}> {g.unit}</span></span>
                           <button onClick={() => (be.configured ? be.togglePrivacy(g.key) : togglePrivacy(g.key))} title="공개 설정" style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 600, padding: '4px 9px', borderRadius: 20, border: `1px solid ${gpub ? 'rgba(103,215,223,.4)' : 'rgba(255,255,255,.12)'}`, background: gpub ? 'rgba(46,155,166,.16)' : 'rgba(255,255,255,.05)', color: gpub ? '#67D7DF' : 'rgba(231,239,234,.5)' }}>
                             <span style={{ width: 6, height: 6, borderRadius: '50%', background: gpub ? '#2E9BA6' : 'rgba(231,239,234,.4)' }} />{gpub ? '공개' : '비공개'}
                           </button>

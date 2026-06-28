@@ -1537,7 +1537,7 @@ export default function Portal() {
             }
             return (
             <div onClick={be.closeChallenge} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 121, background: 'rgba(4,12,10,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
-              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>

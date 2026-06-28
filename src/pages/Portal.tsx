@@ -249,14 +249,14 @@ export default function Portal() {
 
   const gauges = buildGauges(M, measureRanges)
   const radar = useMemo(() => {
-    const base = buildRadar(M)
+    const base = buildRadar(M, measureRanges)
     const rh = s.radarHover
     const rd = base.curDots[rh]
     const tip = (rh >= 0 && rd)
-      ? { show: true, cx: rd.x, rx: +Math.max(2, Math.min(142, rd.x - 48)).toFixed(1), ry: +(rd.y - 34).toFixed(1), t1: +(rd.y - 20).toFixed(1), t2: +(rd.y - 6).toFixed(1), k: rd.k, raw: rd.raw }
-      : { show: false, cx: 0, rx: 0, ry: 0, t1: 0, t2: 0, k: '', raw: '' }
+      ? { show: true, cx: rd.x, rx: +Math.max(2, Math.min(142, rd.x - 48)).toFixed(1), ry: +(rd.y - 34).toFixed(1), t1: +(rd.y - 20).toFixed(1), t2: +(rd.y - 6).toFixed(1), k: rd.k, raw: rd.raw, verdict: rd.verdict, color: rd.color }
+      : { show: false, cx: 0, rx: 0, ry: 0, t1: 0, t2: 0, k: '', raw: '', verdict: '', color: '' }
     return { ...base, tip }
-  }, [s.radarHover, M])
+  }, [s.radarHover, M, measureRanges])
 
   const sel = s.selectedMetric
   const pub = privacyMap[sel] === 'public'
@@ -826,20 +826,23 @@ export default function Portal() {
                   <polygon points={radar.curPoints} fill="rgba(46,155,166,.28)" stroke="#67D7DF" strokeWidth="2.4" strokeLinejoin="round" />
                   {radar.curDots.map((d, i) => (
                     <g key={i}>
-                      <circle cx={d.x} cy={d.y} r="3.4" fill="#67D7DF" />
+                      {d.state !== 'normal' && <circle cx={d.x} cy={d.y} r="6.5" fill="none" stroke={d.color} strokeWidth="1.6" opacity="0.55" />}
+                      <circle cx={d.x} cy={d.y} r="3.6" fill={d.state === 'normal' ? '#67D7DF' : d.color} />
                       <circle cx={d.x} cy={d.y} r="13" fill="transparent" onMouseEnter={() => set({ radarHover: i })} onMouseLeave={() => set({ radarHover: -1 })} style={{ cursor: 'pointer' }} />
                     </g>
                   ))}
-                  {radar.labels.map((l, i) => <text key={i} x={l.x} y={l.y} textAnchor={l.anchor} fontSize="10.5" fontWeight="600" fill="rgba(231,239,234,.6)" fontFamily="Pretendard">{l.k}</text>)}
+                  {radar.labels.map((l, i) => <text key={i} x={l.x} y={l.y} textAnchor={l.anchor} fontSize="10.5" fontWeight="600" fill={l.color} fontFamily="Pretendard">{l.k}</text>)}
                   {radar.tip.show && <>
                     <rect x={radar.tip.rx} y={radar.tip.ry} width="96" height="30" rx="8" fill="#0E1A38" stroke="rgba(103,215,223,.45)" />
-                    <text x={radar.tip.cx} y={radar.tip.t1} textAnchor="middle" fontSize="9" fill="#9DAFCB" fontFamily="Pretendard">{radar.tip.k}</text>
-                    <text x={radar.tip.cx} y={radar.tip.t2} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#EAF3F1" fontFamily="IBM Plex Mono">{radar.tip.raw}</text>
+                    <text x={radar.tip.cx} y={radar.tip.t1} textAnchor="middle" fontSize="9" fill="#9DAFCB" fontFamily="Pretendard">{radar.tip.k}{radar.tip.verdict ? ` · ${radar.tip.verdict}` : ''}</text>
+                    <text x={radar.tip.cx} y={radar.tip.t2} textAnchor="middle" fontSize="10.5" fontWeight="700" fill={radar.tip.verdict ? radar.tip.color : '#EAF3F1'} fontFamily="IBM Plex Mono">{radar.tip.raw}</text>
                   </>}
                 </svg>
-                <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 8, fontSize: 11, color: 'rgba(231,239,234,.5)' }}>
+                <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginTop: 8, fontSize: 11, color: 'rgba(231,239,234,.5)' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 3, background: '#67D7DF', borderRadius: 2 }} />현재</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 0, borderTop: '2px dashed #C9A24B' }} />1월</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7BD88F' }} />Good</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#E0875C' }} />Bad</span>
                 </div>
                 <button onClick={() => setFn((p) => ({ showBalInfo: !p.showBalInfo }))} style={{ all: 'unset', cursor: 'pointer', marginTop: 14, display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 600, color: '#9FE2E8' }}><span style={{ width: 16, height: 16, borderRadius: '50%', border: '1px solid #9FE2E8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>i</span>밸런스는 어떻게 계산되나요?</button>
                 {s.showBalInfo && (

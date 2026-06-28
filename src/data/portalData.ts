@@ -41,6 +41,8 @@ export const gconf: Record<string, { disp: [number, number]; norm: [number, numb
 }
 
 export type RangeMap = Record<string, { min: number; max: number } | null | undefined> | null | undefined
+// metrics where leaving the range in EITHER direction is bad (no "good" side)
+const TWO_SIDED = new Set<string>(['bmi'])
 /** Resolve the normal range for a metric: the person's own range from their
  *  InBody sheet if present, else the generic standard. */
 export function normFor(key: MetricKey, ranges?: RangeMap): [number, number] | null {
@@ -57,7 +59,7 @@ export function assess(key: MetricKey, val: number, md: Record<MetricKey, Metric
   const [nMin, nMax] = norm
   if (val >= nMin && val <= nMax) return { state: 'normal', label: '', color: '#fff' }
   const above = val > nMax
-  const isGood = above ? md[key].good === 'up' : md[key].good === 'down'
+  const isGood = TWO_SIDED.has(key) ? false : (above ? md[key].good === 'up' : md[key].good === 'down')
   return isGood
     ? { state: 'good', label: 'Good', color: '#7BD88F' }
     : { state: 'bad', label: 'Bad', color: '#E0875C' }
@@ -218,7 +220,7 @@ export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics, ra
     let status = '표준', sc = '#67D7DF', verdict: '' | 'Good' | 'Bad' = ''
     if (val < nMin || val > nMax) {
       const above = val > nMax
-      const isGood = above ? m.good === 'up' : m.good === 'down'
+      const isGood = TWO_SIDED.has(key) ? false : (above ? m.good === 'up' : m.good === 'down')
       status = above ? '표준 이상' : '표준 이하'
       verdict = isGood ? 'Good' : 'Bad'
       sc = isGood ? '#7BD88F' : '#E0875C'
@@ -235,22 +237,24 @@ export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics, ra
 export interface RadarData {
   rings: { points: string }[]
   spokes: { x: number; y: number }[]
-  curDots: { x: number; y: number; k: string; raw: string; pctText: string }[]
-  labels: { k: string; x: number; y: number; anchor: 'start' | 'middle' | 'end' }[]
+  curDots: { x: number; y: number; k: string; raw: string; pctText: string; state: 'good' | 'bad' | 'normal'; verdict: string; color: string }[]
+  labels: { k: string; x: number; y: number; anchor: 'start' | 'middle' | 'end'; color: string }[]
   curPoints: string
   prevPoints: string
 }
-export function buildRadar(metricsData: Record<MetricKey, Metric> = metrics): RadarData {
+export function buildRadar(metricsData: Record<MetricKey, Metric> = metrics, ranges?: RangeMap): RadarData {
   const cx = 120, cy = 120, R = 88
   const last = (k: MetricKey) => metricsData[k].series[metricsData[k].series.length - 1]
   const first = (k: MetricKey) => metricsData[k].series[0]
-  const axes = [
-    { k: '근육', cur: norm(last('smm'), 24, 36), prev: norm(first('smm'), 24, 36), raw: '골격근량 ' + last('smm') + 'kg' },
-    { k: '체지방', cur: 1 - norm(last('pbf'), 8, 32), prev: 1 - norm(first('pbf'), 8, 32), raw: '체지방률 ' + last('pbf') + '%' },
-    { k: '수분', cur: norm(last('tbw'), 36, 44), prev: norm(first('tbw'), 36, 44), raw: '체수분 ' + last('tbw') + 'L' },
-    { k: '점수', cur: norm(last('score'), 55, 100), prev: norm(first('score'), 55, 100), raw: '인바디 ' + last('score') + '점' },
-    { k: 'BMI', cur: 1 - norm(Math.abs(last('bmi') - 21.7), 0, 6), prev: 1 - norm(Math.abs(first('bmi') - 21.7), 0, 6), raw: 'BMI ' + last('bmi') },
-    { k: '내장', cur: 1 - norm(last('visceral'), 3, 12), prev: 1 - norm(first('visceral'), 3, 12), raw: '내장지방 Lv.' + last('visceral') },
+  // each axis is normalized so "further out = better"; mk carries the metric so
+  // we can judge Good/Bad against its (personal) standard range.
+  const axes: { k: string; mk: MetricKey; cur: number; prev: number; raw: string }[] = [
+    { k: '근육', mk: 'smm', cur: norm(last('smm'), 24, 36), prev: norm(first('smm'), 24, 36), raw: '골격근량 ' + last('smm') + 'kg' },
+    { k: '체지방', mk: 'pbf', cur: 1 - norm(last('pbf'), 8, 32), prev: 1 - norm(first('pbf'), 8, 32), raw: '체지방률 ' + last('pbf') + '%' },
+    { k: '수분', mk: 'tbw', cur: norm(last('tbw'), 36, 44), prev: norm(first('tbw'), 36, 44), raw: '체수분 ' + last('tbw') + 'L' },
+    { k: '점수', mk: 'score', cur: norm(last('score'), 55, 100), prev: norm(first('score'), 55, 100), raw: '인바디 ' + last('score') + '점' },
+    { k: 'BMI', mk: 'bmi', cur: 1 - norm(Math.abs(last('bmi') - 21.7), 0, 6), prev: 1 - norm(Math.abs(first('bmi') - 21.7), 0, 6), raw: 'BMI ' + last('bmi') },
+    { k: '내장', mk: 'visceral', cur: 1 - norm(last('visceral'), 3, 12), prev: 1 - norm(first('visceral'), 3, 12), raw: '내장지방 Lv.' + last('visceral') },
   ]
   const ang = (i: number) => ((-90 + i * (360 / axes.length)) * Math.PI) / 180
   const pt = (i: number, r: number): [number, number] => [
@@ -259,12 +263,17 @@ export function buildRadar(metricsData: Record<MetricKey, Metric> = metrics): Ra
   ]
   const rings = [0.25, 0.5, 0.75, 1].map((r) => ({ points: axes.map((_a, i) => pt(i, r).join(',')).join(' ') }))
   const spokes = axes.map((_a, i) => { const [x, y] = pt(i, 1); return { x, y } })
-  const curDots = axes.map((a, i) => { const [x, y] = pt(i, a.cur); return { x, y, k: a.k, raw: a.raw, pctText: Math.round(a.cur * 100) + '%' } })
+  const curDots = axes.map((a, i) => {
+    const [x, y] = pt(i, a.cur)
+    const v = assess(a.mk, last(a.mk), metricsData, ranges)
+    return { x, y, k: a.k, raw: a.raw, pctText: Math.round(a.cur * 100) + '%', state: v.state, verdict: v.label, color: v.color }
+  })
   const labels = axes.map((a, i) => {
     const [x, y] = pt(i, 1.2)
     let anchor: 'start' | 'middle' | 'end' = 'middle'
     if (x < cx - 6) anchor = 'end'; else if (x > cx + 6) anchor = 'start'
-    return { k: a.k, x: +x.toFixed(1), y: +(y + 3).toFixed(1), anchor }
+    const v = assess(a.mk, last(a.mk), metricsData, ranges)
+    return { k: a.k, x: +x.toFixed(1), y: +(y + 3).toFixed(1), anchor, color: v.state === 'normal' ? 'rgba(231,239,234,.55)' : v.color }
   })
   return {
     rings, spokes, curDots, labels,

@@ -581,10 +581,15 @@ export default function Portal() {
               </div>
               <div className="hwl-hero-stats" style={{ position: 'relative', zIndex: 2, marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 18, flexWrap: 'nowrap', minWidth: 0 }}>
                 <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', minWidth: 0 }}>
-                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체중</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.weight.series[M.weight.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
-                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체지방률</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.pbf.series[M.pbf.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> %</span></div></div>
-                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>골격근량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.smm.series[M.smm.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
-                  <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체지방량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.bodyFatMass.series[M.bodyFatMass.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
+                  {([
+                    ['체중', M.weight, 'kg', 1],
+                    ['체지방률', M.pbf, '%', 1],
+                    ['체지방량', M.bodyFatMass, 'kg', 1],
+                    ['골격근량', M.smm, 'kg', 1],
+                    ['기초대사량', M.bmr, 'kcal', 0],
+                  ] as [string, typeof M.weight, string, number][]).map(([label, m, unit, fix]) => (
+                    <div key={label}><div style={{ fontSize: 11, color: '#9DAFCB' }}>{label}</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1, whiteSpace: 'nowrap' }}>{m.series[m.series.length - 1].toLocaleString(undefined, { minimumFractionDigits: fix, maximumFractionDigits: fix })}<span style={{ fontSize: 12, color: '#C9A24B' }}> {unit}</span></div></div>
+                  ))}
                 </div>
                 <div style={{ position: 'relative', width: 98, height: 98, flex: 'none' }}>
                   <svg viewBox="0 0 120 120" style={{ width: 98, height: 98, transform: 'rotate(-90deg)' }}>

@@ -73,6 +73,7 @@ export interface Backend {
   measurements: api.MeasurementRow[] | null
   goals: Record<string, number> | null
   setGoal: (metricKey: string, target: number | null) => void
+  viewResultSheet: (path: string) => void
   unreadChat: number
   metrics: Record<MetricKey, Metric>
   dates: string[]
@@ -391,6 +392,11 @@ export function useBackend(): Backend {
     setSleepLogs((ls) => { const rest = (ls ?? []).filter((l) => l.date !== date); return [{ date, hours }, ...rest].sort((a, b) => (a.date < b.date ? 1 : -1)) })
     api.upsertSleepLog(date, hours).catch((e) => console.warn('[backend] addSleepLog', e))
   }, [])
+  const viewResultSheet = useCallback((path: string) => {
+    // open a placeholder synchronously (avoids popup blockers), then redirect
+    const w = window.open('', '_blank')
+    api.getResultSheetUrl(path).then((url) => { if (w) { if (url) w.location.href = url; else w.close() } }).catch(() => w?.close())
+  }, [])
   const setGoal = useCallback((metricKey: string, target: number | null) => {
     setGoals((g) => { const next = { ...(g ?? {}) }; if (target == null) delete next[metricKey]; else next[metricKey] = target; return next })
     ;(target == null ? api.clearGoal(metricKey) : api.setGoal(metricKey, target)).catch((e) => console.warn('[backend] setGoal', e))
@@ -594,7 +600,7 @@ export function useBackend(): Backend {
     daysUntilNextMeasure: lastMeasureISO
       ? Math.ceil((Date.parse(lastMeasureISO) + cycleDays * 86400000 - Date.now()) / 86400000)
       : null,
-    setMeasureCycle, sleepLogs, addSleepLog, measurements, goals, setGoal,
+    setMeasureCycle, sleepLogs, addSleepLog, measurements, goals, setGoal, viewResultSheet,
     unreadChat: (notifications ?? []).filter((n) => n.type === 'chat' && !n.read).length,
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,

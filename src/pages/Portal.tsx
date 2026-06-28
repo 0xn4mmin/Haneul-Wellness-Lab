@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   dates, metrics, segData, research, goals, conditionLog, challenge,
   me as ME, coach as COACH, segColor, buildSpark, buildTrend, buildGauges, buildRadar,
@@ -60,19 +60,25 @@ export default function Portal() {
   const [joinCode, setJoinCode] = useState('')
   const [chatErr, setChatErr] = useState('')
 
-  const mount3d = useRef<HTMLDivElement | null>(null)
   const figure = useRef<FigureHandle | null>(null)
+  const selectedSegRef = useRef(s.selectedSegment)
+  selectedSegRef.current = s.selectedSegment
   const chatRef = useRef<HTMLDivElement | null>(null)
 
-  // 3D figure lifecycle — init runs on every render but is guarded, so it
-  // attaches as soon as the canvas mounts (e.g. after the empty state clears
-  // once data loads, or after login). Dispose only on unmount.
-  useEffect(() => {
-    if (mount3d.current && !figure.current) {
-      figure.current = createFigure(mount3d.current, (seg) => set({ selectedSegment: seg }))
+  // 3D figure lifecycle via a callback ref: React calls this with the node when
+  // the canvas mounts and with null when it unmounts. This correctly re-inits
+  // when the section remounts (e.g. the empty state toggled off after data
+  // loaded) — a plain ref + effect kept a stale figure and left a blank canvas.
+  const mount3d = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      figure.current?.dispose()
+      figure.current = createFigure(node, (seg) => setS((prev) => ({ ...prev, selectedSegment: seg })))
+      figure.current.setSelected(selectedSegRef.current)
+    } else {
+      figure.current?.dispose()
+      figure.current = null
     }
-  })
-  useEffect(() => () => { figure.current?.dispose(); figure.current = null }, [])
+  }, [])
   useEffect(() => { figure.current?.setSelected(s.selectedSegment) }, [s.selectedSegment])
 
   // chat auto-scroll
@@ -395,13 +401,13 @@ export default function Portal() {
     : `171cm · 26세 · 남성 · ${dateLatest} 측정`
   // records: real measurements when signed in (only what the user uploaded), else demo
   const fmtScanDate = (iso: string) => { const [y, m, d] = iso.split('-'); return `${y} · ${+m}월 ${+d}일` }
-  const scansSrc = be.configured
-    ? (be.measurements ?? []).map((m) => ({ date: fmtScanDate(m.date), has: !!m.result_sheet_path }))
+  const scansSrc: { date: string; has: boolean; path: string | null }[] = be.configured
+    ? (be.measurements ?? []).map((m) => ({ date: fmtScanDate(m.date), has: !!m.result_sheet_path, path: m.result_sheet_path }))
     : [
-        { date: '2026 · 6월 14일', has: true }, { date: '2026 · 5월 10일', has: false },
-        { date: '2026 · 4월 12일', has: false }, { date: '2026 · 3월 15일', has: false },
+        { date: '2026 · 6월 14일', has: true, path: null }, { date: '2026 · 5월 10일', has: false, path: null },
+        { date: '2026 · 4월 12일', has: false, path: null }, { date: '2026 · 3월 15일', has: false, path: null },
       ]
-  const scans = scansSrc.map((r) => ({ date: r.date, label: r.has ? '결과지 보기' : '미첨부', cursor: r.has ? 'pointer' : 'default', chipBg: r.has ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.05)', chipFg: r.has ? '#67D7DF' : 'rgba(231,239,234,.35)', has: r.has }))
+  const scans = scansSrc.map((r) => ({ date: r.date, path: r.path, label: r.has ? '결과지 보기' : '미첨부', cursor: r.has ? 'pointer' : 'default', chipBg: r.has ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.05)', chipFg: r.has ? '#67D7DF' : 'rgba(231,239,234,.35)', has: r.has }))
   // research detail: real from the latest measurement when available, else demo
   const researchSrc = latestMeasure
     ? (() => { const dt = latestMeasure.detail || {}; const w = lastV('weight'); const ideal = dt.idealWeight ?? w; const adj = +(ideal - w).toFixed(1)
@@ -415,7 +421,7 @@ export default function Portal() {
         ] })()
     : research
 
-  const inputStyle: React.CSSProperties = { width: '100%', fontFamily: 'inherit', fontSize: 14, padding: '12px 15px', borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }
+  const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: 14, padding: '12px 15px', borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }
   const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'rgba(231,239,234,.6)', marginBottom: 7, display: 'block' }
 
   return (
@@ -433,7 +439,7 @@ export default function Portal() {
               <div style={{ textAlign: 'center', fontSize: 12, color: 'rgba(231,239,234,.5)', margin: '4px 0 20px' }}>회원 전용 포털에 로그인하세요</div>
               <input value={s.loginEmail} onChange={(e) => set({ loginEmail: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') doLogin() }} placeholder="이메일" style={{ ...inputStyle, padding: '12px 16px', fontSize: 14, marginBottom: 9 }} />
               <input value={s.loginPw} onChange={(e) => set({ loginPw: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') doLogin() }} type="password" placeholder="비밀번호" style={{ ...inputStyle, padding: '12px 16px', fontSize: 14, marginBottom: 14 }} />
-              <button onClick={doLogin} style={{ all: 'unset', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 24, boxShadow: '0 16px 34px -16px rgba(22,192,206,.9)' }}>로그인</button>
+              <button onClick={doLogin} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 24, boxShadow: '0 16px 34px -16px rgba(22,192,206,.9)' }}>로그인</button>
               {be.loginError && <div style={{ marginTop: 11, fontSize: 12, color: '#E0A06A', textAlign: 'center', lineHeight: 1.5 }}>{be.loginError}</div>}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 12, color: 'rgba(231,239,234,.5)' }}>
                 <span style={{ cursor: 'pointer' }}>비밀번호 찾기</span>
@@ -587,7 +593,7 @@ export default function Portal() {
                   </svg>
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 29, color: '#fff', lineHeight: 1 }}>{score}</div>
-                    <div style={{ fontSize: 9, color: '#9DAFCB', letterSpacing: '1px', marginTop: 2 }}>인바디 점수</div>
+                    <div style={{ fontSize: 9, color: '#9DAFCB', letterSpacing: '.5px', marginTop: 2, whiteSpace: 'nowrap' }}>인바디 점수</div>
                   </div>
                 </div>
               </div>
@@ -823,8 +829,9 @@ export default function Portal() {
                 <div style={eyebrow}>Records</div>
                 <div style={{ ...cardTitle, margin: '3px 0 14px' }}>측정 기록</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {scans.length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '6px 2px' }}>아직 측정 기록이 없어요. 결과지를 업로드하면 여기에 쌓여요.</div>}
                   {scans.map((r, i) => (
-                    <button key={i} onClick={() => { if (r.has) set({ scanOpen: true }) }} className="hwl-row-hover" style={{ all: 'unset', cursor: r.cursor, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 15px', borderRadius: 13, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                    <button key={i} onClick={() => { if (r.has) { if (be.configured && r.path) be.viewResultSheet(r.path); else set({ scanOpen: true }) } }} className="hwl-row-hover" style={{ all: 'unset', cursor: r.cursor, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 15px', borderRadius: 13, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', boxSizing: 'border-box' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A9BC0" strokeWidth="1.7"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" /></svg>
                         <span style={{ fontSize: 13.5, color: '#EAF3F1', fontWeight: 500 }}>{r.date}</span>

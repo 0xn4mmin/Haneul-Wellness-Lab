@@ -463,6 +463,12 @@ export async function uploadResultSheet(file: File): Promise<string> {
   return (data as { id: string }).id
 }
 
+/** Signed URL to view a stored result-sheet image (private bucket). */
+export async function getResultSheetUrl(path: string): Promise<string | null> {
+  const { data } = await requireSupabase().storage.from('inbody-results').createSignedUrl(path, 60 * 10)
+  return data?.signedUrl ?? null
+}
+
 /** Subscribe to one OCR job's status changes. Returns an unsubscribe fn. */
 export function subscribeOcrJob(jobId: string, onChange: (job: OcrJob) => void) {
   const sb = requireSupabase()
@@ -486,10 +492,14 @@ export async function fetchOcrJob(jobId: string): Promise<OcrJob | null> {
 export async function commitOcrMeasurement(jobId: string, r: OcrResult): Promise<void> {
   const sb = requireSupabase()
   const me = await uid()
+  // carry the uploaded result-sheet image onto the measurement so it's viewable
+  const { data: jobRow } = await sb.from('ocr_jobs').select('image_path').eq('id', jobId).single()
+  const sheetPath = (jobRow as { image_path?: string } | null)?.image_path ?? null
   const { data: m, error: mErr } = await sb.from('measurements').upsert({
     user_id: me, date: r.date, source: 'ocr',
     segmental: r.segmental,
     detail: r.detail,
+    result_sheet_path: sheetPath,
   }, { onConflict: 'user_id,date' }).select('id').single()
   if (mErr) throw mErr
   const measurementId = (m as { id: string }).id

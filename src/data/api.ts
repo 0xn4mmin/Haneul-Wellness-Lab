@@ -318,7 +318,7 @@ export async function deleteChallengeGoal(challengeId: string, metricKey: string
 }
 export interface ChallengeProgressRow {
   user_id: string; name: string; initials: string; color: string; photo_path: string | null
-  metric_key: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null; current: number | null
+  metric_key: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null; current: number | null; prev: number | null
 }
 export async function fetchChallengeProgress(challengeId: string): Promise<ChallengeProgressRow[]> {
   const { data } = await requireSupabase().rpc('get_challenge_progress', { p_challenge: challengeId })

@@ -1393,9 +1393,36 @@ export default function Portal() {
             const goalText = (p: typeof cd.progress[number]) => p.mode === 'relative'
               ? `${p.metricLabel} ${p.target > 0 ? '+' : ''}${fmtN(p.target)}${p.unit}`
               : `${p.metricLabel} ${fmtN(p.target)}${p.unit} 달성`
-            const ranked = [...cd.progress].sort((a, b) => b.pct - a.pct)
             const memberIds = new Set(cd.members.map((m) => m.userId))
             const invitable = (be.members ?? []).filter((m) => !memberIds.has(m.id))
+            const MEDAL = ['#F2C94C', '#C9D1DA', '#CD7F4E']  // gold / silver / bronze
+            const rankBadge = (i: number) => i < 3 ? (
+              <span style={{ position: 'relative', width: 22, height: 22, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {i === 0 && <svg width="14" height="14" viewBox="0 0 24 24" fill={MEDAL[0]} style={{ position: 'absolute', top: -9 }}><path d="M5 16l-2-9 5 4 4-7 4 7 5-4-2 9z" /></svg>}
+                <span style={{ width: 22, height: 22, borderRadius: '50%', background: MEDAL[i], color: '#1a1206', fontSize: 11, fontWeight: 800, fontFamily: "'IBM Plex Mono',monospace", display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 10px ${MEDAL[i]}66` }}>{i + 1}</span>
+              </span>
+            ) : <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: 'rgba(231,239,234,.4)', width: 22, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
+            const board = (getPct: (p: typeof cd.progress[number]) => number) => {
+              const rows = [...cd.progress].sort((a, b) => getPct(b) - getPct(a))
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                  {rows.map((p, i) => { const pv = getPct(p); return (
+                    <div key={p.userId} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {rankBadge(i)}
+                      <Avatar initials={p.initials} color={p.color} photo={p.photo} size={i < 3 ? 34 : 30} fontSize={11} ring={i === 0 ? `0 0 0 2px ${MEDAL[0]}` : undefined} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+                          <span style={{ fontSize: 12.5, fontWeight: i < 3 ? 700 : 600, color: '#EAF3F1' }}>{p.name}{p.isMe ? ' (나)' : ''}</span>
+                          <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: pv >= 100 ? '#7BD88F' : '#67D7DF' }}>{pv}%</span>
+                        </div>
+                        <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pv}%`, background: pv >= 100 ? '#7BD88F' : (i === 0 ? `linear-gradient(90deg,${MEDAL[0]},#67D7DF)` : 'linear-gradient(90deg,#2E9BA6,#67D7DF)') }} /></div>
+                        <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>{goalText(p)} · 현재 {p.current != null ? fmtN(p.current) + p.unit : '—'}</div>
+                      </div>
+                    </div>
+                  ) })}
+                </div>
+              )
+            }
             return (
             <div onClick={be.closeChallenge} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 121, background: 'rgba(4,12,10,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
               <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
@@ -1411,27 +1438,22 @@ export default function Portal() {
                   <button onClick={be.closeChallenge} style={{ all: 'unset', cursor: 'pointer', fontSize: 20, color: 'rgba(231,239,234,.5)', lineHeight: 1 }}>×</button>
                 </div>
 
-                {/* 주간 성취도 비교 (리더보드) */}
-                <div style={{ marginTop: 18 }}>
-                  <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 10 }}>이번 주 성취도</div>
-                  {ranked.length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '4px 0 8px' }}>아직 목표를 설정한 참여자가 없어요.</div>}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-                    {ranked.map((p, i) => (
-                      <div key={p.userId} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                        <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: i === 0 ? '#C9A24B' : 'rgba(231,239,234,.4)', width: 16, flexShrink: 0 }}>{i + 1}</span>
-                        <Avatar initials={p.initials} color={p.color} photo={p.photo} size={32} fontSize={11} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
-                            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#EAF3F1' }}>{p.name}{p.isMe ? ' (나)' : ''}</span>
-                            <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: p.pct >= 100 ? '#7BD88F' : '#67D7DF' }}>{p.pct}%</span>
-                          </div>
-                          <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${p.pct}%`, background: p.pct >= 100 ? '#7BD88F' : 'linear-gradient(90deg,#2E9BA6,#67D7DF)' }} /></div>
-                          <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>{goalText(p)} · 현재 {p.current != null ? fmtN(p.current) + p.unit : '—'}</div>
-                        </div>
-                      </div>
-                    ))}
+                {cd.progress.length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '14px 0 2px' }}>아직 목표를 설정한 참여자가 없어요. 아래에서 내 목표를 정해보세요.</div>}
+                {cd.progress.length > 0 && <>
+                  {/* 전체 성취도 (상단) */}
+                  <div style={{ marginTop: 18 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="#F2C94C"><path d="M5 16l-2-9 5 4 4-7 4 7 5-4-2 9z" /></svg>
+                      <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>전체 성취도 · 순위</div>
+                    </div>
+                    {board((p) => p.pct)}
                   </div>
-                </div>
+                  {/* 이번 주 성취도 (하단) */}
+                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+                    <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 12 }}>이번 주 성취도 · 순위</div>
+                    {board((p) => p.weeklyPct)}
+                  </div>
+                </>}
 
                 {/* 내 목표 설정 */}
                 <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>

@@ -43,7 +43,7 @@ export interface PostView {
 export interface MessageView { id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null }
 export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null; isOwn: boolean }
 export interface ChallengeView { id: string; title: string; metrics: string[]; metricKeys: string[]; scope: string; startDate: string; endDate: string; daysLeft: number; isOwn: boolean }
-export interface ChallengeProgressItem { userId: string; name: string; initials: string; color: string; photo: string | null; metricKey: string; metricLabel: string; unit: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null; current: number | null; pct: number; isMe: boolean }
+export interface ChallengeProgressItem { userId: string; name: string; initials: string; color: string; photo: string | null; metricKey: string; metricLabel: string; unit: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null; current: number | null; pct: number; weeklyPct: number; isMe: boolean }
 export interface ChallengeDetail {
   id: string; title: string; metricKeys: string[]; metricLabels: string[]; startDate: string; endDate: string; scope: string; daysLeft: number; isOwn: boolean
   members: { userId: string; name: string; initials: string; color: string; photo: string | null; isMe: boolean }[]
@@ -535,13 +535,15 @@ export function useBackend(): Backend {
       const m = MOCK_METRICS[r.metric_key as MetricKey]
       const base = r.baseline ?? r.current ?? 0
       const goalDelta = r.mode === 'relative' ? Number(r.target) : (Number(r.target) - base)
-      const actual = (r.current ?? base) - base
-      let pct = goalDelta === 0 ? (actual === 0 ? 100 : 0) : (actual / goalDelta) * 100
-      pct = Math.max(0, Math.min(100, Math.round(pct)))
+      const cur = r.current ?? base
+      const clampPct = (v: number) => Math.max(0, Math.min(100, Math.round(v)))
+      const pct = goalDelta === 0 ? (cur - base === 0 ? 100 : 0) : clampPct(((cur - base) / goalDelta) * 100)
+      // this week = progress in the latest measurement step (prev → current)
+      const weeklyPct = (r.prev == null || goalDelta === 0) ? pct : clampPct(((cur - Number(r.prev)) / goalDelta) * 100)
       return {
         userId: r.user_id, name: r.name, initials: r.initials, color: r.color, photo: api.avatarUrl(r.photo_path),
         metricKey: r.metric_key, metricLabel: m?.label ?? r.metric_key, unit: m?.unit ?? '',
-        mode: r.mode, target: Number(r.target), baseline: r.baseline, current: r.current, pct, isMe: r.user_id === meId,
+        mode: r.mode, target: Number(r.target), baseline: r.baseline, current: r.current, pct, weeklyPct, isMe: r.user_id === meId,
       }
     })
     setChallengeDetail({

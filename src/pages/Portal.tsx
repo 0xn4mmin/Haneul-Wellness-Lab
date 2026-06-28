@@ -475,7 +475,7 @@ export default function Portal() {
       {/* LOGIN GATE */}
       {showLogin && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'radial-gradient(120% 90% at 50% 18%,#0E1C38 0%,#0A1326 55%,#060B17 100%)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <div style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom))' }}>
+          <div className="hwl-modal-wrap" style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ position: 'fixed', top: '16%', left: '50%', transform: 'translateX(-50%)', width: '60%', maxWidth: 520, height: 280, background: 'radial-gradient(circle,rgba(46,155,166,.22),transparent 60%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
             <div className="hwl-login-card" style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.11)', backdropFilter: 'blur(12px)', borderRadius: 24, padding: '28px 26px', boxShadow: '0 40px 90px -50px rgba(0,0,0,.9)' }}>
               <img src="/assets/logo-mark.png" alt="로고" style={{ width: 48, height: 48, objectFit: 'contain', display: 'block', margin: '0 auto 10px' }} />
@@ -1264,7 +1264,7 @@ export default function Portal() {
           {/* 채팅방 만들기 / 입장 모달 (뷰 div 밖) */}
           {chatModal !== 'none' && (
             <div onClick={() => setChatModal('none')} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'hwl-fade .25s ease both' }}>
-              <div style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom))' }}>
+              <div className="hwl-modal-wrap" style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
                   <div style={eyebrow}>{chatModal === 'create' ? 'New Room' : 'Join Room'}</div>
                   <div style={cardTitle}>{chatModal === 'create' ? '채팅방 만들기' : '코드로 입장'}</div>
@@ -1302,7 +1302,7 @@ export default function Portal() {
 
           {/* 측정 주기 설정 모달 */}
           {cycleModal && (
-            <div onClick={() => setCycleModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,9,18,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'hwl-fade .25s ease both' }}>
+            <div onClick={() => setCycleModal(false)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,9,18,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
               <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
                 <div style={eyebrow}>Measurement Cycle</div>
                 <div style={cardTitle}>측정 주기</div>
@@ -1324,7 +1324,7 @@ export default function Portal() {
 
           {/* 목표 설정 모달 */}
           {goalModal && (
-            <div onClick={() => setGoalModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,9,18,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'hwl-fade .25s ease both' }}>
+            <div onClick={() => setGoalModal(false)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,9,18,.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
               <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
                 <div style={eyebrow}>Goals</div>
                 <div style={cardTitle}>목표 설정</div>
@@ -1352,7 +1352,7 @@ export default function Portal() {
           {/* 챌린지 만들기 모달 (뷰 div 밖에 둬서 transform 컨테이닝 블록에 갇히지 않게) */}
           {s.showChallengeForm && (
             <div onClick={() => set({ showChallengeForm: false })} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(4,12,10,.82)', backdropFilter: 'blur(6px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', animation: 'hwl-fade .25s ease both' }}>
-              <div style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom))' }}>
+              <div className="hwl-modal-wrap" style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#0E1834', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 26, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
                   <div style={eyebrow}>New Challenge</div><div style={cardTitle}>챌린지 만들기</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 18 }}>

@@ -41,6 +41,12 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
 .hwl-backdrop{display:none}
 .hwl-tabbar{display:none}
 .hwl-roster-wrap{overflow-x:auto}
+/* modal centering wrapper: on mobile leave room for the bottom tab bar so the
+   card is centered in the visible area above it */
+.hwl-modal-wrap{padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom))}
+@media(max-width:880px){
+  .hwl-modal-wrap{padding-bottom:calc(62px + env(safe-area-inset-bottom))}
+}
 
 @media(max-width:880px){
   /* app-native: bottom tab bar replaces the sidebar */

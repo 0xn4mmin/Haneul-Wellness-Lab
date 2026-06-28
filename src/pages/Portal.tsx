@@ -579,8 +579,8 @@ export default function Portal() {
                   <div style={{ fontSize: 12.5, color: '#9DAFCB', marginTop: 3 }}>{heroMeta}</div>
                 </div>
               </div>
-              <div className="hwl-hero-stats" style={{ position: 'relative', zIndex: 2, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 26, flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', gap: 22 }}>
+              <div className="hwl-hero-stats" style={{ position: 'relative', zIndex: 2, marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 18, flexWrap: 'nowrap', minWidth: 0 }}>
+                <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', minWidth: 0 }}>
                   <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체중</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.weight.series[M.weight.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>
                   <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>체지방률</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.pbf.series[M.pbf.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> %</span></div></div>
                   <div><div style={{ fontSize: 11, color: '#9DAFCB' }}>골격근량</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#fff', marginTop: 1 }}>{M.smm.series[M.smm.series.length - 1].toFixed(1)}<span style={{ fontSize: 12, color: '#C9A24B' }}> kg</span></div></div>

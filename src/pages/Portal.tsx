@@ -1339,7 +1339,7 @@ export default function Portal() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div><label style={labelStyle}>이름</label><input value={P.name} onChange={(e) => onProfileField('name', e.target.value)} style={inputStyle} /></div>
-                  <div><label style={labelStyle}>생년월일</label><input type="date" value={P.birth} onChange={(e) => onProfileField('birth', e.target.value)} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>생년월일</label><input type="date" value={P.birth} onChange={(e) => onProfileField('birth', e.target.value)} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0 }} /></div>
                   <div><label style={labelStyle}>성별</label><div style={{ display: 'flex', gap: 8 }}>{genders.map((g, i) => <button key={i} onClick={() => onProfileField('gender', g.label)} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '11px 0', borderRadius: 12, fontSize: 13.5, fontWeight: 600, border: `1px solid ${g.border}`, background: g.bg, color: g.fg }}>{g.label}</button>)}</div></div>
                   <div><label style={labelStyle}>핸드폰 번호</label><input value={P.phone} onChange={(e) => onProfileField('phone', e.target.value)} placeholder="010-0000-0000" style={inputStyle} /></div>
                 </div>

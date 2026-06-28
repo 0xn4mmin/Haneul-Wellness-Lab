@@ -319,16 +319,29 @@ export function useBackend(): Backend {
   }, [meId, activeRoomId, reloadMessages])
 
   // ── auth actions ──
+  const validCreds = (email: string, password: string) => {
+    if (!email.trim() || !password) { setLoginError('이메일과 비밀번호를 입력하세요.'); return false }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) { setLoginError('올바른 이메일 형식이 아니에요.'); return false }
+    if (password.length < 6) { setLoginError('비밀번호는 6자 이상이어야 해요.'); return false }
+    return true
+  }
   const signIn = useCallback(async (email: string, password: string) => {
     setLoginError('')
+    if (!validCreds(email, password)) return
     const { error } = await api.signIn(email, password)
     if (error) setLoginError(error.message)
   }, [])
   const signUp = useCallback(async (email: string, password: string) => {
     setLoginError('')
+    if (!validCreds(email, password)) return
     const { data, error } = await api.signUp(email, password, email.split('@')[0])
-    if (error) { setLoginError(error.message); return }
-    if (!data.session) setLoginError('확인 메일을 보냈어요. 인증 후 로그인하거나, 대시보드에서 Auto Confirm 하세요.')
+    if (error) {
+      setLoginError(/rate limit/i.test(error.message)
+        ? '메일 발송 한도를 초과했어요. 잠시 후 다시 시도하거나 관리자에게 문의하세요.'
+        : error.message)
+      return
+    }
+    if (!data.session) setLoginError('확인 메일을 보냈어요. 메일의 링크를 눌러 인증한 뒤 로그인하세요.')
   }, [])
   const signOut = useCallback(async () => { await api.signOut() }, [])
 

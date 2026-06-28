@@ -396,6 +396,9 @@ export function useBackend(): Backend {
     setMessages(null)
     void reloadMessages(id)
     void api.fetchRoomMembers(id).then(setRoomMembers).catch(() => setRoomMembers([]))
+    // viewing the room clears its chat notifications
+    setNotifications((ns) => ns?.map((n) => (n.type === 'chat' ? { ...n, read: true } : n)) ?? ns)
+    void api.markRoomNotificationsRead(id).catch(() => {})
   }, [reloadMessages])
 
   const createRoom = useCallback(async (name: string, isPrivate: boolean) => {

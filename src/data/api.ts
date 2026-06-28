@@ -283,6 +283,12 @@ export async function markNotificationsRead() {
   const me = await uid()
   return requireSupabase().from('notifications').update({ read: true }).eq('user_id', me).eq('read', false)
 }
+/** Mark the chat notifications for a room read (the user is viewing it). */
+export async function markRoomNotificationsRead(roomId: string) {
+  const me = await uid()
+  return requireSupabase().from('notifications').update({ read: true })
+    .eq('user_id', me).eq('type', 'chat').eq('ref', roomId).eq('read', false)
+}
 export function subscribeNotifications(userId: string, onChange: () => void) {
   const sb = requireSupabase()
   const channel = sb.channel(`notif:${userId}`)

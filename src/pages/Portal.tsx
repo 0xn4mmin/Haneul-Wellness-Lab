@@ -205,6 +205,8 @@ export default function Portal() {
   const M = be.metrics
   const D = be.dates
   const privacyMap = be.privacy ?? s.privacy
+  // signed-in user with no measurements yet → show an empty state, not mock data
+  const noData = be.configured && !!be.session && !be.hasData
 
   const meDisp = {
     name: isTrainer ? COACH.name : (be.profile?.name ?? s.profile.name),
@@ -495,6 +497,19 @@ export default function Portal() {
         <div className="hwl-content" style={{ flex: 1, minWidth: 0, padding: '26px 34px 60px', maxWidth: 1180, width: '100%', margin: '0 auto' }}>
           {/* ============ 나의 건강 ============ */}
           <div style={{ display: s.view === 'health' ? 'block' : 'none', animation: 'hwl-rise .4s ease both' }}>
+            {noData ? (
+              <section style={{ ...card, padding: '36px 26px', textAlign: 'center' }}>
+                <div style={{ width: 64, height: 64, borderRadius: 18, margin: '0 auto 16px', background: 'rgba(46,155,166,.12)', border: '1px solid rgba(103,215,223,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#67D7DF" strokeWidth="1.6"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" /></svg>
+                </div>
+                <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 22, color: '#F2F7F3', marginBottom: 8 }}>{meDisp.name}님, 환영해요</div>
+                <div style={{ fontSize: 13.5, color: 'rgba(231,239,234,.6)', lineHeight: 1.7, maxWidth: 360, margin: '0 auto 20px' }}>아직 측정 데이터가 없어요. 인바디 결과지를 업로드하면 자동으로 인식해 차트·추이·코치 피드백이 채워집니다.</div>
+                <div style={{ maxWidth: 360, margin: '0 auto' }}>
+                  <OcrUpload onCommitted={be.reload} />
+                </div>
+              </section>
+            ) : (
+            <>
             {/* HERO BAND */}
             <section className="hwl-hero" style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(120deg,#1B2A52 0%,#122046 55%,#1D2E58 100%)', border: '1px solid rgba(184,148,85,.18)', borderRadius: 26, padding: '24px 30px', marginBottom: 20, boxShadow: '0 30px 64px -44px rgba(0,0,0,.9)', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
               <div style={{ position: 'absolute', top: '-55%', right: '7%', width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle,rgba(46,155,166,.45),transparent 65%)', filter: 'blur(38px)', pointerEvents: 'none' }} />
@@ -806,7 +821,8 @@ export default function Portal() {
                 </div>
               </section>
             </div>
-
+            </>
+            )}
           </div>
 
           {/* ============ 커뮤니티 ============ */}

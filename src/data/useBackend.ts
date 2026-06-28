@@ -64,6 +64,7 @@ export interface Backend {
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   reload: () => void
+  hasData: boolean   // false for a signed-in user with no measurements (show empty state, not mock)
   metrics: Record<MetricKey, Metric>
   dates: string[]
   privacy: Record<string, 'public' | 'private'> | null
@@ -556,6 +557,7 @@ export function useBackend(): Backend {
 
   return {
     configured: isSupabaseConfigured, ready, session, loginError, signIn, signUp, signOut, reload,
+    hasData: !isSupabaseConfigured || remoteMetrics !== null,
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, updateProfile, uploadAvatar,

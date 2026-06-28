@@ -1045,7 +1045,7 @@ export default function Portal() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
                   {be.challenges.map((c) => (
                     <div key={c.id} style={{ ...card, borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <button onClick={() => { setCgMetric(''); setCgTarget(''); setCgMode('relative'); setInviteOpen(false); be.openChallenge(c) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                      <button onClick={() => { setCgMetric(''); setCgTarget(''); setCgMode('relative'); setInviteOpen(false); setMemberQuery(''); be.openChallenge(c) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 14, fontWeight: 700, color: '#EAF3F1' }}>{c.title}</span>
                           <span style={{ fontSize: 10, fontWeight: 600, color: '#67D7DF', background: 'rgba(103,215,223,.14)', borderRadius: 8, padding: '1px 7px' }}>D-{c.daysLeft}</span>
@@ -1442,18 +1442,22 @@ export default function Portal() {
                       <button onClick={() => void be.deleteChallengeGoal(g.metricKey)} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, color: 'rgba(224,135,92,.8)' }}>삭제</button>
                     </div>
                   ))}
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
-                    <select value={cgMetric} onChange={(e) => setCgMetric(e.target.value)} style={{ ...inputStyle, width: 'auto', flex: '1 1 110px', padding: '9px 10px', fontSize: 12.5 }}>
-                      <option value="">지표 선택</option>
-                      {cd.metricKeys.map((k, i) => <option key={k} value={k}>{cd.metricLabels[i]}</option>)}
-                    </select>
-                    <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,.12)' }}>
-                      {([['relative', '변화'], ['absolute', '달성']] as const).map(([m, l]) => (
-                        <button key={m} onClick={() => setCgMode(m)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '9px 11px', background: cgMode === m ? '#2E9BA6' : 'transparent', color: cgMode === m ? '#060B17' : '#9DAFCB' }}>{l}</button>
-                      ))}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                    <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                      <select value={cgMetric} onChange={(e) => setCgMetric(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '7px 9px', fontSize: 12, borderRadius: 9 }}>
+                        <option value="">지표 선택</option>
+                        {cd.metricKeys.map((k, i) => <option key={k} value={k}>{cd.metricLabels[i]}</option>)}
+                      </select>
+                      <div style={{ display: 'flex', flexShrink: 0, borderRadius: 9, overflow: 'hidden', border: '1px solid rgba(255,255,255,.12)' }}>
+                        {([['relative', '변화'], ['absolute', '달성']] as const).map(([m, l]) => (
+                          <button key={m} onClick={() => setCgMode(m)} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '7px 10px', background: cgMode === m ? '#2E9BA6' : 'transparent', color: cgMode === m ? '#060B17' : '#9DAFCB' }}>{l}</button>
+                        ))}
+                      </div>
                     </div>
-                    <input value={cgTarget} onChange={(e) => setCgTarget(e.target.value)} type="number" step="0.1" placeholder={cgMode === 'relative' ? '예) -3' : '예) 35'} style={{ ...inputStyle, width: 78, flex: '0 0 78px', padding: '9px 10px', fontSize: 12.5 }} />
-                    <button onClick={() => { const t = parseFloat(cgTarget); if (cgMetric && !isNaN(t)) { void be.setChallengeGoal(cgMetric, cgMode, t); setCgMetric(''); setCgTarget('') } }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '9px 14px', borderRadius: 10 }}>저장</button>
+                    <div style={{ display: 'flex', gap: 7 }}>
+                      <input value={cgTarget} onChange={(e) => setCgTarget(e.target.value)} type="number" step="0.1" placeholder={cgMode === 'relative' ? '예) -3' : '예) 35'} style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '8px 11px', fontSize: 12.5, borderRadius: 9 }} />
+                      <button onClick={() => { const t = parseFloat(cgTarget); if (cgMetric && !isNaN(t)) { void be.setChallengeGoal(cgMetric, cgMode, t); setCgMetric(''); setCgTarget('') } }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '8px 20px', borderRadius: 9 }}>저장</button>
+                    </div>
                   </div>
                   <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginTop: 6, lineHeight: 1.5 }}>변화 = 현재 대비 증감(예: 체지방 -3), 달성 = 절대 목표값(예: 골격근 35). 시작 시점 수치를 기준으로 성취도를 계산해요.</div>
                 </div>
@@ -1462,17 +1466,23 @@ export default function Portal() {
                 <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>참여 멤버 {cd.members.length}</div>
-                    {cd.isOwn && invitable.length > 0 && <button onClick={() => setInviteOpen((v) => !v)} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 16, padding: '5px 11px' }}>＋ 회원 초대</button>}
+                    {cd.isOwn && <button onClick={() => setInviteOpen((v) => !v)} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 16, padding: '5px 11px' }}>{inviteOpen ? '닫기' : '＋ 회원 초대'}</button>}
                   </div>
                   {inviteOpen && cd.isOwn && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, maxHeight: 160, overflowY: 'auto' }}>
-                      {invitable.map((m) => (
-                        <button key={m.id} onClick={() => void be.inviteToChallenge(m.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
-                          <Avatar initials={m.initials} color={m.color} photo={m.photo} size={28} fontSize={10} />
-                          <span style={{ flex: 1, fontSize: 12.5, color: '#EAF3F1' }}>{m.name}</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: '#67D7DF' }}>초대</span>
-                        </button>
-                      ))}
+                    <div style={{ marginBottom: 12 }}>
+                      <input value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} placeholder="이름으로 검색…" style={{ ...inputStyle, padding: '8px 12px', fontSize: 12.5, marginBottom: 8 }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                        {invitable.filter((m) => m.name.includes(memberQuery.trim())).map((m) => (
+                          <button key={m.id} onClick={() => void be.inviteToChallenge(m.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                            <Avatar initials={m.initials} color={m.color} photo={m.photo} size={28} fontSize={10} />
+                            <span style={{ flex: 1, fontSize: 12.5, color: '#EAF3F1' }}>{m.name}</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#67D7DF' }}>초대</span>
+                          </button>
+                        ))}
+                        {invitable.filter((m) => m.name.includes(memberQuery.trim())).length === 0 && (
+                          <div style={{ fontSize: 12, color: 'rgba(231,239,234,.45)', padding: '8px 2px' }}>{invitable.length === 0 ? '초대할 수 있는 다른 회원이 없어요.' : '검색 결과가 없어요.'}</div>
+                        )}
+                      </div>
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>

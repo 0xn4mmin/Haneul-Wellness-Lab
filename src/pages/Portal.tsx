@@ -388,19 +388,21 @@ export default function Portal() {
 
       {/* LOGIN GATE */}
       {showLogin && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'radial-gradient(120% 90% at 50% 18%,#0E1C38 0%,#0A1326 55%,#060B17 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ position: 'absolute', top: '18%', left: '50%', transform: 'translateX(-50%)', width: '60%', maxWidth: 520, height: 300, background: 'radial-gradient(circle,rgba(46,155,166,.22),transparent 60%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
-          <div className="hwl-login-card" style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.11)', backdropFilter: 'blur(12px)', borderRadius: 24, padding: '36px 30px', boxShadow: '0 40px 90px -50px rgba(0,0,0,.9)' }}>
-            <img src="/assets/logo-mark.png" alt="로고" style={{ width: 56, height: 56, objectFit: 'contain', display: 'block', margin: '0 auto 14px' }} />
-            <div style={{ textAlign: 'center', fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#F2F7F3' }}>하늘 웰니스 랩</div>
-            <div style={{ textAlign: 'center', fontSize: 12.5, color: 'rgba(231,239,234,.5)', margin: '5px 0 26px' }}>회원 전용 포털에 로그인하세요</div>
-            <input value={s.loginEmail} onChange={(e) => set({ loginEmail: e.target.value })} placeholder="이메일" style={{ ...inputStyle, padding: '13px 16px', fontSize: 14, marginBottom: 10 }} />
-            <input value={s.loginPw} onChange={(e) => set({ loginPw: e.target.value })} type="password" placeholder="비밀번호" style={{ ...inputStyle, padding: '13px 16px', fontSize: 14, marginBottom: 18 }} />
-            <button onClick={doLogin} style={{ all: 'unset', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 14, borderRadius: 24, boxShadow: '0 16px 34px -16px rgba(22,192,206,.9)' }}>로그인</button>
-            {be.loginError && <div style={{ marginTop: 12, fontSize: 12, color: '#E0A06A', textAlign: 'center', lineHeight: 1.5 }}>{be.loginError}</div>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 18, fontSize: 12, color: 'rgba(231,239,234,.5)' }}>
-              <span style={{ cursor: 'pointer' }}>비밀번호 찾기</span>
-              <span onClick={doSignup} style={{ cursor: 'pointer', color: '#67D7DF', fontWeight: 600 }}>회원가입</span>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'radial-gradient(120% 90% at 50% 18%,#0E1C38 0%,#0A1326 55%,#060B17 100%)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom))' }}>
+            <div style={{ position: 'fixed', top: '16%', left: '50%', transform: 'translateX(-50%)', width: '60%', maxWidth: 520, height: 280, background: 'radial-gradient(circle,rgba(46,155,166,.22),transparent 60%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
+            <div className="hwl-login-card" style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.11)', backdropFilter: 'blur(12px)', borderRadius: 24, padding: '28px 26px', boxShadow: '0 40px 90px -50px rgba(0,0,0,.9)' }}>
+              <img src="/assets/logo-mark.png" alt="로고" style={{ width: 48, height: 48, objectFit: 'contain', display: 'block', margin: '0 auto 10px' }} />
+              <div style={{ textAlign: 'center', fontFamily: "'Gowun Batang',serif", fontSize: 22, color: '#F2F7F3' }}>하늘 웰니스 랩</div>
+              <div style={{ textAlign: 'center', fontSize: 12, color: 'rgba(231,239,234,.5)', margin: '4px 0 20px' }}>회원 전용 포털에 로그인하세요</div>
+              <input value={s.loginEmail} onChange={(e) => set({ loginEmail: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') doLogin() }} placeholder="이메일" style={{ ...inputStyle, padding: '12px 16px', fontSize: 14, marginBottom: 9 }} />
+              <input value={s.loginPw} onChange={(e) => set({ loginPw: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') doLogin() }} type="password" placeholder="비밀번호" style={{ ...inputStyle, padding: '12px 16px', fontSize: 14, marginBottom: 14 }} />
+              <button onClick={doLogin} style={{ all: 'unset', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 24, boxShadow: '0 16px 34px -16px rgba(22,192,206,.9)' }}>로그인</button>
+              {be.loginError && <div style={{ marginTop: 11, fontSize: 12, color: '#E0A06A', textAlign: 'center', lineHeight: 1.5 }}>{be.loginError}</div>}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 12, color: 'rgba(231,239,234,.5)' }}>
+                <span style={{ cursor: 'pointer' }}>비밀번호 찾기</span>
+                <span onClick={doSignup} style={{ cursor: 'pointer', color: '#67D7DF', fontWeight: 600 }}>회원가입</span>
+              </div>
             </div>
           </div>
         </div>

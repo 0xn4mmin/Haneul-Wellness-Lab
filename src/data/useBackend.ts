@@ -128,6 +128,7 @@ export interface Backend {
   createRoom: (name: string, isPrivate: boolean) => Promise<void>
   joinRoom: (code: string) => Promise<{ ok: boolean; reason?: string }>
   deleteRoom: (id: string) => Promise<void>
+  renameRoom: (id: string, name: string) => Promise<void>
   // challenges
   challenges: ChallengeView[] | null
   createChallenge: (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => Promise<void>
@@ -623,6 +624,10 @@ export function useBackend(): Backend {
     if (next) { await reloadMessages(next); setRoomMembers(await api.fetchRoomMembers(next)) }
     else { setMessages([]); setRoomMembers([]) }
   }, [reloadRooms, reloadMessages])
+  const renameRoom = useCallback(async (id: string, name: string) => {
+    await api.renameRoom(id, name)
+    await reloadRooms()
+  }, [reloadRooms])
 
   // ── challenges ──
   const createChallenge = useCallback(async (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => {
@@ -845,7 +850,7 @@ export function useBackend(): Backend {
     privacy, togglePrivacy, profile, isAdmin: profile?.role === 'trainer', updateProfile, uploadAvatar,
     posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
-    rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom,
+    rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
     challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,
     members, activeMember, openMember, closeMember, addMemberCheer,

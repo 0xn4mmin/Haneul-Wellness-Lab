@@ -1323,9 +1323,17 @@ export default function Portal() {
                             {sel && <span style={{ fontSize: 10.5 }}>현재</span>}
                           </button>
                         ) })}
-                        <div style={{ display: 'flex', gap: 8, padding: 10 }}>
-                          <button onClick={() => { setChatErr(''); setChatModal('create'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(46,155,166,.14)', color: '#67D7DF', border: '1px solid rgba(103,215,223,.3)' }}>＋ 방 만들기</button>
-                          <button onClick={() => { setChatErr(''); setChatModal('join'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>코드로 입장</button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10 }}>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={() => { setChatErr(''); setChatModal('create'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(46,155,166,.14)', color: '#67D7DF', border: '1px solid rgba(103,215,223,.3)' }}>＋ 방 만들기</button>
+                            <button onClick={() => { setChatErr(''); setChatModal('join'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>코드로 입장</button>
+                          </div>
+                          {(activeRoom?.isOwn || (be.isAdmin && activeRoom)) && (
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button onClick={() => { const n = prompt('새 방 이름', activeRoom!.name); if (n && n.trim() && n.trim() !== activeRoom!.name) void be.renameRoom(activeRoom!.id, n.trim()); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>✎ 이름 수정</button>
+                              <button onClick={() => { if (confirm(`'${activeRoom!.name}' 방을 삭제할까요? 메시지도 모두 사라져요.`)) void be.deleteRoom(activeRoom!.id); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(224,138,94,.12)', color: '#E0A06A', border: '1px solid rgba(224,138,94,.3)' }}>🗑 방 삭제</button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </>
@@ -1339,11 +1347,6 @@ export default function Portal() {
                     {be.configured && activeRoom && (
                       <button onClick={() => { setAnonOn(be.myRoomAlias?.anonymous ?? false); setAnonName(be.myRoomAlias?.aliasName ?? ''); setAnonPhoto(null); setAliasModal(true) }} title="입장 설정" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', color: be.myRoomAlias?.anonymous ? '#C9A24B' : '#9DAFCB', background: be.myRoomAlias?.anonymous ? 'rgba(201,162,75,.14)' : 'rgba(255,249,238,.05)', border: `1px solid ${be.myRoomAlias?.anonymous ? 'rgba(201,162,75,.3)' : 'rgba(255,247,232,.12)'}`, borderRadius: 14, padding: '5px 10px' }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" strokeLinecap="round" /></svg>{be.myRoomAlias?.anonymous ? '익명' : '프로필'}
-                      </button>
-                    )}
-                    {activeRoom?.isOwn && (
-                      <button onClick={() => { if (confirm(`'${activeRoom.name}' 방을 삭제할까요? 메시지도 모두 사라져요.`)) void be.deleteRoom(activeRoom.id) }} title="방 삭제" style={{ all: 'unset', cursor: 'pointer', width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(224,160,106,.8)' }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </button>
                     )}
                   </div>

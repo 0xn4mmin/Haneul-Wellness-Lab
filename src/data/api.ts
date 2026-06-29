@@ -338,6 +338,9 @@ export async function createRoom(name: string, isPrivate: boolean): Promise<Room
 export async function deleteRoom(roomId: string) {
   return requireSupabase().from('chat_rooms').delete().eq('id', roomId)
 }
+export async function renameRoom(roomId: string, name: string) {
+  return requireSupabase().from('chat_rooms').update({ name: name.trim() }).eq('id', roomId)
+}
 
 /** Joins a (possibly private) room by its code. */
 export async function joinRoomByCode(code: string): Promise<{ ok: boolean; reason?: string; room_id?: string; name?: string }> {

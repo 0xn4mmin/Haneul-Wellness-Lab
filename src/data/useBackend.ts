@@ -734,7 +734,9 @@ export function useBackend(): Backend {
     })()
   }, [meId])
   const addCoachNote = useCallback(async (memberId: string, metricKey: string, text: string): Promise<string> => {
-    const { error } = await api.addCoachNote(memberId, metricKey, text)
+    // write to chart_comments (owner = the member) so it lands in their
+    // "하늘 코치의 피드백" thread (which reads chart_comments) and notifies them
+    const { error } = await api.addChartComment(memberId, metricKey, text)
     return error ? error.message : ''
   }, [])
 

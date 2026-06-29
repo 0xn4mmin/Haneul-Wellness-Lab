@@ -1318,7 +1318,7 @@ export default function Portal() {
                       <div style={{ position: 'absolute', top: '100%', left: 20, right: 20, marginTop: 2, zIndex: 10, background: '#0E1A38', border: '1px solid rgba(255,247,232,.14)', borderRadius: 14, boxShadow: '0 24px 50px -20px rgba(0,0,0,.85)', overflow: 'hidden', maxHeight: 300, overflowY: 'auto' }}>
                         {chatRooms.map((r) => { const sel = r.id === be.activeRoomId; return (
                           <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 5, width: '100%', boxSizing: 'border-box', padding: '8px 12px', background: sel ? 'rgba(46,155,166,.16)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-                            <button onClick={() => { be.selectRoom(r.id); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: sel ? '#67D7DF' : '#EAF3F1' }}>
+                            <button onClick={() => { be.selectRoom(r.id); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: '0 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: sel ? '#67D7DF' : '#EAF3F1' }}>
                               {r.isPrivate && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
                               <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
                             </button>
@@ -1332,7 +1332,7 @@ export default function Portal() {
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
                               </button>
                             )}
-                            {sel && <span style={{ flexShrink: 0, fontSize: 10.5, color: '#67D7DF' }}>현재</span>}
+                            {sel && <span style={{ flexShrink: 0, marginLeft: 'auto', fontSize: 10.5, color: '#67D7DF' }}>현재</span>}
                           </div>
                         ) })}
                         <div style={{ display: 'flex', gap: 8, padding: 10 }}>

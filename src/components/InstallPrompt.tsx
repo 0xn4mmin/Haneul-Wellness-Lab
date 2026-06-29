@@ -18,8 +18,12 @@ export default function InstallPrompt() {
   const standalone = typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true)
   const isNative = typeof window !== 'undefined' && !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
-  const isIOS = /iphone|ipad|ipod/i.test(ua)
-  const isSafari = isIOS && /safari/i.test(ua) && !/crios|fxios|edgios/i.test(ua)
+  const touch = typeof navigator !== 'undefined' ? (navigator.maxTouchPoints || 0) : 0
+  // iPadOS reports a "Macintosh" UA — detect it via touch points
+  const isIOS = /iphone|ipad|ipod/i.test(ua) || (/Macintosh/i.test(ua) && touch > 1)
+  const isMacDesktop = /Macintosh/i.test(ua) && touch <= 1
+  // on iOS every browser is WebKit, but only Safari can "Add to Home Screen"
+  const isSafari = /AppleWebKit/i.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|OPR|SamsungBrowser/i.test(ua)
 
   useEffect(() => {
     const onBIP = (e: Event) => { e.preventDefault(); setDeferred(e as BIPEvent) }
@@ -27,8 +31,12 @@ export default function InstallPrompt() {
     return () => window.removeEventListener('beforeinstallprompt', onBIP)
   }, [])
 
+  // Android/Chromium → native prompt; iOS/iPadOS Safari & Mac Safari → manual steps
+  const manual = isSafari && (isIOS || isMacDesktop)
+  useEffect(() => { if (manual) setIosHelp(true) }, [manual])
+
   if (standalone || isNative || dismissed) return null
-  const canShow = !!deferred || isSafari
+  const canShow = !!deferred || manual
   if (!canShow) return null
 
   const close = () => { setDismissed(true); try { localStorage.setItem('hwl-install-dismissed', '1') } catch { /* ignore */ } }
@@ -51,7 +59,9 @@ export default function InstallPrompt() {
         </div>
         {iosHelp && (
           <div style={{ marginTop: 11, paddingTop: 11, borderTop: '1px solid rgba(255,255,255,.1)', fontSize: 12.5, color: 'rgba(231,239,234,.8)', lineHeight: 1.7 }}>
-            <b style={{ color: '#9FE2E8' }}>Safari</b>에서 ① 하단 <b>공유</b> 버튼 <span style={{ fontSize: 14 }}>􀈂</span> → ② <b>“홈 화면에 추가”</b> → ③ <b>추가</b> 를 누르면 설치돼요.
+            {isMacDesktop
+              ? <><b style={{ color: '#9FE2E8' }}>Mac Safari</b>에서 ① 상단 <b>공유</b> 버튼 → ② <b>“Dock에 추가”</b>. (없으면 <b>파일</b> 메뉴 → Dock에 추가)</>
+              : <><b style={{ color: '#9FE2E8' }}>Safari</b>에서 ① 하단(또는 상단) <b>공유</b> 버튼 → ② <b>“홈 화면에 추가”</b> → ③ <b>추가</b>. <span style={{ color: 'rgba(231,239,234,.5)' }}>※ Chrome 등 다른 iOS 브라우저에선 안 돼요 — 꼭 Safari에서.</span></>}
           </div>
         )}
       </div>

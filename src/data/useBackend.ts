@@ -91,6 +91,9 @@ export interface Backend {
   goals: Record<string, number> | null
   setGoal: (metricKey: string, target: number | null) => void
   viewResultSheet: (path: string) => void
+  deleteMeasurement: (id: string, resultPath?: string | null) => Promise<void>
+  updateMeasurement: (id: string, values: Record<string, number>) => Promise<void>
+  fetchMeasurementValues: (id: string) => Promise<Record<string, number>>
   unreadChat: number
   metrics: Record<MetricKey, Metric>
   dates: string[]
@@ -484,6 +487,15 @@ export function useBackend(): Backend {
     const w = window.open('', '_blank')
     api.getResultSheetUrl(path).then((url) => { if (w) { if (url) w.location.href = url; else w.close() } }).catch(() => w?.close())
   }, [])
+  const deleteMeasurement = useCallback(async (id: string, resultPath?: string | null) => {
+    await api.deleteMeasurement(id, resultPath)
+    setReloadKey((k) => k + 1)
+  }, [])
+  const updateMeasurement = useCallback(async (id: string, values: Record<string, number>) => {
+    await api.updateMeasurementValues(id, values)
+    setReloadKey((k) => k + 1)
+  }, [])
+  const fetchMeasurementValues = useCallback((id: string) => api.fetchMeasurementValues(id), [])
   const setGoal = useCallback((metricKey: string, target: number | null) => {
     setGoals((g) => { const next = { ...(g ?? {}) }; if (target == null) delete next[metricKey]; else next[metricKey] = target; return next })
     ;(target == null ? api.clearGoal(metricKey) : api.setGoal(metricKey, target)).catch((e) => console.warn('[backend] setGoal', e))
@@ -795,6 +807,7 @@ export function useBackend(): Backend {
       ? Math.ceil((Date.parse(lastMeasureISO) + cycleDays * 86400000 - Date.now()) / 86400000)
       : null,
     setMeasureCycle, sleepLogs, addSleepLog, measurements, goals, setGoal, viewResultSheet,
+    deleteMeasurement, updateMeasurement, fetchMeasurementValues,
     unreadChat: (notifications ?? []).filter((n) => n.type === 'chat' && !n.read).length,
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,

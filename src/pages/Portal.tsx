@@ -59,6 +59,7 @@ export default function Portal() {
   const [roomMenu, setRoomMenu] = useState(false)
   const [editNoteId, setEditNoteId] = useState<string | null>(null)
   const [editNoteText, setEditNoteText] = useState('')
+  const [measEdit, setMeasEdit] = useState<{ id: string; date: string; values: Record<string, string> } | null>(null)
   const [postImg, setPostImg] = useState<File | null>(null)
   const [chatImg, setChatImg] = useState<File | null>(null)
   const [cgMetric, setCgMetric] = useState('')
@@ -264,6 +265,14 @@ export default function Portal() {
     if (be.configured) { void be.addCoachNote(s.coachTargetId, 'overall', t).then((err) => err ? set({ coachConfirm: '⚠ ' + err }) : done()); return }
     done()
   }
+  const MEAS_FIELDS: { key: string; label: string; unit: string }[] = [
+    { key: 'score', label: '인바디 점수', unit: '점' }, { key: 'weight', label: '체중', unit: 'kg' },
+    { key: 'smm', label: '골격근량', unit: 'kg' }, { key: 'pbf', label: '체지방률', unit: '%' },
+    { key: 'bodyFatMass', label: '체지방량', unit: 'kg' }, { key: 'bmi', label: 'BMI', unit: '' },
+    { key: 'bmr', label: '기초대사량', unit: 'kcal' }, { key: 'visceral', label: '내장지방', unit: '레벨' },
+    { key: 'tbw', label: '체수분', unit: 'L' },
+  ]
+  const MEAS_EDIT_KEYS = MEAS_FIELDS.map((f) => f.key)
   const CH_METRIC_OPTS = [
     { key: 'weight', label: '체중' }, { key: 'smm', label: '골격근량' }, { key: 'pbf', label: '체지방률' },
     { key: 'bodyFatMass', label: '체지방량' }, { key: 'bmi', label: 'BMI' }, { key: 'score', label: '인바디 점수' },
@@ -505,13 +514,13 @@ export default function Portal() {
     : `171cm · 26세 · 남성 · ${dateLatest} 측정`
   // records: real measurements when signed in (only what the user uploaded), else demo
   const fmtScanDate = (iso: string) => { const [y, m, d] = iso.split('-'); return `${y} · ${+m}월 ${+d}일` }
-  const scansSrc: { date: string; has: boolean; path: string | null }[] = be.configured
-    ? (be.measurements ?? []).map((m) => ({ date: fmtScanDate(m.date), has: !!m.result_sheet_path, path: m.result_sheet_path }))
+  const scansSrc: { id: string | null; date: string; has: boolean; path: string | null }[] = be.configured
+    ? (be.measurements ?? []).map((m) => ({ id: m.id, date: fmtScanDate(m.date), has: !!m.result_sheet_path, path: m.result_sheet_path }))
     : [
-        { date: '2026 · 6월 14일', has: true, path: null }, { date: '2026 · 5월 10일', has: false, path: null },
-        { date: '2026 · 4월 12일', has: false, path: null }, { date: '2026 · 3월 15일', has: false, path: null },
+        { id: null, date: '2026 · 6월 14일', has: true, path: null }, { id: null, date: '2026 · 5월 10일', has: false, path: null },
+        { id: null, date: '2026 · 4월 12일', has: false, path: null }, { id: null, date: '2026 · 3월 15일', has: false, path: null },
       ]
-  const scans = scansSrc.map((r) => ({ date: r.date, path: r.path, label: r.has ? '결과지 보기' : '미첨부', cursor: r.has ? 'pointer' : 'default', chipBg: r.has ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.05)', chipFg: r.has ? '#67D7DF' : 'rgba(231,239,234,.35)', has: r.has }))
+  const scans = scansSrc.map((r) => ({ id: r.id, date: r.date, path: r.path, label: r.has ? '결과지 보기' : '미첨부', cursor: r.has ? 'pointer' : 'default', chipBg: r.has ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.05)', chipFg: r.has ? '#67D7DF' : 'rgba(231,239,234,.35)', has: r.has }))
   // research detail: real from the latest measurement when available, else demo
   const researchSrc = latestMeasure
     ? (() => { const dt = latestMeasure.detail || {}; const w = lastV('weight'); const ideal = dt.idealWeight ?? w; const adj = +(ideal - w).toFixed(1)
@@ -983,13 +992,23 @@ export default function Portal() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                   {scans.length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '6px 2px' }}>아직 측정 기록이 없어요. 결과지를 업로드하면 여기에 쌓여요.</div>}
                   {scans.map((r, i) => (
-                    <button key={i} onClick={() => { if (r.has) { if (be.configured && r.path) be.viewResultSheet(r.path); else set({ scanOpen: true }) } }} className="hwl-row-hover" style={{ all: 'unset', cursor: r.cursor, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 15px', borderRadius: 13, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', boxSizing: 'border-box' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A9BC0" strokeWidth="1.7"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" /></svg>
+                    <div key={i} className="hwl-row-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 13px', borderRadius: 13, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                      <button onClick={() => { if (r.has) { if (be.configured && r.path) be.viewResultSheet(r.path); else set({ scanOpen: true }) } }} style={{ all: 'unset', cursor: r.cursor, flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 11 }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A9BC0" strokeWidth="1.7" style={{ flexShrink: 0 }}><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" /></svg>
                         <span style={{ fontSize: 13.5, color: '#EAF3F1', fontWeight: 500 }}>{r.date}</span>
-                      </div>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: r.chipFg, background: r.chipBg, padding: '5px 11px', borderRadius: 18 }}>{r.label}</span>
-                    </button>
+                      </button>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: r.chipFg, background: r.chipBg, padding: '5px 11px', borderRadius: 18, flexShrink: 0 }}>{r.label}</span>
+                      {be.configured && r.id && (
+                        <>
+                          <button onClick={() => { const id = r.id!; void be.fetchMeasurementValues(id).then((vals) => { const v: Record<string, string> = {}; for (const k of MEAS_EDIT_KEYS) v[k] = vals[k] != null ? String(vals[k]) : ''; setMeasEdit({ id, date: r.date, values: v }) }) }} title="값 수정" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(157,175,203,.8)' }}>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 20h4l10-10-4-4L4 16v4z" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.5 6.5l4 4" strokeLinecap="round" /></svg>
+                          </button>
+                          <button onClick={() => { const id = r.id!; if (confirm(`${r.date} 측정 기록을 삭제할까요? 차트에서도 제거돼요.`)) void be.deleteMeasurement(id, r.path) }} title="삭제" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(224,135,92,.8)' }}>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </button>
+                        </>
+                      )}
+                    </div>
                   ))}
                 </div>
                 {be.configured && be.session && <OcrUpload onCommitted={be.reload} />}
@@ -1463,6 +1482,28 @@ export default function Portal() {
                   {readModal.map((n, i) => <div key={i} style={{ fontSize: 13.5, color: '#EAF3F1' }}>{n}</div>)}
                 </div>
                 <button onClick={() => setReadModal(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', marginTop: 18, fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 12, borderRadius: 20 }}>닫기</button>
+              </div>
+            </div>
+          )}
+
+          {/* 측정값 수정 모달 */}
+          {measEdit && (
+            <div onClick={() => setMeasEdit(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 122, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto', background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                <div style={eyebrow}>Edit Measurement</div><div style={cardTitle}>측정값 수정</div>
+                <div style={{ fontSize: 12, color: 'rgba(231,239,234,.5)', marginTop: 4, marginBottom: 16 }}>{measEdit.date} · 잘못 인식된 값을 직접 고칠 수 있어요.</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
+                  {MEAS_FIELDS.map((f) => (
+                    <div key={f.key}>
+                      <label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>{f.label}{f.unit ? ` (${f.unit})` : ''}</label>
+                      <input type="number" step="0.1" value={measEdit.values[f.key] ?? ''} onChange={(e) => setMeasEdit((m) => m ? { ...m, values: { ...m.values, [f.key]: e.target.value } } : m)} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                  <button onClick={() => setMeasEdit(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
+                  <button onClick={() => { const vals: Record<string, number> = {}; for (const f of MEAS_FIELDS) { const n = parseFloat(measEdit.values[f.key]); if (!isNaN(n)) vals[f.key] = n } void be.updateMeasurement(measEdit.id, vals); setMeasEdit(null) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>저장</button>
+                </div>
               </div>
             </div>
           )}

@@ -89,6 +89,27 @@ export async function fetchMeasurements(userId: string): Promise<MeasurementRow[
   if (error) throw error
   return (data ?? []) as MeasurementRow[]
 }
+/** Delete a measurement (cascades its metric_readings) + its result-sheet image. */
+export async function deleteMeasurement(measurementId: string, resultPath?: string | null) {
+  const sb = requireSupabase()
+  if (resultPath) await sb.storage.from('inbody-results').remove([resultPath]).then(() => {}).catch(() => {})
+  return sb.from('measurements').delete().eq('id', measurementId)
+}
+/** Current metric values for a measurement (for the edit form). */
+export async function fetchMeasurementValues(measurementId: string): Promise<Record<string, number>> {
+  const { data } = await requireSupabase().from('metric_readings').select('metric_key, value').eq('measurement_id', measurementId)
+  const out: Record<string, number> = {}
+  for (const r of (data ?? []) as { metric_key: string; value: number }[]) out[r.metric_key] = Number(r.value)
+  return out
+}
+/** Update the metric values of an existing measurement. */
+export async function updateMeasurementValues(measurementId: string, values: Record<string, number>) {
+  const sb = requireSupabase()
+  for (const [k, v] of Object.entries(values)) {
+    const { error } = await sb.from('metric_readings').update({ value: v }).eq('measurement_id', measurementId).eq('metric_key', k)
+    if (error) throw error
+  }
+}
 
 // ───────────────────────── privacy ──────────────────────
 export async function fetchPrivacy(userId: string): Promise<Record<string, 'public' | 'private'>> {

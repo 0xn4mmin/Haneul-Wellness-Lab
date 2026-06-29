@@ -57,6 +57,8 @@ export default function Portal() {
   const [chEnd, setChEnd] = useState('')
   const [editChallengeId, setEditChallengeId] = useState<string | null>(null)
   const [roomMenu, setRoomMenu] = useState(false)
+  const [editNoteId, setEditNoteId] = useState<string | null>(null)
+  const [editNoteText, setEditNoteText] = useState('')
   const [postImg, setPostImg] = useState<File | null>(null)
   const [chatImg, setChatImg] = useState<File | null>(null)
   const [cgMetric, setCgMetric] = useState('')
@@ -118,6 +120,19 @@ export default function Portal() {
     if (be.configured && be.session) be.loadChartComments(s.selectedMetric)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [be.configured, be.session, s.selectedMetric])
+
+  // trainer studio: default the note target to a real roster member
+  useEffect(() => {
+    if (be.configured && be.isAdmin && be.roster && be.roster.length && !be.roster.some((r) => r.id === s.coachTargetId)) {
+      set({ coachTargetId: be.roster[0].id })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [be.roster, be.isAdmin])
+  // trainer studio: load the selected member's coach-note history
+  useEffect(() => {
+    if (be.configured && be.isAdmin && s.view === 'trainer' && s.coachTargetId) { setEditNoteId(null); void be.loadCoachNotes(s.coachTargetId) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [be.configured, be.isAdmin, s.view, s.coachTargetId])
 
   // on login / logout (user id changes — not on token refresh), land on the
   // default tab with no leftover detail view, modal, or draft from before
@@ -298,11 +313,19 @@ export default function Portal() {
   // personal standard ranges from the latest InBody sheet (backend only)
   const measureRanges = be.configured ? (be.measurements?.[0]?.ranges ?? undefined) : undefined
 
-  const meDisp = {
-    name: isTrainer ? COACH.name : (be.profile?.name ?? s.profile.name),
-    initials: isTrainer ? COACH.initials : (be.profile?.initials ?? ME.initials),
-    color: isTrainer ? COACH.color : (be.profile?.color ?? ME.color),
-    photo: isTrainer ? null : (be.configured ? be.profile?.photoUrl : s.profile.photo),
+  // a real (backend) account always shows its own profile — incl. the trainer
+  // admin (their uploaded photo + name). The COACH persona is only the mock demo.
+  const meDisp = be.configured ? {
+    name: be.profile?.name ?? s.profile.name,
+    initials: be.profile?.initials ?? ME.initials,
+    color: be.profile?.color ?? ME.color,
+    photo: be.profile?.photoUrl ?? null,
+    role: be.profile?.role === 'trainer' ? '트레이너 · 관리자' : ME.role,
+  } : {
+    name: isTrainer ? COACH.name : s.profile.name,
+    initials: isTrainer ? COACH.initials : ME.initials,
+    color: isTrainer ? COACH.color : ME.color,
+    photo: isTrainer ? null : s.profile.photo,
     role: isTrainer ? '트레이너 · 관리자' : ME.role,
   }
 
@@ -1817,6 +1840,40 @@ export default function Portal() {
                   <button onClick={sendCoachNote} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '12px 22px', borderRadius: 24 }}>노트 보내기</button>
                 </div>
                 <div style={{ fontSize: 12, color: '#8AA4CC', marginTop: 11 }}>{s.coachConfirm}</div>
+
+                {/* 지금까지 보낸 코칭 노트 내역 */}
+                {be.configured && (
+                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.1)' }}>
+                    <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 12 }}>{coachTargetMember ? coachTargetMember.name : '회원'}님 코칭 노트 내역</div>
+                    {(be.coachNotes ?? []).length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '2px 0 4px' }}>아직 보낸 노트가 없어요.</div>}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {(be.coachNotes ?? []).map((n) => (
+                        <div key={n.id} style={{ display: 'flex', gap: 10 }}>
+                          <Avatar initials={n.initials} color={n.color} photo={n.photo} size={30} fontSize={10.5} ring={n.isCoach ? '0 0 0 2px #2E9BA6' : undefined} />
+                          <div style={{ flex: 1, minWidth: 0, background: n.isCoach ? 'rgba(46,155,166,.12)' : 'rgba(255,255,255,.05)', border: `1px solid ${n.isCoach ? 'rgba(103,215,223,.25)' : 'rgba(255,255,255,.09)'}`, borderRadius: '4px 13px 13px 13px', padding: '9px 13px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+                              <span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{n.author}</span>
+                              <span style={{ fontSize: 9.5, fontWeight: 600, color: '#67D7DF', background: n.isCoach ? 'rgba(46,155,166,.2)' : 'rgba(103,215,223,.16)', padding: '1px 7px', borderRadius: 9 }}>{n.isCoach ? '코치' : '회원'}</span>
+                              <span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginLeft: 'auto' }}>{n.time}</span>
+                            </div>
+                            {editNoteId === n.id ? (
+                              <div style={{ display: 'flex', gap: 7, marginTop: 4 }}>
+                                <input value={editNoteText} onChange={(e) => setEditNoteText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const t = editNoteText.trim(); if (t) { void be.editCoachNote(n.id, t, s.coachTargetId); setEditNoteId(null) } } }} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 13, padding: '7px 11px', borderRadius: 9, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.06)', outline: 'none', color: '#fff' }} />
+                                <button onClick={() => { const t = editNoteText.trim(); if (t) { void be.editCoachNote(n.id, t, s.coachTargetId); setEditNoteId(null) } }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#060B17', background: CTA, padding: '7px 13px', borderRadius: 9 }}>저장</button>
+                                <button onClick={() => setEditNoteId(null)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, color: '#9DAFCB', padding: '7px 4px' }}>취소</button>
+                              </div>
+                            ) : (
+                              <>
+                                <div style={{ fontSize: 13, lineHeight: 1.55, color: 'rgba(231,239,234,.82)', whiteSpace: 'pre-wrap' }}>{n.text}</div>
+                                {(n.isMine || be.isAdmin) && <button onClick={() => { setEditNoteId(n.id); setEditNoteText(n.text) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(157,175,203,.8)', marginTop: 4 }}>수정</button>}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </section>
             </div>
           )}

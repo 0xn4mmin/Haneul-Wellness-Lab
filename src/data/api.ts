@@ -120,11 +120,14 @@ export async function fetchMembers(): Promise<ProfileRow[]> {
 export async function fetchChartComments(ownerId: string, metricKey: string) {
   const { data, error } = await requireSupabase()
     .from('chart_comments')
-    .select('id, text, created_at, author:profiles!chart_comments_author_id_fkey(name, initials, avatar_color, role, photo_path)')
+    .select('id, author_id, text, created_at, author:profiles!chart_comments_author_id_fkey(name, initials, avatar_color, role, photo_path)')
     .eq('owner_id', ownerId).eq('metric_key', metricKey)
     .order('created_at', { ascending: true })
   if (error) throw error
   return data ?? []
+}
+export async function updateChartComment(id: string, text: string) {
+  return requireSupabase().from('chart_comments').update({ text }).eq('id', id)
 }
 export async function addChartComment(ownerId: string, metricKey: string, text: string) {
   const me = await uid()

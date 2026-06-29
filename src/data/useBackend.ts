@@ -69,6 +69,7 @@ export interface ActiveMemberDetail {
 export interface ChartCommentView { author: string; initials: string; color: string; role: Role; text: string; time: string }
 export interface FeedbackItem { author: string; initials: string; color: string; photo?: string | null; isCoach: boolean; text: string; time: string }
 export interface RosterRow { id: string; name: string; initials: string; color: string; score: number; pbf: number; smm: number }
+export interface CoachNoteItem { id: string; author: string; initials: string; color: string; photo: string | null; isCoach: boolean; isMine: boolean; text: string; time: string }
 
 export interface Backend {
   configured: boolean
@@ -152,6 +153,9 @@ export interface Backend {
   // trainer
   roster: RosterRow[] | null
   addCoachNote: (memberId: string, metricKey: string, text: string) => Promise<string>
+  coachNotes: CoachNoteItem[] | null
+  loadCoachNotes: (memberId: string) => Promise<void>
+  editCoachNote: (id: string, text: string, memberId: string) => Promise<string>
   // notifications
   notifications: NotificationView[] | null
   unreadCount: number
@@ -192,6 +196,7 @@ export function useBackend(): Backend {
   const [challengeDetail, setChallengeDetail] = useState<ChallengeDetail | null>(null)
   const [notifications, setNotifications] = useState<NotificationView[] | null>(null)
   const [roster, setRoster] = useState<RosterRow[] | null>(null)
+  const [coachNotes, setCoachNotes] = useState<CoachNoteItem[] | null>(null)
   const [briefing, setBriefing] = useState<{ focus: string; summary: string; actions: string[] } | null>(null)
   const [briefingBusy, setBriefingBusy] = useState(false)
   const [briefingUsed, setBriefingUsed] = useState(0)
@@ -332,7 +337,7 @@ export function useBackend(): Backend {
     if (!supabase || !meId) {
       setRemoteMetrics(null); setRemoteDates(null); setPrivacyState(null); setProfile(null)
       setLastMeasureISO(null); setCycleDays(28); setSleepLogs(null); setMeasurements(null); setGoals(null)
-      setPosts(null); setMessages(null); setMyRoomAlias(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null)
+      setPosts(null); setMessages(null); setMyRoomAlias(null); setMembers(null); setActiveMember(null); setChartComments(null); setRoster(null); setCoachNotes(null)
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
       setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null); setChallengeDetail(null); setNotifications(null)
       roomId.current = null
@@ -669,8 +674,10 @@ export function useBackend(): Backend {
         const priv = await api.fetchPrivacy(id)
         const cheers = await api.fetchMemberCheers(id)
         const prof = await api.fetchMemberProfile(id)
+        // a trainer/admin sees every metric regardless of the member's privacy
+        const adminView = isAdminRef.current
         const mc = METRIC_CARD_KEYS.map((k) => {
-          const open = priv[k] === 'public'
+          const open = adminView || priv[k] === 'public'
           const sv = series[k]
           return {
             label: MOCK_METRICS[k].label, unit: MOCK_METRICS[k].unit, locked: !open, shown: open,
@@ -678,7 +685,7 @@ export function useBackend(): Backend {
           }
         })
         const publicCount = mc.filter((m) => m.shown).length
-        const scorePublic = priv.score === 'public' && !!series.score?.length
+        const scorePublic = (adminView || priv.score === 'public') && !!series.score?.length
         setActiveMember({
           id, name: prof?.name ?? '', initials: prof?.initials ?? '', color: prof?.avatar_color ?? '#5E97A0',
           photo: api.avatarUrl(prof?.photo_path), role: prof?.role ?? 'client', bio2: prof?.bio2 ?? '', score: scorePublic ? series.score![series.score!.length - 1] : 0,
@@ -733,12 +740,27 @@ export function useBackend(): Backend {
       } catch (e) { console.warn('[backend] roster', e) }
     })()
   }, [meId])
+  const loadCoachNotes = useCallback(async (memberId: string) => {
+    if (!memberId || !/^[0-9a-f-]{36}$/i.test(memberId)) { setCoachNotes(null); return }
+    const rows = await api.fetchChartComments(memberId, 'overall').catch(() => [])
+    setCoachNotes((rows as any[]).map((c) => ({
+      id: c.id, author: c.author?.name ?? '', photo: api.avatarUrl(c.author?.photo_path),
+      initials: c.author?.initials ?? '', color: c.author?.avatar_color ?? '#5E97A0',
+      isCoach: c.author?.role === 'trainer', isMine: c.author_id === meId, text: c.text, time: relTime(c.created_at),
+    })))
+  }, [meId])
   const addCoachNote = useCallback(async (memberId: string, metricKey: string, text: string): Promise<string> => {
     // write to chart_comments (owner = the member) so it lands in their
     // "하늘 코치의 피드백" thread (which reads chart_comments) and notifies them
     const { error } = await api.addChartComment(memberId, metricKey, text)
+    if (!error) void loadCoachNotes(memberId)
     return error ? error.message : ''
-  }, [])
+  }, [loadCoachNotes])
+  const editCoachNote = useCallback(async (id: string, text: string, memberId: string): Promise<string> => {
+    const { error } = await api.updateChartComment(id, text)
+    if (!error) await loadCoachNotes(memberId)
+    return error ? error.message : ''
+  }, [loadCoachNotes])
 
   const markNotificationsRead = useCallback(() => {
     setNotifications((ns) => ns?.map((n) => ({ ...n, read: true })) ?? ns)
@@ -784,7 +806,7 @@ export function useBackend(): Backend {
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal,
     members, activeMember, openMember, closeMember, addMemberCheer,
     chartComments, loadChartComments, addChartComment, coachFeedback, addCoachFeedback,
-    roster, addCoachNote,
+    roster, addCoachNote, coachNotes, loadCoachNotes, editCoachNote,
     notifications, unreadCount: (notifications ?? []).filter((n) => !n.read).length, markNotificationsRead,
   }
 }

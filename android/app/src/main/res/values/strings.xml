@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">하늘 웰니스 랩</string>
+    <string name="title_activity_main">하늘 웰니스 랩</string>
+    <string name="package_name">com.haneulwellness.lab</string>
+    <string name="custom_url_scheme">com.haneulwellness.lab</string>
+</resources>

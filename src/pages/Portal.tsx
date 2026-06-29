@@ -1428,12 +1428,12 @@ export default function Portal() {
                       <div style={{ maxWidth: '76%', display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3, justifyContent: m.justify }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{m.author}</span><span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)' }}>{m.time}</span></div>
                         {deleted ? (
-                          <div style={{ fontSize: 13, fontStyle: 'italic', color: 'rgba(231,239,234,.4)', padding: '8px 13px', borderRadius: m.radius, border: '1px dashed rgba(255,255,255,.14)' }}>메시지가 삭제되었습니다</div>
+                          <div style={{ fontSize: 13, fontStyle: 'italic', color: 'rgba(231,239,234,.4)', padding: '6px 11px', borderRadius: m.radius, border: '1px dashed rgba(255,255,255,.14)' }}>메시지가 삭제되었습니다</div>
                         ) : (
                           <div onClick={() => be.configured && setMsgActions(open ? null : mid)} style={{ cursor: be.configured ? 'pointer' : 'default', borderRadius: m.radius, background: m.bubbleBg, border: `1px solid ${m.bubbleBorder}`, overflow: 'hidden' }}>
                             {reply && <div style={{ fontSize: 11.5, padding: '7px 12px 0', color: isMine ? 'rgba(6,17,15,.7)' : 'rgba(231,239,234,.6)' }}><b>{reply.author}</b><div style={{ opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200, borderLeft: '2px solid currentColor', paddingLeft: 7, marginTop: 2 }}>{reply.text}</div></div>}
                             {img && <img src={img} alt="" style={{ width: '100%', maxWidth: 240, display: 'block', marginTop: reply ? 6 : 0 }} />}
-                            {m.text && <div style={{ fontSize: 14, lineHeight: 1.5, padding: '10px 14px', color: m.bubbleFg }}>{m.text}</div>}
+                            {m.text && <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-.1px', lineHeight: 1.42, padding: '6px 11px', color: m.bubbleFg }}>{m.text}</div>}
                           </div>
                         )}
                         {reactions.length > 0 && (

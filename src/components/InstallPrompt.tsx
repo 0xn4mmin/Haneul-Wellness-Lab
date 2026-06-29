@@ -11,8 +11,12 @@ type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ out
 export default function InstallPrompt() {
   const [deferred, setDeferred] = useState<BIPEvent | null>(null)
   const [iosHelp, setIosHelp] = useState(false)
-  const [dismissed, setDismissed] = useState(() => {
-    try { return localStorage.getItem('hwl-install-dismissed') === '1' } catch { return false }
+  // X just hides for this visit (session) — reappears on the next URL load.
+  // Only "다시 보지 않기" persists. (If installed, the platform suppresses it:
+  // Android stops firing beforeinstallprompt; the app runs in standalone.)
+  const [closed, setClosed] = useState(false)
+  const [never, setNever] = useState(() => {
+    try { return localStorage.getItem('hwl-install-never') === '1' } catch { return false }
   })
 
   const standalone = typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true)
@@ -35,13 +39,14 @@ export default function InstallPrompt() {
   const manual = isSafari && (isIOS || isMacDesktop)
   useEffect(() => { if (manual) setIosHelp(true) }, [manual])
 
-  if (standalone || isNative || dismissed) return null
+  if (standalone || isNative || never || closed) return null
   const canShow = !!deferred || manual
   if (!canShow) return null
 
-  const close = () => { setDismissed(true); try { localStorage.setItem('hwl-install-dismissed', '1') } catch { /* ignore */ } }
+  const close = () => setClosed(true)                                  // this visit only
+  const dontShow = () => { setNever(true); try { localStorage.setItem('hwl-install-never', '1') } catch { /* ignore */ } }
   const install = async () => {
-    if (deferred) { await deferred.prompt(); const r = await deferred.userChoice; if (r.outcome === 'accepted') close(); setDeferred(null) }
+    if (deferred) { await deferred.prompt(); const r = await deferred.userChoice; if (r.outcome === 'accepted') dontShow(); setDeferred(null) }
     else setIosHelp((v) => !v)
   }
 
@@ -52,7 +57,7 @@ export default function InstallPrompt() {
           <div style={{ fontSize: 22 }}>📲</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#EAF3F1' }}>앱으로 설치</div>
-            <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.6)' }}>홈 화면에 추가하면 전체화면 앱으로 써요</div>
+            <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.6)' }}>홈 화면에 추가하면 전체화면 앱으로 써요 · <button onClick={dontShow} style={{ all: 'unset', cursor: 'pointer', color: 'rgba(231,239,234,.45)', textDecoration: 'underline' }}>다시 보지 않기</button></div>
           </div>
           <button onClick={install} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#060B17', background: 'linear-gradient(110deg,#67D7DF,#16C0CE)', padding: '9px 16px', borderRadius: 20 }}>{deferred ? '설치' : '설치 방법'}</button>
           <button onClick={close} aria-label="닫기" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(231,239,234,.5)', fontSize: 16 }}>✕</button>

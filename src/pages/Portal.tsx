@@ -244,8 +244,9 @@ export default function Portal() {
   const sendCoachNote = () => {
     const t = s.coachNote.trim(); if (!t) return
     const target = (be.configured ? be.roster : null)?.find((m) => m.id === s.coachTargetId) ?? s.members.find((m) => m.id === s.coachTargetId)
-    const done = () => set({ coachNote: '', coachConfirm: '✓ ' + (target ? target.name : '회원') + '님의 ' + M[s.selectedMetric].label + ' 차트에 노트를 전달했어요.' })
-    if (be.configured) { void be.addCoachNote(s.coachTargetId, s.selectedMetric, t).then((err) => err ? set({ coachConfirm: '⚠ ' + err }) : done()); return }
+    const done = () => set({ coachNote: '', coachConfirm: '✓ ' + (target ? target.name : '회원') + '님에게 전체 피드백을 전달했어요.' })
+    // overall feedback → shows in the member's "하늘 코치의 피드백" thread
+    if (be.configured) { void be.addCoachNote(s.coachTargetId, 'overall', t).then((err) => err ? set({ coachConfirm: '⚠ ' + err }) : done()); return }
     done()
   }
   const CH_METRIC_OPTS = [
@@ -1805,7 +1806,7 @@ export default function Portal() {
               </section>
               <section style={{ background: 'linear-gradient(165deg,#16264E,#101D3E)', border: '1px solid rgba(184,148,85,.18)', color: '#EAF3F1', borderRadius: 24, padding: 24, marginTop: 20, boxShadow: '0 26px 52px -40px rgba(0,0,0,.8)' }}>
                 <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 21, marginBottom: 4, color: '#F2F7F3' }}>코칭 노트 보내기</div>
-                <div style={{ fontSize: 13, color: '#9DAFCB', marginBottom: 16 }}>선택한 회원의 “{trend.title}” 차트에 코치 하늘 이름으로 등록됩니다.</div>
+                <div style={{ fontSize: 13, color: '#9DAFCB', marginBottom: 16 }}>선택한 회원에게 전체 피드백으로 등록돼요. 회원의 측정 화면 “하늘 코치의 피드백”에 표시되고, 회원이 댓글로 답할 수 있어요.</div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
                   {roster.map((r) => (
                     <button key={r.id} onClick={() => set({ coachTargetId: r.id === 'jiwoo' ? 'minseo' : r.id, coachConfirm: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '7px 14px', borderRadius: 20, border: `1px solid ${r.selBorder}`, background: r.selBg, color: r.selFg }}>{r.name}</button>

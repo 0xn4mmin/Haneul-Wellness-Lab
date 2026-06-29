@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createField, type FieldHandle } from '../lib/threeField'
+import InstallPrompt from '../components/InstallPrompt'
 
 const PORTAL = '/portal'
 
@@ -157,6 +158,7 @@ export default function Intro() {
           <span style={{ width: 1, height: 24, background: 'linear-gradient(180deg,rgba(103,215,223,.8),transparent)', animation: 'hwl-cue 1.8s ease-in-out infinite' }} />
         </div>
       </section>
+      <InstallPrompt />
     </div>
   )
 }

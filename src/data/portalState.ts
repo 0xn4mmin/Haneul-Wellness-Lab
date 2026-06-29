@@ -17,7 +17,7 @@ export interface Message {
   reactions?: { emoji: string; count: number; mine: boolean; users: string[] }[]
   readBy?: string[]; readCount?: number
 }
-export interface Member { id: string; name: string; initials: string; color: string; photo?: string | null; bio: string; bio2: string; score: number; pub: string[] }
+export interface Member { id: string; name: string; initials: string; color: string; photo?: string | null; role?: 'client' | 'trainer'; bio: string; bio2: string; score: number; pub: string[] }
 export interface Profile { name: string; birth: string; gender: string; phone: string; photo: string | null }
 
 export interface PortalState {

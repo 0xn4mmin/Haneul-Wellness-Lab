@@ -471,7 +471,7 @@ export function avatarUrl(path?: string | null): string | null {
 
 // ───────────────────────── members ──────────────────────
 export interface MemberCard {
-  id: string; name: string; initials: string; color: string; photo: string | null
+  id: string; name: string; initials: string; color: string; photo: string | null; role: 'client' | 'trainer'
   bio: string | null; bio2: string | null; pub: string[]; score: number | null
 }
 /** Member roster with each member's public metric keys + score (if public). */
@@ -481,9 +481,9 @@ export async function fetchMemberCards(): Promise<MemberCard[]> {
   // include trainers/admins too — they have all member features and should be
   // browsable + invitable like any member
   const { data: profs } = await sb.from('profiles')
-    .select('id, name, initials, avatar_color, bio, bio2, photo_path').neq('id', me)
+    .select('id, name, initials, avatar_color, bio, bio2, photo_path, role').neq('id', me)
   const cards: MemberCard[] = []
-  for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null }>) {
+  for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null; role: 'client' | 'trainer' }>) {
     const { data: pv } = await sb.from('metric_privacy').select('metric_key, visibility').eq('user_id', p.id)
     const pub = ((pv ?? []) as { metric_key: string; visibility: string }[]).filter((r) => r.visibility === 'public').map((r) => r.metric_key)
     let score: number | null = null
@@ -491,7 +491,7 @@ export async function fetchMemberCards(): Promise<MemberCard[]> {
       const { data: sc } = await sb.from('metric_readings').select('value').eq('user_id', p.id).eq('metric_key', 'score').order('date', { ascending: false }).limit(1)
       score = (sc?.[0] as { value: number } | undefined)?.value ?? null
     }
-    cards.push({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), bio: p.bio, bio2: p.bio2, pub, score })
+    cards.push({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), role: p.role, bio: p.bio, bio2: p.bio2, pub, score })
   }
   return cards
 }

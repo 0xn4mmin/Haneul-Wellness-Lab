@@ -59,7 +59,7 @@ export interface ChallengeDetail {
 }
 const METRIC_LABEL: Record<string, string> = { weight: '체중', smm: '골격근량', pbf: '체지방률', bodyFatMass: '체지방량', bmi: 'BMI', bmr: '기초대사량', visceral: '내장지방', tbw: '체수분', score: '인바디 점수' }
 export interface NotificationView { id: string; type: string; text: string; read: boolean; time: string; actorInitials: string; actorColor: string; actorPhoto?: string | null }
-export interface MemberView { id: string; name: string; initials: string; color: string; photo?: string | null; bio: string; bio2: string; score: number; pub: string[] }
+export interface MemberView { id: string; name: string; initials: string; color: string; photo?: string | null; role: 'client' | 'trainer'; bio: string; bio2: string; score: number; pub: string[] }
 export interface ActiveMemberDetail {
   id: string; name: string; initials: string; color: string; photo: string | null; bio2: string; score: number
   measureCount: number; lastDate: string | null; publicCount: number; lockedCount: number
@@ -322,7 +322,7 @@ export function useBackend(): Backend {
 
   const reloadMembers = useCallback(async () => {
     const cards = await api.fetchMemberCards()
-    setMembers(cards.map((c) => ({ id: c.id, name: c.name, initials: c.initials, color: c.color, photo: c.photo, bio: c.bio ?? '', bio2: c.bio2 ?? '', score: c.score ?? 0, pub: c.pub })))
+    setMembers(cards.map((c) => ({ id: c.id, name: c.name, initials: c.initials, color: c.color, photo: c.photo, role: c.role, bio: c.bio ?? '', bio2: c.bio2 ?? '', score: c.score ?? 0, pub: c.pub })))
   }, [])
 
   // load everything for the signed-in user

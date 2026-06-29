@@ -1618,8 +1618,8 @@ export default function Portal() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
                         {invitable.filter((m) => m.name.includes(memberQuery.trim())).map((m) => (
                           <button key={m.id} onClick={() => void be.inviteToChallenge(m.id)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
-                            <Avatar initials={m.initials} color={m.color} photo={m.photo} size={28} fontSize={10} />
-                            <span style={{ flex: 1, fontSize: 12.5, color: '#EAF3F1' }}>{m.name}</span>
+                            <Avatar initials={m.initials} color={m.color} photo={m.photo} size={28} fontSize={10} ring={m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : undefined} />
+                            <span style={{ flex: 1, fontSize: 12.5, color: '#EAF3F1', display: 'flex', alignItems: 'center', gap: 5 }}>{m.name}{m.role === 'trainer' && <span style={{ fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '1px 5px' }}>코치</span>}</span>
                             <span style={{ fontSize: 11, fontWeight: 600, color: '#67D7DF' }}>초대</span>
                           </button>
                         ))}
@@ -1709,8 +1709,8 @@ export default function Portal() {
                   {membersDisp.filter((m) => m.name.includes(memberQuery.trim())).map((m) => (
                     <button key={m.id} onClick={() => openMember(m.id)} className="hwl-card-hover" style={{ all: 'unset', cursor: 'pointer', ...card, borderRadius: 22, padding: 20, display: 'flex', flexDirection: 'column', gap: 13 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <Avatar initials={m.initials} color={m.color} photo={m.photo} size={48} fontSize={15} />
-                        <div><div style={{ fontWeight: 700, fontSize: 15, color: '#EAF3F1' }}>{m.name}</div><div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)' }}>{m.bio}</div></div>
+                        <Avatar initials={m.initials} color={m.color} photo={m.photo} size={48} fontSize={15} ring={m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : undefined} />
+                        <div><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontWeight: 700, fontSize: 15, color: '#EAF3F1' }}>{m.name}</span>{m.role === 'trainer' && <span style={{ fontSize: 9.5, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 7, padding: '1px 6px' }}>코치</span>}</div><div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)' }}>{m.bio}</div></div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                         <div><div style={{ fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>점수</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 26, color: '#67D7DF' }}>{m.score > 0 ? m.score : '—'}</div></div>

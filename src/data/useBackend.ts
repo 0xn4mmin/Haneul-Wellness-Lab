@@ -124,6 +124,7 @@ export interface Backend {
   rooms: RoomView[] | null
   activeRoomId: string | null
   roomMembers: api.RoomMember[]
+  onlineIds: string[]
   selectRoom: (id: string) => void
   createRoom: (name: string, isPrivate: boolean) => Promise<void>
   joinRoom: (code: string) => Promise<{ ok: boolean; reason?: string }>
@@ -442,6 +443,14 @@ export function useBackend(): Backend {
     })
     return unsub
   }, [meId, activeRoomId, reloadMessages])
+
+  // realtime presence: who is currently in the active room (online even if idle)
+  const [onlineIds, setOnlineIds] = useState<string[]>([])
+  useEffect(() => {
+    if (!supabase || !meId || !activeRoomId) { setOnlineIds([]); return }
+    const unsub = api.subscribePresence(activeRoomId, meId, setOnlineIds)
+    return () => { setOnlineIds([]); unsub() }
+  }, [meId, activeRoomId])
 
   // ── auth actions ──
   const validCreds = (email: string, password: string) => {
@@ -850,7 +859,7 @@ export function useBackend(): Backend {
     privacy, togglePrivacy, profile, isAdmin: profile?.role === 'trainer', updateProfile, uploadAvatar,
     posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
-    rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
+    rooms, activeRoomId, roomMembers, onlineIds, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
     challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,
     members, activeMember, openMember, closeMember, addMemberCheer,

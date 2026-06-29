@@ -282,6 +282,31 @@ export function subscribeMessages(roomId: string, onChange: (row: unknown) => vo
   return () => { sb.removeChannel(channel) }
 }
 
+/**
+ * Realtime presence for a room: tracks this user as online and reports the
+ * set of user ids currently present (app open in this room). Stays online
+ * while the page is connected — no polling, accurate even when idle.
+ */
+export function subscribePresence(roomId: string, userId: string, onSync: (ids: string[]) => void) {
+  const sb = requireSupabase()
+  const channel = sb.channel(`presence:room:${roomId}`, { config: { presence: { key: userId } } })
+  const sync = () => {
+    const state = channel.presenceState() as Record<string, Array<{ user_id?: string }>>
+    const ids = new Set<string>()
+    for (const key of Object.keys(state)) {
+      ids.add(key)
+      for (const meta of state[key]) if (meta.user_id) ids.add(meta.user_id)
+    }
+    onSync([...ids])
+  }
+  channel
+    .on('presence', { event: 'sync' }, sync)
+    .on('presence', { event: 'join' }, sync)
+    .on('presence', { event: 'leave' }, sync)
+    .subscribe((status) => { if (status === 'SUBSCRIBED') void channel.track({ user_id: userId, at: Date.now() }) })
+  return () => { sb.removeChannel(channel) }
+}
+
 export interface RoomRow { id: string; name: string; is_private: boolean; join_code: string | null; created_by: string | null }
 
 /** Rooms the current user is a member of (default lounge first). */

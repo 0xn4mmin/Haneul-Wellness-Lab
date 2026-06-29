@@ -1363,21 +1363,21 @@ export default function Portal() {
                     <>
                       <div onClick={() => setMemberList(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
                       <div style={{ position: 'absolute', top: '100%', left: 18, marginTop: 2, zIndex: 10, width: 264, maxWidth: 'calc(100% - 36px)', background: '#0E1A38', border: '1px solid rgba(255,247,232,.14)', borderRadius: 14, boxShadow: '0 24px 50px -20px rgba(0,0,0,.85)', maxHeight: 320, overflowY: 'auto', padding: 8 }}>
-                        <div style={{ fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', padding: '6px 8px 8px' }}>멤버 {be.roomMembers.length}</div>
+                        <div style={{ fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', padding: '6px 8px 8px' }}>멤버 {be.roomMembers.length}{be.onlineIds.filter((id) => be.roomMembers.some((m) => m.userId === id)).length > 0 && <span style={{ color: '#7BD88F', marginLeft: 6 }}>● {be.onlineIds.filter((id) => be.roomMembers.some((m) => m.userId === id)).length} 접속</span>}</div>
                         {be.roomMembers.length === 0 && <div style={{ fontSize: 12, color: 'rgba(231,239,234,.45)', padding: '4px 8px 8px' }}>멤버 정보를 불러오는 중…</div>}
-                        {[...be.roomMembers].sort((a, b) => Date.parse(b.lastReadAt ?? '0') - Date.parse(a.lastReadAt ?? '0')).map((m) => {
+                        {[...be.roomMembers].sort((a, b) => (be.onlineIds.includes(b.userId) ? 1 : 0) - (be.onlineIds.includes(a.userId) ? 1 : 0) || Date.parse(b.lastReadAt ?? '0') - Date.parse(a.lastReadAt ?? '0')).map((m) => {
                           const disp = m.anonymous ? (m.aliasName?.trim() || '익명') : m.name
-                          const act = fmtActive(m.lastReadAt)
-                          const online = act === null
+                          const online = be.onlineIds.includes(m.userId)
+                          const label = online ? '접속 중' : (fmtActive(m.lastReadAt) ?? '방금 전 활동')
                           return (
                             <div key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px' }}>
                               <div style={{ position: 'relative', flexShrink: 0 }}>
                                 <Avatar initials={m.anonymous ? '익' : m.initials} color={m.color} photo={m.anonymous ? m.aliasPhoto : m.photo} size={32} fontSize={11} />
-                                <span style={{ position: 'absolute', right: -1, bottom: -1, width: 10, height: 10, borderRadius: '50%', background: online ? '#7BD88F' : 'rgba(157,175,203,.55)', border: '2.5px solid #0E1A38' }} />
+                                <span style={{ position: 'absolute', right: -1, bottom: -1, width: 10, height: 10, borderRadius: '50%', background: online ? '#7BD88F' : 'rgba(157,175,203,.55)', border: '2.5px solid #0E1A38', boxShadow: online ? '0 0 6px rgba(123,216,143,.8)' : 'none' }} />
                               </div>
                               <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 13, fontWeight: 600, color: '#EAF3F1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{disp}</span>{m.role === 'trainer' && <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '0 5px' }}>코치</span>}</div>
-                                <div style={{ fontSize: 11, color: online ? '#7BD88F' : 'rgba(231,239,234,.45)' }}>{online ? '접속 중' : act}</div>
+                                <div style={{ fontSize: 11, fontWeight: online ? 600 : 400, color: online ? '#7BD88F' : 'rgba(231,239,234,.45)' }}>{label}</div>
                               </div>
                             </div>
                           )

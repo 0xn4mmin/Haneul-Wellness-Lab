@@ -1300,14 +1300,14 @@ export default function Portal() {
             <div className="hwl-chat-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 20, animation: 'hwl-rise .4s ease both' }}>
               <section className="hwl-chat-panel" style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)', overflow: 'hidden' }}>
                 <div style={{ position: 'relative', padding: '12px 18px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 10, zIndex: 6 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {activeRoom && (
                       <div style={{ marginBottom: 3 }}>
                         <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '.3px', borderRadius: 7, padding: '1px 6px', color: activeRoom.isPrivate ? '#C9A24B' : '#67D7DF', background: activeRoom.isPrivate ? 'rgba(201,162,75,.14)' : 'rgba(46,155,166,.12)', border: `1px solid ${activeRoom.isPrivate ? 'rgba(201,162,75,.3)' : 'rgba(103,215,223,.25)'}` }}>{activeRoom.isPrivate ? '비공개' : '공개'}</span>
                       </div>
                     )}
-                    <button onClick={() => be.configured && chatRooms != null && setRoomMenu((v) => !v)} style={{ all: 'unset', cursor: be.configured && chatRooms != null ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, maxWidth: '100%' }}>
+                    <button onClick={() => be.configured && chatRooms != null && setRoomMenu((v) => !v)} style={{ all: 'unset', cursor: be.configured && chatRooms != null ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, maxWidth: '100%' }}>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)', flexShrink: 0 }} />
                       <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roomTitle}</span>
                       {be.configured && chatRooms != null && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.8)" strokeWidth="2" style={{ flexShrink: 0, transform: roomMenu ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                     </button>

@@ -41,6 +41,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
 .hwl-backdrop{display:none}
 .hwl-tabbar{display:none}
 .hwl-roster-wrap{overflow-x:auto}
+/* desktop: static height; on mobile JS sizes it to the visible viewport */
+.hwl-chat-panel{height:calc(100vh - 168px)}
 /* modal centering wrapper: on mobile leave room for the bottom tab bar so the
    card is centered in the visible area above it */
 .hwl-modal-wrap{padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom))}
@@ -71,15 +73,14 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
   .hwl-content{padding:16px 14px calc(86px + env(safe-area-inset-bottom))!important}
   /* chat view: the panel is fixed-height, so the big bottom padding only adds
      page scroll and clips the panel's bottom border — trim it right down */
-  .hwl-content.hwl-content-chat{padding-bottom:calc(10px + env(safe-area-inset-bottom))!important}
+  /* chat view: no page scroll — the panel (JS-sized) fills the visible area and
+     the message list scrolls inside it, so the keyboard can't push the page */
+  .hwl-content.hwl-content-chat{padding-bottom:0!important;overflow:hidden!important}
   .hwl-header{padding:calc(12px + env(safe-area-inset-top)) 16px 12px!important;gap:10px!important}
   .hwl-hero{padding:20px 18px!important}
   .hwl-hero-stats{margin-left:0!important;width:100%}
   .hwl-roster-inner{min-width:560px}
-  /* fixed block so the message list scrolls inside it (not the page) and the
-     input bar stays visible. Subtract header + tab bar + BOTH safe-area insets
-     so it fits above the bottom tab bar on notched phones. */
-  .hwl-chat-panel{height:calc(100dvh - 144px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;min-height:0}
+  /* mobile chat panel height is set in JS (fit-to-visible-viewport) */
 
   /* prevent iOS zoom-on-focus: inputs must be >=16px */
   input,textarea,select{font-size:16px!important}

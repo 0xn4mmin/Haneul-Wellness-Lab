@@ -97,6 +97,7 @@ export default function Portal() {
   const selectedSegRef = useRef(s.selectedSegment)
   selectedSegRef.current = s.selectedSegment
   const chatRef = useRef<HTMLDivElement | null>(null)
+  const chatPanelRef = useRef<HTMLElement | null>(null)
 
   // 3D figure lifecycle via a callback ref: React calls this with the node when
   // the canvas mounts and with null when it unmounts. This correctly re-inits
@@ -143,6 +144,31 @@ export default function Portal() {
     if (be.configured && be.isAdmin && s.view === 'trainer' && s.coachTargetId) { setEditNoteId(null); void be.loadCoachNotes(s.coachTargetId) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [be.configured, be.isAdmin, s.view, s.coachTargetId])
+
+  // size the chat panel to the *visible* viewport (in flow — no fixed
+  // positioning). Measuring the panel's real top + the visualViewport makes it
+  // fit exactly above the tab bar (no clipping), and shrink when the keyboard
+  // opens so the input stays visible above it.
+  useEffect(() => {
+    const fit = () => {
+      const panel = chatPanelRef.current
+      if (!panel) return
+      if (window.innerWidth > 880) { panel.style.height = ''; return } // desktop: CSS handles it
+      const vv = window.visualViewport
+      const visBottom = vv ? vv.offsetTop + vv.height : window.innerHeight
+      const kb = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0
+      const tab = document.querySelector('.hwl-tabbar') as HTMLElement | null
+      const reserve = kb > 60 ? 6 : (tab?.offsetHeight ?? 58) + 6 // tab bar hides under the keyboard
+      const top = panel.getBoundingClientRect().top
+      panel.style.height = Math.max(220, visBottom - top - reserve) + 'px'
+    }
+    fit()
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', fit); vv?.addEventListener('scroll', fit)
+    window.addEventListener('resize', fit); window.addEventListener('orientationchange', fit)
+    return () => { vv?.removeEventListener('resize', fit); vv?.removeEventListener('scroll', fit); window.removeEventListener('resize', fit); window.removeEventListener('orientationchange', fit) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.view])
 
   // on login / logout (user id changes — not on token refresh), land on the
   // default tab with no leftover detail view, modal, or draft from before
@@ -1298,7 +1324,7 @@ export default function Portal() {
           {/* ============ 그룹 채팅 ============ */}
           {s.view === 'chat' && (
             <div className="hwl-chat-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 224px', gap: 20, animation: 'hwl-rise .4s ease both' }}>
-              <section className="hwl-chat-panel" style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)', overflow: 'hidden' }}>
+              <section ref={chatPanelRef} className="hwl-chat-panel" style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <div style={{ position: 'relative', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', zIndex: 6 }}>
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)', flexShrink: 0 }} />
                   <button onClick={() => be.configured && chatRooms != null && setRoomMenu((v) => !v)} style={{ all: 'unset', cursor: be.configured && chatRooms != null ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
@@ -1415,7 +1441,7 @@ export default function Portal() {
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     <input type="file" accept="image/*" disabled={be.configured && !activeRoom} onChange={(e) => { const f = e.target.files?.[0]; if (f) setChatImg(f); e.target.value = '' }} style={{ display: 'none' }} />
                   </label>
-                  <input value={s.newMsg} disabled={be.configured && !activeRoom} onChange={(e) => set({ newMsg: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder={be.configured && !activeRoom ? '먼저 채팅방을 만들거나 입장하세요' : '메시지를 입력하세요…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1', opacity: be.configured && !activeRoom ? 0.5 : 1 }} />
+                  <input value={s.newMsg} disabled={be.configured && !activeRoom} onChange={(e) => set({ newMsg: e.target.value })} onFocus={() => setTimeout(() => { window.dispatchEvent(new Event('resize')); if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 350)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder={be.configured && !activeRoom ? '먼저 채팅방을 만들거나 입장하세요' : '메시지를 입력하세요…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1', opacity: be.configured && !activeRoom ? 0.5 : 1 }} />
                   <button onClick={sendMsg} style={{ all: 'unset', cursor: 'pointer', flex: 'none', width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg,#67D7DF,#2E9BA6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#060B17" strokeWidth="2"><path d="M4 12l16-7-7 16-2-7z" strokeLinejoin="round" /></svg></button>
                 </div>
               </section>

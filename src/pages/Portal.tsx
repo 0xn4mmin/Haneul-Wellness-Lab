@@ -109,6 +109,7 @@ export default function Portal() {
   const selectedSegRef = useRef(s.selectedSegment)
   selectedSegRef.current = s.selectedSegment
   const chatRef = useRef<HTMLDivElement | null>(null)
+  const chatPanelRef = useRef<HTMLElement | null>(null)
 
   // 3D figure lifecycle via a callback ref: React calls this with the node when
   // the canvas mounts and with null when it unmounts. This correctly re-inits
@@ -155,6 +156,25 @@ export default function Portal() {
     if (be.configured && be.isAdmin && s.view === 'trainer' && s.coachTargetId) { setEditNoteId(null); void be.loadCoachNotes(s.coachTargetId) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [be.configured, be.isAdmin, s.view, s.coachTargetId])
+
+  // fit the chat panel into one screen: measure its real top + the tab bar so
+  // it ends just above the tab bar regardless of header/safe-area height.
+  // (mobile only; desktop keeps the CSS height.)
+  useEffect(() => {
+    if (s.view !== 'chat') return
+    const fit = () => {
+      const panel = chatPanelRef.current
+      if (!panel) return
+      if (window.innerWidth > 880) { panel.style.height = ''; return }
+      const tab = document.querySelector('.hwl-tabbar') as HTMLElement | null
+      const top = panel.getBoundingClientRect().top
+      const reserve = (tab?.offsetHeight ?? 58) + 10
+      panel.style.height = Math.max(260, window.innerHeight - top - reserve) + 'px'
+    }
+    const id = setTimeout(fit, 0)
+    window.addEventListener('resize', fit); window.addEventListener('orientationchange', fit)
+    return () => { clearTimeout(id); window.removeEventListener('resize', fit); window.removeEventListener('orientationchange', fit) }
+  }, [s.view])
 
   // on login / logout (user id changes — not on token refresh), land on the
   // default tab with no leftover detail view, modal, or draft from before
@@ -1310,7 +1330,7 @@ export default function Portal() {
           {/* ============ 그룹 채팅 ============ */}
           {s.view === 'chat' && (
             <div className="hwl-chat-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 20, animation: 'hwl-rise .4s ease both' }}>
-              <section className="hwl-chat-panel" style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)', overflow: 'hidden' }}>
+              <section ref={chatPanelRef} className="hwl-chat-panel" style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <div style={{ position: 'relative', padding: '12px 18px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 10, zIndex: 6 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {activeRoom && (

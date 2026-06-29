@@ -41,6 +41,8 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
 .hwl-backdrop{display:none}
 .hwl-tabbar{display:none}
 .hwl-roster-wrap{overflow-x:auto}
+/* desktop: static height; on mobile JS fits it to the screen above the tab bar */
+.hwl-chat-panel{height:calc(100vh - 168px)}
 /* modal centering wrapper: on mobile leave room for the bottom tab bar so the
    card is centered in the visible area above it */
 .hwl-modal-wrap{padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom))}
@@ -73,8 +75,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
   .hwl-hero{padding:20px 18px!important}
   .hwl-hero-stats{margin-left:0!important;width:100%}
   .hwl-roster-inner{min-width:560px}
-  /* fixed tall block so the message list scrolls inside it (not the page) */
-  .hwl-chat-panel{height:calc(100dvh - 180px)!important;min-height:400px}
+  /* mobile chat panel height is set in JS (fit-to-screen above the tab bar) */
 
   /* prevent iOS zoom-on-focus: inputs must be >=16px */
   input,textarea,select{font-size:16px!important}

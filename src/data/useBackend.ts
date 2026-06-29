@@ -68,7 +68,7 @@ export interface ActiveMemberDetail {
 }
 export interface ChartCommentView { author: string; initials: string; color: string; role: Role; text: string; time: string }
 export interface FeedbackItem { author: string; initials: string; color: string; photo?: string | null; isCoach: boolean; text: string; time: string }
-export interface RosterRow { id: string; name: string; initials: string; color: string; score: number; pbf: number; smm: number }
+export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number; pbf: number; smm: number }
 export interface CoachNoteItem { id: string; author: string; initials: string; color: string; photo: string | null; isCoach: boolean; isMine: boolean; text: string; time: string }
 
 export interface Backend {
@@ -736,7 +736,7 @@ export function useBackend(): Backend {
     void (async () => {
       try {
         const rows = await api.fetchRoster()
-        setRoster(rows.map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, score: r.score ?? 0, pbf: r.pbf ?? 0, smm: r.smm ?? 0 })))
+        setRoster(rows.map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo, score: r.score ?? 0, pbf: r.pbf ?? 0, smm: r.smm ?? 0 })))
       } catch (e) { console.warn('[backend] roster', e) }
     })()
   }, [meId])

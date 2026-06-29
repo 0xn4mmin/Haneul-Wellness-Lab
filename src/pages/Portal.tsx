@@ -435,10 +435,10 @@ export default function Portal() {
 
   const statusOf = (score: number) => score >= 85 ? { t: '순조', fg: '#67D7DF', bg: 'rgba(46,155,166,.18)' } : score >= 78 ? { t: '유지', fg: '#D9B45A', bg: 'rgba(214,178,90,.2)' } : { t: '점검 필요', fg: '#E0A06A', bg: 'rgba(224,138,94,.2)' }
   const rosterSrc = be.configured
-    ? (be.roster ?? []).map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, score: r.score, pbf: r.pbf, smm: r.smm, last: D[D.length - 1] }))
+    ? (be.roster ?? []).map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo as string | null, score: r.score, pbf: r.pbf, smm: r.smm, last: D[D.length - 1] }))
     : [
-      { id: 'jiwoo', name: '박지우', initials: '지우', color: '#6E9B8E', score: 78, pbf: 20.0, smm: 31.9, last: '6월 14일' },
-      ...s.members.map((m, i) => ({ id: m.id, name: m.name, initials: m.initials, color: m.color, score: m.score, pbf: metrics.pbf.series[5] + (m.score - 80) * -0.3, smm: metrics.smm.series[5] + (m.score - 80) * 0.1, last: ['6월 12일', '6월 13일', '6월 11일'][i] || '6월 10일' })),
+      { id: 'jiwoo', name: '박지우', initials: '지우', color: '#6E9B8E', photo: null as string | null, score: 78, pbf: 20.0, smm: 31.9, last: '6월 14일' },
+      ...s.members.map((m, i) => ({ id: m.id, name: m.name, initials: m.initials, color: m.color, photo: (m.photo ?? null) as string | null, score: m.score, pbf: metrics.pbf.series[5] + (m.score - 80) * -0.3, smm: metrics.smm.series[5] + (m.score - 80) * 0.1, last: ['6월 12일', '6월 13일', '6월 11일'][i] || '6월 10일' })),
     ]
   const roster = rosterSrc.map((r) => { const st = statusOf(r.score); const tsel = s.coachTargetId === r.id; return { ...r, pbf: r.pbf.toFixed(1), smm: r.smm.toFixed(1), status: st.t, statusFg: st.fg, statusBg: st.bg, selBg: tsel ? CTA : 'rgba(255,255,255,.06)', selFg: tsel ? '#060B17' : '#BFCCE6', selBorder: tsel ? 'transparent' : 'rgba(255,255,255,.16)' } })
   const coachTargetMember = roster.find((m) => m.id === s.coachTargetId)
@@ -1818,7 +1818,7 @@ export default function Portal() {
                 </div>
                 {roster.map((r) => (
                   <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.3fr', gap: 8, alignItems: 'center', padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}><Avatar initials={r.initials} color={r.color} size={38} fontSize={12} /><div><div style={{ fontWeight: 600, fontSize: 14, color: '#EAF3F1' }}>{r.name}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>최근 측정 {r.last}</div></div></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}><Avatar initials={r.initials} color={r.color} photo={r.photo} size={38} fontSize={12} /><div><div style={{ fontWeight: 600, fontSize: 14, color: '#EAF3F1' }}>{r.name}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>최근 측정 {r.last}</div></div></div>
                     <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#67D7DF' }}>{r.score}</div>
                     <div style={{ fontSize: 14, fontFamily: "'IBM Plex Mono',monospace", color: '#EAF3F1' }}>{r.pbf}<span style={{ color: 'rgba(231,239,234,.4)' }}>%</span></div>
                     <div style={{ fontSize: 14, fontFamily: "'IBM Plex Mono',monospace", color: '#EAF3F1' }}>{r.smm}<span style={{ color: 'rgba(231,239,234,.4)' }}>kg</span></div>

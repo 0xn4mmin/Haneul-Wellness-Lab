@@ -525,17 +525,17 @@ export async function fetchMemberProfile(id: string) {
 }
 
 // ───────────────────── trainer studio ───────────────────
-export interface RosterRow { id: string; name: string; initials: string; color: string; score: number | null; pbf: number | null; smm: number | null }
+export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number | null; pbf: number | null; smm: number | null }
 export async function fetchRoster(): Promise<RosterRow[]> {
   const sb = requireSupabase()
   const { data: profs } = await sb.from('profiles').select('id, name, initials, avatar_color, role, photo_path').eq('role', 'client')
   const rows: RosterRow[] = []
-  for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string }>) {
+  for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; photo_path: string | null }>) {
     const latest = async (k: string) => {
       const { data } = await sb.from('metric_readings').select('value').eq('user_id', p.id).eq('metric_key', k).order('date', { ascending: false }).limit(1)
       return (data?.[0] as { value: number } | undefined)?.value ?? null
     }
-    rows.push({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, score: await latest('score'), pbf: await latest('pbf'), smm: await latest('smm') })
+    rows.push({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), score: await latest('score'), pbf: await latest('pbf'), smm: await latest('smm') })
   }
   return rows
 }

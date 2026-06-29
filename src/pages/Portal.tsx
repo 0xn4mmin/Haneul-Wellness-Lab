@@ -12,6 +12,17 @@ import OcrUpload from '../components/OcrUpload'
 import TabBar from '../components/TabBar'
 
 const CTA = 'linear-gradient(110deg,#67D7DF,#2E9BA6)'
+// last-active label from a timestamp; null = online now (<3 min)
+function fmtActive(iso: string | null): string | null {
+  if (!iso) return '활동 기록 없음'
+  const min = Math.floor((Date.now() - Date.parse(iso)) / 60000)
+  if (min < 3) return null
+  if (min < 60) return `${min}분 전 활동`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}시간 전 활동`
+  return `${Math.floor(hr / 24)}일 전 활동`
+}
+
 const card: React.CSSProperties = {
   background: 'rgba(255,255,255,.045)', border: '1px solid rgba(255,255,255,.1)',
   backdropFilter: 'blur(7px)', borderRadius: 24,
@@ -58,6 +69,7 @@ export default function Portal() {
   const [chEnd, setChEnd] = useState('')
   const [editChallengeId, setEditChallengeId] = useState<string | null>(null)
   const [roomMenu, setRoomMenu] = useState(false)
+  const [memberList, setMemberList] = useState(false)
   const [chProgInfo, setChProgInfo] = useState(false)
   const [notifPerm, setNotifPerm] = useState<string>(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
   const [editNoteId, setEditNoteId] = useState<string | null>(null)
@@ -1302,11 +1314,16 @@ export default function Portal() {
                 <div style={{ position: 'relative', padding: '12px 18px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 10, zIndex: 6 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {activeRoom && (
-                      <div style={{ marginBottom: 3 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                         <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '.3px', borderRadius: 7, padding: '1px 6px', color: activeRoom.isPrivate ? '#C9A24B' : '#67D7DF', background: activeRoom.isPrivate ? 'rgba(201,162,75,.14)' : 'rgba(46,155,166,.12)', border: `1px solid ${activeRoom.isPrivate ? 'rgba(201,162,75,.3)' : 'rgba(103,215,223,.25)'}` }}>{activeRoom.isPrivate ? '비공개' : '공개'}</span>
+                        {be.configured && (
+                          <button onClick={() => { setRoomMenu(false); setMemberList((v) => !v) }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 700, letterSpacing: '.3px', borderRadius: 7, padding: '1px 6px', color: '#9FE2E8', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.14)' }}>
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c.6-2.6 2.6-4 5.5-4s4.9 1.4 5.5 4" strokeLinecap="round" /><path d="M16 6.5a3 3 0 0 1 0 5.4M17 19c-.3-2-1-3.2-2.4-4" strokeLinecap="round" /></svg>멤버 {be.roomMembers.length}
+                          </button>
+                        )}
                       </div>
                     )}
-                    <button onClick={() => be.configured && chatRooms != null && setRoomMenu((v) => !v)} style={{ all: 'unset', cursor: be.configured && chatRooms != null ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, maxWidth: '100%' }}>
+                    <button onClick={() => be.configured && chatRooms != null && (setMemberList(false), setRoomMenu((v) => !v))} style={{ all: 'unset', cursor: be.configured && chatRooms != null ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, maxWidth: '100%' }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)', flexShrink: 0 }} />
                       <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roomTitle}</span>
                       {be.configured && chatRooms != null && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.8)" strokeWidth="2" style={{ flexShrink: 0, transform: roomMenu ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
@@ -1339,6 +1356,32 @@ export default function Portal() {
                           <button onClick={() => { setChatErr(''); setChatModal('create'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(46,155,166,.14)', color: '#67D7DF', border: '1px solid rgba(103,215,223,.3)' }}>＋ 방 만들기</button>
                           <button onClick={() => { setChatErr(''); setChatModal('join'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>코드로 입장</button>
                         </div>
+                      </div>
+                    </>
+                  )}
+                  {memberList && (
+                    <>
+                      <div onClick={() => setMemberList(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
+                      <div style={{ position: 'absolute', top: '100%', left: 18, marginTop: 2, zIndex: 10, width: 264, maxWidth: 'calc(100% - 36px)', background: '#0E1A38', border: '1px solid rgba(255,247,232,.14)', borderRadius: 14, boxShadow: '0 24px 50px -20px rgba(0,0,0,.85)', maxHeight: 320, overflowY: 'auto', padding: 8 }}>
+                        <div style={{ fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', padding: '6px 8px 8px' }}>멤버 {be.roomMembers.length}</div>
+                        {be.roomMembers.length === 0 && <div style={{ fontSize: 12, color: 'rgba(231,239,234,.45)', padding: '4px 8px 8px' }}>멤버 정보를 불러오는 중…</div>}
+                        {[...be.roomMembers].sort((a, b) => Date.parse(b.lastReadAt ?? '0') - Date.parse(a.lastReadAt ?? '0')).map((m) => {
+                          const disp = m.anonymous ? (m.aliasName?.trim() || '익명') : m.name
+                          const act = fmtActive(m.lastReadAt)
+                          const online = act === null
+                          return (
+                            <div key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px' }}>
+                              <div style={{ position: 'relative', flexShrink: 0 }}>
+                                <Avatar initials={m.anonymous ? '익' : m.initials} color={m.color} photo={m.anonymous ? m.aliasPhoto : m.photo} size={32} fontSize={11} />
+                                <span style={{ position: 'absolute', right: -1, bottom: -1, width: 10, height: 10, borderRadius: '50%', background: online ? '#7BD88F' : 'rgba(157,175,203,.55)', border: '2.5px solid #0E1A38' }} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 13, fontWeight: 600, color: '#EAF3F1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{disp}</span>{m.role === 'trainer' && <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '0 5px' }}>코치</span>}</div>
+                                <div style={{ fontSize: 11, color: online ? '#7BD88F' : 'rgba(231,239,234,.45)' }}>{online ? '접속 중' : act}</div>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     </>
                   )}

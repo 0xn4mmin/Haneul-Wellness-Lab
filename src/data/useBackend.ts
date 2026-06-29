@@ -92,7 +92,7 @@ export interface Backend {
   setGoal: (metricKey: string, target: number | null) => void
   viewResultSheet: (path: string) => void
   deleteMeasurement: (id: string, resultPath?: string | null) => Promise<void>
-  updateMeasurement: (id: string, values: Record<string, number>) => Promise<void>
+  updateMeasurement: (id: string, date: string | null, values: Record<string, number>) => Promise<void>
   fetchMeasurementValues: (id: string) => Promise<Record<string, number>>
   unreadChat: number
   metrics: Record<MetricKey, Metric>
@@ -491,7 +491,8 @@ export function useBackend(): Backend {
     await api.deleteMeasurement(id, resultPath)
     setReloadKey((k) => k + 1)
   }, [])
-  const updateMeasurement = useCallback(async (id: string, values: Record<string, number>) => {
+  const updateMeasurement = useCallback(async (id: string, date: string | null, values: Record<string, number>) => {
+    if (date) await api.updateMeasurementDate(id, date)
     await api.updateMeasurementValues(id, values)
     setReloadKey((k) => k + 1)
   }, [])

@@ -110,6 +110,14 @@ export async function updateMeasurementValues(measurementId: string, values: Rec
     if (error) throw error
   }
 }
+/** Change a measurement's date (updates the measurement + all its readings). */
+export async function updateMeasurementDate(measurementId: string, date: string) {
+  const sb = requireSupabase()
+  const { error } = await sb.from('measurements').update({ date }).eq('id', measurementId)
+  if (error) throw new Error(/duplicate|unique/i.test(error.message) ? '그 날짜에 이미 다른 측정이 있어요.' : error.message)
+  const { error: rErr } = await sb.from('metric_readings').update({ date }).eq('measurement_id', measurementId)
+  if (rErr) throw rErr
+}
 
 // ───────────────────────── privacy ──────────────────────
 export async function fetchPrivacy(userId: string): Promise<Record<string, 'public' | 'private'>> {

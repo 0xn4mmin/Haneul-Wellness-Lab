@@ -701,7 +701,7 @@ export default function Portal() {
           </div>
         </header>
 
-        <div className="hwl-content" style={{ flex: 1, minWidth: 0, padding: '26px 34px 60px', maxWidth: 1180, width: '100%', margin: '0 auto' }}>
+        <div className={`hwl-content${s.view === 'chat' ? ' hwl-content-chat' : ''}`} style={{ flex: 1, minWidth: 0, padding: '26px 34px 60px', maxWidth: 1180, width: '100%', margin: '0 auto' }}>
           {/* ============ 나의 건강 ============ */}
           <div style={{ display: s.view === 'health' ? 'block' : 'none', animation: 'hwl-rise .4s ease both' }}>
             {noData ? (

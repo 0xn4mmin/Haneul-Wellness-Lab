@@ -69,6 +69,9 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
   .hwl-2col{grid-template-columns:minmax(0,1fr)!important;gap:14px!important}
   .hwl-chat-grid{grid-template-columns:minmax(0,1fr)!important;gap:14px!important}
   .hwl-content{padding:16px 14px calc(86px + env(safe-area-inset-bottom))!important}
+  /* chat view: the panel is fixed-height, so the big bottom padding only adds
+     page scroll and clips the panel's bottom border — trim it right down */
+  .hwl-content.hwl-content-chat{padding-bottom:calc(10px + env(safe-area-inset-bottom))!important}
   .hwl-header{padding:calc(12px + env(safe-area-inset-top)) 16px 12px!important;gap:10px!important}
   .hwl-hero{padding:20px 18px!important}
   .hwl-hero-stats{margin-left:0!important;width:100%}
@@ -76,7 +79,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
   /* fixed block so the message list scrolls inside it (not the page) and the
      input bar stays visible. Subtract header + tab bar + BOTH safe-area insets
      so it fits above the bottom tab bar on notched phones. */
-  .hwl-chat-panel{height:calc(100dvh - 132px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;min-height:0}
+  .hwl-chat-panel{height:calc(100dvh - 144px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;min-height:0}
 
   /* prevent iOS zoom-on-focus: inputs must be >=16px */
   input,textarea,select{font-size:16px!important}

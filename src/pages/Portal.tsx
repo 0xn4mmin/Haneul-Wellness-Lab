@@ -144,24 +144,6 @@ export default function Portal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [be.configured, be.isAdmin, s.view, s.coachTargetId])
 
-  // keep the chat panel pinned to the visible viewport: --hdr (header height)
-  // + --kb (on-screen keyboard height) drive the fixed top/bottom on mobile
-  useEffect(() => {
-    const root = document.documentElement
-    const sync = () => {
-      const vv = window.visualViewport
-      const kb = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0
-      root.style.setProperty('--kb', kb + 'px')
-      const hdr = document.querySelector('.hwl-header') as HTMLElement | null
-      if (hdr) root.style.setProperty('--hdr', hdr.offsetHeight + 'px')
-    }
-    sync()
-    const vv = window.visualViewport
-    vv?.addEventListener('resize', sync); vv?.addEventListener('scroll', sync)
-    window.addEventListener('resize', sync); window.addEventListener('orientationchange', sync)
-    return () => { vv?.removeEventListener('resize', sync); vv?.removeEventListener('scroll', sync); window.removeEventListener('resize', sync); window.removeEventListener('orientationchange', sync) }
-  }, [])
-
   // on login / logout (user id changes — not on token refresh), land on the
   // default tab with no leftover detail view, modal, or draft from before
   const lastUserId = useRef<string | undefined>(undefined)
@@ -1315,7 +1297,7 @@ export default function Portal() {
 
           {/* ============ 그룹 채팅 ============ */}
           {s.view === 'chat' && (
-            <div className="hwl-chat-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 224px', gap: 20 }}>
+            <div className="hwl-chat-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 224px', gap: 20, animation: 'hwl-rise .4s ease both' }}>
               <section className="hwl-chat-panel" style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)', overflow: 'hidden' }}>
                 <div style={{ position: 'relative', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', zIndex: 6 }}>
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)', flexShrink: 0 }} />
@@ -1433,11 +1415,11 @@ export default function Portal() {
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     <input type="file" accept="image/*" disabled={be.configured && !activeRoom} onChange={(e) => { const f = e.target.files?.[0]; if (f) setChatImg(f); e.target.value = '' }} style={{ display: 'none' }} />
                   </label>
-                  <input value={s.newMsg} disabled={be.configured && !activeRoom} onChange={(e) => set({ newMsg: e.target.value })} onFocus={() => setTimeout(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, 320)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder={be.configured && !activeRoom ? '먼저 채팅방을 만들거나 입장하세요' : '메시지를 입력하세요…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1', opacity: be.configured && !activeRoom ? 0.5 : 1 }} />
+                  <input value={s.newMsg} disabled={be.configured && !activeRoom} onChange={(e) => set({ newMsg: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder={be.configured && !activeRoom ? '먼저 채팅방을 만들거나 입장하세요' : '메시지를 입력하세요…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1', opacity: be.configured && !activeRoom ? 0.5 : 1 }} />
                   <button onClick={sendMsg} style={{ all: 'unset', cursor: 'pointer', flex: 'none', width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg,#67D7DF,#2E9BA6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#060B17" strokeWidth="2"><path d="M4 12l16-7-7 16-2-7z" strokeLinejoin="round" /></svg></button>
                 </div>
               </section>
-              <aside className="hwl-chat-aside" style={{ ...card, borderRadius: 22, padding: 18, height: 'fit-content' }}>
+              <aside style={{ ...card, borderRadius: 22, padding: 18, height: 'fit-content' }}>
                 {activeRoom?.isPrivate && activeRoom.joinCode && (
                   <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid rgba(255,247,232,.1)' }}>
                     <div style={{ fontSize: 10.5, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 7 }}>입장 코드</div>

@@ -46,7 +46,7 @@ export default function InstallPrompt() {
   }
 
   return (
-    <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 300, display: 'flex', justifyContent: 'center', padding: '0 12px 12px', pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 300, display: 'flex', justifyContent: 'center', padding: '0 12px calc(12px + env(safe-area-inset-bottom))', pointerEvents: 'none' }}>
       <div style={{ pointerEvents: 'auto', width: '100%', maxWidth: 460, background: 'rgba(14,24,52,.92)', backdropFilter: 'blur(14px)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '13px 15px', boxShadow: '0 24px 60px -24px rgba(0,0,0,.8)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ fontSize: 22 }}>📲</div>

@@ -111,7 +111,7 @@ export default function Intro() {
         <div style={{ position: 'absolute', inset: 0, zIndex: 26, pointerEvents: 'none', background: 'radial-gradient(58% 90% at 50% 36%,rgba(6,9,20,.72) 0%,rgba(6,9,20,.2) 48%,transparent 72%),linear-gradient(180deg,rgba(6,9,20,.5) 0%,transparent 24%,transparent 52%,rgba(6,9,20,.85) 100%)' }} />
 
         {/* NAV */}
-        <nav style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 60, display: 'flex', alignItems: 'center', gap: 14, padding: '18px clamp(18px,4vw,40px)' }}>
+        <nav style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 60, display: 'flex', alignItems: 'center', gap: 14, padding: 'calc(18px + env(safe-area-inset-top)) clamp(18px,4vw,40px) 18px' }}>
           <a href={PORTAL} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 11, flex: 'none', minWidth: 0 }}>
             <img src="/assets/logo-mark.png" alt="로고" style={{ width: 36, height: 36, objectFit: 'contain', flex: 'none' }} />
             <span className="hwl-wordmark" style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 19, letterSpacing: '.4px', color: '#fff', whiteSpace: 'nowrap' }}>Haneul Wellness Lab</span>

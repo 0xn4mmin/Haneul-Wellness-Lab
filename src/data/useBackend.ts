@@ -49,6 +49,8 @@ export interface MessageView {
   readBy: string[]; readCount: number
 }
 export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null; isOwn: boolean }
+export interface SessionView extends api.ClassSession { seq: number; pkgTotal: number; pkgUsed: number; pkgRemaining: number }
+export interface PackageView extends api.ClassPackage { used: number; remaining: number }
 export interface ChallengeView { id: string; title: string; metrics: string[]; metricKeys: string[]; scope: string; startDate: string; endDate: string; daysLeft: number; isOwn: boolean }
 export interface ChallengeProgressItem { userId: string; name: string; initials: string; color: string; photo: string | null; metricKey: string; metricLabel: string; unit: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null; current: number | null; pct: number; weeklyPct: number; needsBaseline: boolean; hasWeekly: boolean; isMe: boolean }
 export interface ChallengeDetail {
@@ -130,11 +132,13 @@ export interface Backend {
   joinRoom: (code: string) => Promise<{ ok: boolean; reason?: string }>
   deleteRoom: (id: string) => Promise<void>
   renameRoom: (id: string, name: string) => Promise<void>
-  slots: api.ScheduleSlot[] | null
-  createSlot: (title: string, startsAt: string, durationMin: number, capacity: number, note: string | null) => Promise<void>
-  deleteSlot: (id: string) => Promise<void>
-  bookSlot: (id: string) => Promise<string>
-  cancelBooking: (id: string) => Promise<void>
+  sessions: SessionView[] | null
+  packages: PackageView[] | null
+  createSession: (s: { memberId: string | null; packageId: string | null; title: string; color: string; startsAt: string; durationMin: number }) => Promise<void>
+  updateSession: (id: string, fields: Parameters<typeof api.updateSession>[1]) => Promise<void>
+  deleteSession: (id: string) => Promise<void>
+  createPackage: (memberId: string, total: number, registeredOn: string, note: string | null) => Promise<void>
+  deletePackage: (id: string) => Promise<void>
   // challenges
   challenges: ChallengeView[] | null
   createChallenge: (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => Promise<void>
@@ -643,19 +647,42 @@ export function useBackend(): Backend {
     await reloadRooms()
   }, [reloadRooms])
 
-  // ── class schedule ──
-  const [slots, setSlots] = useState<api.ScheduleSlot[] | null>(null)
-  const reloadSlots = useCallback(async () => {
-    if (!supabase || !meId) { setSlots(null); return }
-    setSlots(await api.fetchSlots(meId))
+  // ── coach scheduler ──
+  const [sessions, setSessions] = useState<SessionView[] | null>(null)
+  const [packages, setPackages] = useState<PackageView[] | null>(null)
+  const reloadSchedule = useCallback(async () => {
+    if (!supabase || !meId) { setSessions(null); setPackages(null); return }
+    const dayMs = 86400000
+    const fromISO = new Date(Date.now() - 45 * dayMs).toISOString()
+    const toISO = new Date(Date.now() + 150 * dayMs).toISOString()
+    const [pkgs, pkgSess, winSess] = await Promise.all([api.fetchPackages(), api.fetchPackageSessions(), api.fetchSessions(fromISO, toISO)])
+    // per-package: usage + 회차 numbering (advance-cancels skipped)
+    const byPkg = new Map<string, { used: number; seq: Map<string, number> }>()
+    const grouped = new Map<string, typeof pkgSess>()
+    for (const s of pkgSess) { if (!s.packageId) continue; (grouped.get(s.packageId) ?? grouped.set(s.packageId, []).get(s.packageId)!).push(s) }
+    for (const [pid, list] of grouped) {
+      const ordered = [...list].sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      const seq = new Map<string, number>(); let n = 0; let used = 0
+      for (const s of ordered) {
+        if (s.status === 'cancelled') continue
+        n += 1; seq.set(s.id, n)
+        if (s.status === 'attended' || s.status === 'sameday_cancel') used += 1
+      }
+      byPkg.set(pid, { used, seq })
+    }
+    setPackages(pkgs.map((p) => { const u = byPkg.get(p.id)?.used ?? 0; return { ...p, used: u, remaining: p.totalSessions - u } }))
+    setSessions(winSess.map((s) => {
+      const pk = pkgs.find((p) => p.id === s.packageId)
+      const info = s.packageId ? byPkg.get(s.packageId) : undefined
+      return { ...s, seq: (s.packageId && info?.seq.get(s.id)) || 0, pkgTotal: pk?.totalSessions ?? 0, pkgUsed: info?.used ?? 0, pkgRemaining: pk ? pk.totalSessions - (info?.used ?? 0) : 0 }
+    }))
   }, [meId])
-  const createSlot = useCallback(async (title: string, startsAt: string, durationMin: number, capacity: number, note: string | null) => {
-    await api.createSlot(title, startsAt, durationMin, capacity, note); await reloadSlots()
-  }, [reloadSlots])
-  const deleteSlot = useCallback(async (id: string) => { await api.deleteSlot(id); await reloadSlots() }, [reloadSlots])
-  const bookSlot = useCallback(async (id: string) => { const { error } = await api.bookSlot(id); await reloadSlots(); return error ? error.message : '' }, [reloadSlots])
-  const cancelBooking = useCallback(async (id: string) => { await api.cancelBooking(id); await reloadSlots() }, [reloadSlots])
-  useEffect(() => { void reloadSlots() }, [reloadSlots, reloadKey])
+  const createSession = useCallback(async (s: { memberId: string | null; packageId: string | null; title: string; color: string; startsAt: string; durationMin: number }) => { await api.createSession(s); await reloadSchedule() }, [reloadSchedule])
+  const updateSession = useCallback(async (id: string, fields: Parameters<typeof api.updateSession>[1]) => { await api.updateSession(id, fields); await reloadSchedule() }, [reloadSchedule])
+  const deleteSession = useCallback(async (id: string) => { await api.deleteSession(id); await reloadSchedule() }, [reloadSchedule])
+  const createPackage = useCallback(async (memberId: string, total: number, registeredOn: string, note: string | null) => { await api.createPackage(memberId, total, registeredOn, note); await reloadSchedule() }, [reloadSchedule])
+  const deletePackage = useCallback(async (id: string) => { await api.deletePackage(id); await reloadSchedule() }, [reloadSchedule])
+  useEffect(() => { void reloadSchedule() }, [reloadSchedule, reloadKey])
 
   // ── challenges ──
   const createChallenge = useCallback(async (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => {
@@ -879,7 +906,7 @@ export function useBackend(): Backend {
     posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, onlineIds, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
-    slots, createSlot, deleteSlot, bookSlot, cancelBooking,
+    sessions, packages, createSession, updateSession, deleteSession, createPackage, deletePackage,
     challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,
     members, activeMember, openMember, closeMember, addMemberCheer,

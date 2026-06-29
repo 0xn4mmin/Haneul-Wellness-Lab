@@ -367,42 +367,61 @@ export async function renameRoom(roomId: string, name: string) {
   return requireSupabase().from('chat_rooms').update({ name: name.trim() }).eq('id', roomId)
 }
 
-// ───────────────────── class schedule ────────────────────
-export interface ScheduleSlot {
-  id: string; title: string; startsAt: string; durationMin: number; capacity: number; note: string | null
-  trainerName: string; bookedCount: number; mine: boolean
-  attendees: { userId: string; name: string; initials: string; color: string; photo: string | null }[]
+// ───────────────────── coach scheduler ────────────────────
+export type SessionStatus = 'scheduled' | 'attended' | 'sameday_cancel' | 'cancelled'
+export interface ClassSession {
+  id: string; trainerId: string; memberId: string | null; packageId: string | null
+  title: string; color: string; startsAt: string; durationMin: number; status: SessionStatus
+  memberName: string; memberInitials: string; memberColor: string; memberPhoto: string | null
 }
-/** Upcoming class slots (today onward) with booking info. */
-export async function fetchSlots(meId: string): Promise<ScheduleSlot[]> {
-  const sinceISO = new Date(Date.now() - 12 * 3600 * 1000).toISOString() // keep today's earlier slots visible
-  const { data } = await requireSupabase().from('class_slots')
-    .select('id, title, starts_at, duration_min, capacity, note, trainer:profiles!class_slots_trainer_id_fkey(name), bookings:class_bookings(user_id, attendee:profiles!class_bookings_user_id_fkey(name, initials, avatar_color, photo_path))')
-    .gte('starts_at', sinceISO).order('starts_at', { ascending: true })
-  return ((data ?? []) as any[]).map((s) => {
-    const bookings = (s.bookings ?? []) as any[]
-    return {
-      id: s.id, title: s.title, startsAt: s.starts_at, durationMin: s.duration_min, capacity: s.capacity, note: s.note ?? null,
-      trainerName: (Array.isArray(s.trainer) ? s.trainer[0] : s.trainer)?.name ?? '트레이너',
-      bookedCount: bookings.length, mine: bookings.some((b) => b.user_id === meId),
-      attendees: bookings.map((b) => { const p = Array.isArray(b.attendee) ? b.attendee[0] : b.attendee; return { userId: b.user_id, name: p?.name ?? '', initials: p?.initials ?? '', color: p?.avatar_color ?? '#5E97A0', photo: avatarUrl(p?.photo_path) } }),
-    }
-  })
+export interface ClassPackage {
+  id: string; memberId: string; memberName: string; memberInitials: string; memberColor: string; memberPhoto: string | null
+  totalSessions: number; registeredOn: string; note: string | null
 }
-export async function createSlot(title: string, startsAt: string, durationMin: number, capacity: number, note: string | null) {
+const mp = (raw: any) => (Array.isArray(raw) ? raw[0] : raw)
+
+/** All sessions in [fromISO, toISO) the caller can see, with member info. */
+export async function fetchSessions(fromISO: string, toISO: string): Promise<ClassSession[]> {
+  const { data } = await requireSupabase().from('class_sessions')
+    .select('id, trainer_id, member_id, package_id, title, color, starts_at, duration_min, status, member:profiles!class_sessions_member_id_fkey(name, initials, avatar_color, photo_path)')
+    .gte('starts_at', fromISO).lt('starts_at', toISO).order('starts_at', { ascending: true })
+  return ((data ?? []) as any[]).map((s) => { const m = mp(s.member); return {
+    id: s.id, trainerId: s.trainer_id, memberId: s.member_id, packageId: s.package_id,
+    title: s.title, color: s.color, startsAt: s.starts_at, durationMin: s.duration_min, status: s.status as SessionStatus,
+    memberName: m?.name ?? '', memberInitials: m?.initials ?? '', memberColor: m?.avatar_color ?? '#5E97A0', memberPhoto: avatarUrl(m?.photo_path),
+  } })
+}
+/** Every session for a package (used to number them / count usage). */
+export async function fetchPackageSessions(): Promise<{ id: string; packageId: string | null; startsAt: string; status: SessionStatus }[]> {
+  const { data } = await requireSupabase().from('class_sessions')
+    .select('id, package_id, starts_at, status').not('package_id', 'is', null).order('starts_at', { ascending: true })
+  return ((data ?? []) as any[]).map((s) => ({ id: s.id, packageId: s.package_id, startsAt: s.starts_at, status: s.status as SessionStatus }))
+}
+export async function fetchPackages(): Promise<ClassPackage[]> {
+  const { data } = await requireSupabase().from('class_packages')
+    .select('id, member_id, total_sessions, registered_on, note, member:profiles!class_packages_member_id_fkey(name, initials, avatar_color, photo_path)')
+    .order('registered_on', { ascending: false })
+  return ((data ?? []) as any[]).map((p) => { const m = mp(p.member); return {
+    id: p.id, memberId: p.member_id, totalSessions: p.total_sessions, registeredOn: p.registered_on, note: p.note ?? null,
+    memberName: m?.name ?? '', memberInitials: m?.initials ?? '', memberColor: m?.avatar_color ?? '#5E97A0', memberPhoto: avatarUrl(m?.photo_path),
+  } })
+}
+export async function createSession(s: { memberId: string | null; packageId: string | null; title: string; color: string; startsAt: string; durationMin: number }) {
   const me = await uid()
-  return requireSupabase().from('class_slots').insert({ trainer_id: me, title: title.trim() || 'PT 세션', starts_at: startsAt, duration_min: durationMin, capacity, note: note?.trim() || null })
+  return requireSupabase().from('class_sessions').insert({ trainer_id: me, member_id: s.memberId, package_id: s.packageId, title: s.title.trim() || 'PT', color: s.color, starts_at: s.startsAt, duration_min: s.durationMin })
 }
-export async function deleteSlot(slotId: string) {
-  return requireSupabase().from('class_slots').delete().eq('id', slotId)
+export async function updateSession(id: string, fields: Partial<{ title: string; color: string; starts_at: string; duration_min: number; member_id: string | null; package_id: string | null; status: SessionStatus }>) {
+  return requireSupabase().from('class_sessions').update(fields).eq('id', id)
 }
-export async function bookSlot(slotId: string) {
+export async function deleteSession(id: string) {
+  return requireSupabase().from('class_sessions').delete().eq('id', id)
+}
+export async function createPackage(memberId: string, totalSessions: number, registeredOn: string, note: string | null) {
   const me = await uid()
-  return requireSupabase().from('class_bookings').insert({ slot_id: slotId, user_id: me })
+  return requireSupabase().from('class_packages').insert({ member_id: memberId, trainer_id: me, total_sessions: totalSessions, registered_on: registeredOn, note: note?.trim() || null })
 }
-export async function cancelBooking(slotId: string) {
-  const me = await uid()
-  return requireSupabase().from('class_bookings').delete().eq('slot_id', slotId).eq('user_id', me)
+export async function deletePackage(id: string) {
+  return requireSupabase().from('class_packages').delete().eq('id', id)
 }
 
 /** Joins a (possibly private) room by its code. */

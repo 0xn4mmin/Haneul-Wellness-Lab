@@ -23,6 +23,17 @@ function fmtActive(iso: string | null): string | null {
   return `${Math.floor(hr / 24)}일 전 활동`
 }
 
+// ── scheduler date helpers (browser-local) ──
+const WD = ['일', '월', '화', '수', '목', '금', '토']
+const SLOT_COLORS = ['#2E9BA6', '#67D7DF', '#8FD89E', '#E0B86A', '#E0875C', '#B98BD9', '#E082A8', '#7C8AAE']
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const parseYMD = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1) }
+const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
+const weekStart = (d: Date) => addDays(d, -((d.getDay() + 6) % 7)) // Monday
+const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
+const STATUS_LABEL: Record<string, string> = { scheduled: '예정', attended: '출석', sameday_cancel: '당일취소', cancelled: '취소' }
+const STATUS_COLOR: Record<string, string> = { scheduled: '#9DAFCB', attended: '#7BD88F', sameday_cancel: '#E0875C', cancelled: 'rgba(157,175,203,.5)' }
+
 const card: React.CSSProperties = {
   background: 'rgba(255,255,255,.045)', border: '1px solid rgba(255,255,255,.1)',
   backdropFilter: 'blur(7px)', borderRadius: 24,
@@ -71,8 +82,12 @@ export default function Portal() {
   const [roomMenu, setRoomMenu] = useState(false)
   const [memberList, setMemberList] = useState(false)
   const [commTab, setCommTab] = useState<'feed' | 'challenge' | 'members'>('feed')
-  const [slotForm, setSlotForm] = useState({ date: '', time: '', title: 'PT 세션', cap: '1', note: '' })
-  const [slotErr, setSlotErr] = useState('')
+  const [schedView, setSchedView] = useState<'week' | 'month'>('week')
+  const [schedAnchor, setSchedAnchor] = useState('')   // YYYY-MM-DD reference; '' = today
+  const [schedDay, setSchedDay] = useState('')          // selected day in month view
+  const [sessForm, setSessForm] = useState<null | { id?: string; memberId: string; packageId: string; title: string; color: string; date: string; time: string; dur: string; status: string }>(null)
+  const [pkgForm, setPkgForm] = useState<null | { memberId: string; total: string; date: string; note: string }>(null)
+  const [schedErr, setSchedErr] = useState('')
   const [chProgInfo, setChProgInfo] = useState(false)
   const [notifPerm, setNotifPerm] = useState<string>(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
   const [editNoteId, setEditNoteId] = useState<string | null>(null)
@@ -1670,6 +1685,96 @@ export default function Portal() {
             </div>
           )}
 
+          {/* 수업 추가/수정 모달 (코치) */}
+          {sessForm && (() => {
+            const f = sessForm
+            const memberPkgs = (be.packages ?? []).filter((p) => p.memberId === f.memberId)
+            const canSave = !!f.date && !!f.time
+            const save = () => {
+              if (!canSave) { setSchedErr('날짜·시간을 입력하세요.'); return }
+              const startsAt = new Date(`${f.date}T${f.time}`).toISOString()
+              const dur = parseInt(f.dur, 10) || 50
+              const done = () => setSessForm(null)
+              if (f.id) void be.updateSession(f.id, { title: f.title, color: f.color, starts_at: startsAt, duration_min: dur, member_id: f.memberId || null, package_id: f.packageId || null, status: f.status as never }).then(done).catch((e) => setSchedErr(e instanceof Error ? e.message : '저장 실패'))
+              else void be.createSession({ memberId: f.memberId || null, packageId: f.packageId || null, title: f.title, color: f.color, startsAt, durationMin: dur }).then(done).catch((e) => setSchedErr(e instanceof Error ? e.message : '저장 실패'))
+            }
+            return (
+              <div onClick={() => setSessForm(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 124, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
+                <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto', background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                  <div style={eyebrow}>Class</div><div style={cardTitle}>{f.id ? '수업 수정' : '수업 추가'}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 11, marginTop: 14 }}>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>회원</label>
+                      <select value={f.memberId} onChange={(e) => setSessForm({ ...f, memberId: e.target.value, packageId: '' })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }}>
+                        <option value="">선택 안 함</option>
+                        {(be.roster ?? []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    </div>
+                    {f.memberId && (
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>회차권 연결 (시수 차감)</label>
+                        <select value={f.packageId} onChange={(e) => setSessForm({ ...f, packageId: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }}>
+                          <option value="">연결 안 함</option>
+                          {memberPkgs.map((p) => <option key={p.id} value={p.id}>{p.totalSessions}회권 · {p.remaining}회 남음 ({p.registeredOn.replace(/-/g, '.')})</option>)}
+                        </select>
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: 9 }}>
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>날짜</label><input type="date" value={f.date} onChange={(e) => setSessForm({ ...f, date: e.target.value })} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 8px', fontSize: 13 }} /></div>
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>시간</label><input type="time" value={f.time} onChange={(e) => setSessForm({ ...f, time: e.target.value })} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 8px', fontSize: 13 }} /></div>
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>분</label><input type="number" value={f.dur} onChange={(e) => setSessForm({ ...f, dur: e.target.value })} style={{ ...inputStyle, padding: '9px 8px', fontSize: 13 }} /></div>
+                    </div>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>수업명</label><input value={f.title} onChange={(e) => setSessForm({ ...f, title: e.target.value })} placeholder="예) PT, 그룹 클래스" style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>색상</label>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{SLOT_COLORS.map((c) => <button key={c} onClick={() => setSessForm({ ...f, color: c })} style={{ all: 'unset', cursor: 'pointer', width: 26, height: 26, borderRadius: '50%', background: c, boxShadow: f.color === c ? '0 0 0 2px #0E1834, 0 0 0 4px #fff' : 'none' }} />)}</div>
+                    </div>
+                    {f.id && (
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>상태</label>
+                        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>{(['scheduled', 'attended', 'sameday_cancel', 'cancelled'] as const).map((st) => <button key={st} onClick={() => setSessForm({ ...f, status: st })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '7px 12px', borderRadius: 10, background: f.status === st ? STATUS_COLOR[st] : 'rgba(255,255,255,.05)', color: f.status === st ? '#060B17' : '#9DAFCB', border: '1px solid rgba(255,255,255,.1)' }}>{STATUS_LABEL[st]}</button>)}</div>
+                        <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginTop: 5 }}>출석·당일취소는 시수 1회 차감, 일반 취소는 차감 안 됨.</div>
+                      </div>
+                    )}
+                  </div>
+                  {schedErr && <div style={{ fontSize: 12, color: '#E0A06A', marginTop: 10 }}>{schedErr}</div>}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                    {f.id && <button onClick={() => { if (confirm('이 수업을 삭제할까요?')) void be.deleteSession(f.id!).then(() => setSessForm(null)) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#E0875C', background: 'rgba(224,138,94,.12)', border: '1px solid rgba(224,138,94,.3)', padding: '12px 16px', borderRadius: 22 }}>삭제</button>}
+                    <button onClick={() => setSessForm(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '12px 18px', borderRadius: 22 }}>취소</button>
+                    <button onClick={save} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 12, borderRadius: 22 }}>저장</button>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* 회차권 등록 모달 (코치) */}
+          {pkgForm && (() => {
+            const f = pkgForm
+            const total = parseInt(f.total, 10)
+            const canSave = !!f.memberId && !isNaN(total) && total >= 1 && !!f.date
+            return (
+              <div onClick={() => setPkgForm(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 124, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
+                <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                  <div style={eyebrow}>Session Pass</div><div style={cardTitle}>회차권 등록</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 11, marginTop: 14 }}>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>회원</label>
+                      <select value={f.memberId} onChange={(e) => setPkgForm({ ...f, memberId: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }}>
+                        <option value="">회원 선택</option>
+                        {(be.roster ?? []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>총 횟수</label><input type="number" min="1" value={f.total} onChange={(e) => setPkgForm({ ...f, total: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>등록일</label><input type="date" value={f.date} onChange={(e) => setPkgForm({ ...f, date: e.target.value })} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 8px', fontSize: 13 }} /></div>
+                    </div>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>메모(선택)</label><input value={f.note} onChange={(e) => setPkgForm({ ...f, note: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                    <button onClick={() => setPkgForm(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '12px 18px', borderRadius: 22 }}>취소</button>
+                    <button disabled={!canSave} onClick={() => { void be.createPackage(f.memberId, total, f.date, f.note).then(() => setPkgForm(null)) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSave ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSave ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>등록</button>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* 측정값 수정 모달 */}
           {measEdit && (
             <div onClick={() => setMeasEdit(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 122, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
@@ -2046,79 +2151,125 @@ export default function Portal() {
 
           {/* ============ 수업 스케줄 ============ */}
           {s.view === 'schedule' && (
-            <div style={{ maxWidth: 720, margin: '0 auto', animation: 'hwl-rise .4s ease both' }}>
+            <div style={{ maxWidth: 880, margin: '0 auto', animation: 'hwl-rise .4s ease both' }}>
               {!be.configured && (
                 <section style={{ ...card, borderRadius: 22, padding: '24px 22px', textAlign: 'center' }}>
                   <div style={eyebrow}>Schedule</div>
-                  <div style={{ fontSize: 14, color: 'rgba(231,239,234,.6)', marginTop: 8, lineHeight: 1.6 }}>로그인하면 트레이너가 올린 수업 일정을 보고 예약할 수 있어요.</div>
+                  <div style={{ fontSize: 14, color: 'rgba(231,239,234,.6)', marginTop: 8, lineHeight: 1.6 }}>로그인하면 수업 일정을 달력에서 확인할 수 있어요.</div>
                 </section>
               )}
-              {be.configured && be.isAdmin && (() => {
-                const cap = parseInt(slotForm.cap, 10)
-                const canAdd = !!slotForm.date && !!slotForm.time && !isNaN(cap) && cap >= 1
-                const addSlot = () => {
-                  if (!canAdd) { setSlotErr('날짜·시간·정원을 확인하세요.'); return }
-                  const iso = new Date(`${slotForm.date}T${slotForm.time}`).toISOString()
-                  void be.createSlot(slotForm.title, iso, 50, cap, slotForm.note).then(() => { setSlotForm({ date: '', time: '', title: 'PT 세션', cap: '1', note: '' }); setSlotErr('') }).catch((e) => setSlotErr(e instanceof Error ? e.message : '추가 실패'))
-                }
-                return (
-                  <section style={{ ...card, borderRadius: 22, padding: 20, marginBottom: 18 }}>
-                    <div style={eyebrow}>New Class</div><div style={cardTitle}>수업 추가</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
-                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>날짜</label><input type="date" value={slotForm.date} onChange={(e) => setSlotForm((f) => ({ ...f, date: e.target.value }))} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 11px', fontSize: 13 }} /></div>
-                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>시간</label><input type="time" value={slotForm.time} onChange={(e) => setSlotForm((f) => ({ ...f, time: e.target.value }))} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 11px', fontSize: 13 }} /></div>
-                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>수업명</label><input value={slotForm.title} onChange={(e) => setSlotForm((f) => ({ ...f, title: e.target.value }))} placeholder="예) PT 세션" style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
-                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>정원</label><input type="number" min="1" value={slotForm.cap} onChange={(e) => setSlotForm((f) => ({ ...f, cap: e.target.value }))} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
-                    </div>
-                    <input value={slotForm.note} onChange={(e) => setSlotForm((f) => ({ ...f, note: e.target.value }))} placeholder="메모(선택) — 장소·준비물 등" style={{ ...inputStyle, padding: '9px 11px', fontSize: 13, marginTop: 10 }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-                      <button disabled={!canAdd} onClick={addSlot} style={{ all: 'unset', cursor: canAdd ? 'pointer' : 'not-allowed', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: canAdd ? CTA : 'rgba(103,215,223,.3)', padding: '10px 22px', borderRadius: 22 }}>수업 추가</button>
-                      <span style={{ fontSize: 12, color: '#E0A06A' }}>{slotErr}</span>
-                    </div>
-                  </section>
+              {be.configured && (() => {
+                const isCoach = be.isAdmin
+                const sessions = be.sessions ?? []
+                const anchor = schedAnchor ? parseYMD(schedAnchor) : new Date()
+                const todayY = ymd(new Date())
+                const byDay = new Map<string, typeof sessions>()
+                for (const ss of sessions) { const k = ymd(new Date(ss.startsAt)); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k)!.push(ss) }
+                const dayList = (k: string) => [...(byDay.get(k) ?? [])].sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+                const lowPkgs = (be.packages ?? []).filter((p) => p.remaining <= 2 && p.remaining >= 0)
+                const ws = weekStart(anchor)
+                const week = Array.from({ length: 7 }, (_, i) => addDays(ws, i))
+                const mFirst = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
+                const grid = Array.from({ length: 42 }, (_, i) => addDays(weekStart(mFirst), i))
+                const rangeLabel = schedView === 'week'
+                  ? `${ws.getMonth() + 1}.${ws.getDate()} – ${addDays(ws, 6).getMonth() + 1}.${addDays(ws, 6).getDate()}`
+                  : `${anchor.getFullYear()}.${String(anchor.getMonth() + 1).padStart(2, '0')}`
+                const shift = (dir: number) => setSchedAnchor(ymd(schedView === 'week' ? addDays(anchor, dir * 7) : new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1)))
+                const editSess = (ss: typeof sessions[number]) => { setSchedErr(''); setSessForm({ id: ss.id, memberId: ss.memberId || '', packageId: ss.packageId || '', title: ss.title, color: ss.color, date: ymd(new Date(ss.startsAt)), time: hhmm(ss.startsAt), dur: String(ss.durationMin), status: ss.status }) }
+                const openNew = (dateStr?: string) => { setSchedErr(''); setSessForm({ memberId: '', packageId: '', title: 'PT', color: SLOT_COLORS[0], date: dateStr || todayY, time: '10:00', dur: '50', status: 'scheduled' }) }
+                const SessCard = (ss: typeof sessions[number]) => (
+                  <button key={ss.id} onClick={() => isCoach && editSess(ss)} style={{ all: 'unset', cursor: isCoach ? 'pointer' : 'default', display: 'flex', gap: 9, alignItems: 'stretch', width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 11, padding: '8px 11px', opacity: ss.status === 'cancelled' ? 0.5 : 1 }}>
+                    <span style={{ width: 4, borderRadius: 4, background: ss.color, flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#9FE2E8' }}>{hhmm(ss.startsAt)}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#EAF3F1', textDecoration: ss.status === 'cancelled' ? 'line-through' : 'none' }}>{ss.title}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 700, color: STATUS_COLOR[ss.status], background: 'rgba(255,255,255,.06)', borderRadius: 6, padding: '0 5px' }}>{STATUS_LABEL[ss.status]}</span>
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontSize: 11, color: 'rgba(231,239,234,.5)' }}>
+                        {ss.memberName && <span>{ss.memberName}</span>}
+                        {ss.packageId && ss.pkgTotal > 0 && <span style={{ color: ss.pkgRemaining <= 2 ? '#E0875C' : '#67D7DF', fontFamily: "'IBM Plex Mono',monospace" }}>{ss.pkgTotal}회 중 {ss.seq}회차</span>}
+                      </span>
+                    </span>
+                  </button>
                 )
-              })()}
-              {be.configured && (be.slots == null || be.slots.length === 0) && (
-                <section style={{ ...card, borderRadius: 22, padding: '26px 22px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 14, color: 'rgba(231,239,234,.6)', lineHeight: 1.6 }}>예정된 수업이 없어요.{be.isAdmin ? '' : '\n트레이너가 일정을 올리면 여기에서 예약할 수 있어요.'}</div>
-                </section>
-              )}
-              {be.configured && be.slots && be.slots.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {be.slots.map((sl) => {
-                    const d = new Date(sl.startsAt); const days = ['일', '월', '화', '수', '목', '금', '토']
-                    const when = `${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]}) ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-                    const full = sl.bookedCount >= sl.capacity
-                    return (
-                      <section key={sl.id} style={{ ...card, borderRadius: 18, padding: 16 }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: 15, fontWeight: 700, color: '#EAF3F1' }}>{sl.title}</span>
-                              <span style={{ fontSize: 10.5, fontWeight: 600, color: full ? '#E0A06A' : '#67D7DF', background: full ? 'rgba(224,138,94,.16)' : 'rgba(46,155,166,.16)', borderRadius: 8, padding: '1px 8px' }}>{sl.bookedCount}/{sl.capacity}{full ? ' 마감' : ''}</span>
-                              {sl.mine && <span style={{ fontSize: 10.5, fontWeight: 700, color: '#060B17', background: '#7BD88F', borderRadius: 8, padding: '1px 8px' }}>예약됨</span>}
+                return (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                      <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,.12)' }}>
+                        {(['week', 'month'] as const).map((v) => <button key={v} onClick={() => setSchedView(v)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '7px 14px', background: schedView === v ? '#2E9BA6' : 'transparent', color: schedView === v ? '#060B17' : '#9DAFCB' }}>{v === 'week' ? '주간' : '월간'}</button>)}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <button onClick={() => shift(-1)} style={{ all: 'unset', cursor: 'pointer', width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9DAFCB', background: 'rgba(255,255,255,.05)' }}>‹</button>
+                        <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: '#EAF3F1', minWidth: 96, textAlign: 'center' }}>{rangeLabel}</span>
+                        <button onClick={() => shift(1)} style={{ all: 'unset', cursor: 'pointer', width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9DAFCB', background: 'rgba(255,255,255,.05)' }}>›</button>
+                        <button onClick={() => { setSchedAnchor(''); setSchedDay('') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#9DAFCB', padding: '6px 10px' }}>오늘</button>
+                      </div>
+                      {isCoach && <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                        <button onClick={() => setPkgForm({ memberId: '', total: '10', date: todayY, note: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9FE2E8', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '7px 14px' }}>회차권 등록</button>
+                        <button onClick={() => openNew()} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, borderRadius: 18, padding: '7px 16px' }}>+ 수업</button>
+                      </div>}
+                    </div>
+
+                    {isCoach && lowPkgs.length > 0 && (
+                      <div style={{ marginBottom: 14, padding: '11px 14px', borderRadius: 12, background: 'rgba(224,160,106,.12)', border: '1px solid rgba(224,160,106,.3)', fontSize: 12.5, color: '#F2C28A', lineHeight: 1.6 }}>
+                        <b>재등록 임박</b> · {lowPkgs.map((p) => `${p.memberName}(${p.remaining}회 남음)`).join(', ')}
+                      </div>
+                    )}
+
+                    {schedView === 'week' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {week.map((d) => { const k = ymd(d); const list = dayList(k); const isToday = k === todayY; return (
+                          <section key={k} style={{ ...card, borderRadius: 14, padding: '12px 14px', borderColor: isToday ? 'rgba(103,215,223,.4)' : undefined }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: list.length ? 9 : 0 }}>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: isToday ? '#67D7DF' : '#EAF3F1' }}>{d.getMonth() + 1}.{d.getDate()} <span style={{ color: d.getDay() === 0 ? '#E0875C' : d.getDay() === 6 ? '#67D7DF' : 'rgba(231,239,234,.5)' }}>({WD[d.getDay()]})</span>{isToday && <span style={{ fontSize: 10, color: '#67D7DF', marginLeft: 6 }}>오늘</span>}</span>
+                              {isCoach && <button onClick={() => openNew(k)} style={{ all: 'unset', cursor: 'pointer', fontSize: 16, color: 'rgba(157,175,203,.7)', lineHeight: 1 }}>+</button>}
                             </div>
-                            <div style={{ fontSize: 13, color: '#9FE2E8', marginTop: 4, fontFamily: "'IBM Plex Mono',monospace" }}>{when} · {sl.durationMin}분</div>
-                            <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>{sl.trainerName} 코치{sl.note ? ` · ${sl.note}` : ''}</div>
-                            {sl.attendees.length > 0 && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: -6, marginTop: 9 }}>
-                                {sl.attendees.slice(0, 6).map((a) => <span key={a.userId} style={{ marginRight: -6 }} title={a.name}><Avatar initials={a.initials} color={a.color} photo={a.photo} size={26} fontSize={9.5} /></span>)}
-                                {be.isAdmin && <span style={{ fontSize: 11, color: 'rgba(231,239,234,.5)', marginLeft: 12 }}>{sl.attendees.map((a) => a.name).join(', ')}</span>}
-                              </div>
-                            )}
+                            {list.length === 0 ? <div style={{ fontSize: 12, color: 'rgba(231,239,234,.3)' }}>{isCoach ? '' : '수업 없음'}</div> : <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>{list.map(SessCard)}</div>}
+                          </section>
+                        ) })}
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ ...card, borderRadius: 16, padding: 12 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 6 }}>
+                            {WD.map((w, i) => <div key={w} style={{ textAlign: 'center', fontSize: 10.5, fontWeight: 600, color: i === 0 ? '#E0875C' : i === 6 ? '#67D7DF' : 'rgba(231,239,234,.45)' }}>{w}</div>)}
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flexShrink: 0 }}>
-                            {sl.mine
-                              ? <button onClick={() => void be.cancelBooking(sl.id)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, textAlign: 'center', color: '#E0A06A', background: 'rgba(224,138,94,.12)', border: '1px solid rgba(224,138,94,.3)', padding: '8px 16px', borderRadius: 18 }}>예약 취소</button>
-                              : <button disabled={full} onClick={() => { void be.bookSlot(sl.id).then((err) => { if (err) alert('이미 마감되었거나 예약에 실패했어요.') }) }} style={{ all: 'unset', cursor: full ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, textAlign: 'center', color: '#060B17', background: full ? 'rgba(103,215,223,.3)' : CTA, padding: '8px 18px', borderRadius: 18 }}>{full ? '마감' : '예약하기'}</button>}
-                            {be.isAdmin && <button onClick={() => { if (confirm(`'${sl.title}' 수업을 삭제할까요?`)) void be.deleteSlot(sl.id) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, textAlign: 'center', color: 'rgba(224,160,106,.8)', padding: '4px 0' }}>삭제</button>}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
+                            {grid.map((d) => { const k = ymd(d); const list = dayList(k); const inMonth = d.getMonth() === anchor.getMonth(); const isToday = k === todayY; const selected = k === schedDay; return (
+                              <button key={k} onClick={() => setSchedDay(k)} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', minHeight: 46, padding: '4px 3px', borderRadius: 9, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: selected ? 'rgba(46,155,166,.2)' : isToday ? 'rgba(46,155,166,.08)' : 'transparent', border: `1px solid ${selected ? 'rgba(103,215,223,.5)' : 'transparent'}`, opacity: inMonth ? 1 : 0.35 }}>
+                                <span style={{ fontSize: 11.5, fontWeight: isToday ? 700 : 500, color: isToday ? '#67D7DF' : d.getDay() === 0 ? '#E0875C' : '#EAF3F1' }}>{d.getDate()}</span>
+                                <span style={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>{list.slice(0, 4).map((ss) => <span key={ss.id} style={{ width: 5, height: 5, borderRadius: '50%', background: ss.color }} />)}</span>
+                              </button>
+                            ) })}
                           </div>
                         </div>
+                        {schedDay && (
+                          <section style={{ ...card, borderRadius: 14, padding: '12px 14px', marginTop: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: '#EAF3F1' }}>{parseYMD(schedDay).getMonth() + 1}.{parseYMD(schedDay).getDate()} ({WD[parseYMD(schedDay).getDay()]})</span>
+                              {isCoach && <button onClick={() => openNew(schedDay)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, borderRadius: 16, padding: '5px 13px' }}>+ 수업</button>}
+                            </div>
+                            {dayList(schedDay).length === 0 ? <div style={{ fontSize: 12, color: 'rgba(231,239,234,.35)' }}>수업 없음</div> : <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>{dayList(schedDay).map(SessCard)}</div>}
+                          </section>
+                        )}
+                      </>
+                    )}
+
+                    {!isCoach && (be.packages ?? []).length > 0 && (
+                      <section style={{ ...card, borderRadius: 16, padding: 16, marginTop: 16 }}>
+                        <div style={eyebrow}>My Pass</div>
+                        {(be.packages ?? []).map((p) => (
+                          <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+                            <div><div style={{ fontSize: 13.5, fontWeight: 700, color: '#EAF3F1' }}>{p.totalSessions}회권</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)' }}>등록 {p.registeredOn.replace(/-/g, '.')}</div></div>
+                            <div style={{ textAlign: 'right' }}><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 22, color: p.remaining <= 2 ? '#E0875C' : '#67D7DF' }}>{p.remaining}<span style={{ fontSize: 12, color: 'rgba(231,239,234,.4)' }}> / {p.totalSessions}</span></div><div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)' }}>남은 시수</div></div>
+                          </div>
+                        ))}
                       </section>
-                    )
-                  })}
-                </div>
-              )}
+                    )}
+                  </>
+                )
+              })()}
             </div>
           )}
 

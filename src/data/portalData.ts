@@ -176,9 +176,10 @@ export function buildTrend(
   const improved = (m.good === 'up') ? diff >= 0 : diff <= 0
   const dec = (m.unit === '%' || ['smm', 'tbw', 'bodyFatMass', 'weight', 'bmi'].includes(selectedMetric)) ? 1 : 0
   const sign = diff > 0 ? '+' : ''
+  const firstLabel = (datesData[0] ?? '').split(' ')[0] || '처음'
   return {
     title: m.label, latest: last + (m.unit ? ' ' + m.unit : ''), line, area, pts, grid,
-    deltaText: '1월 대비 ' + sign + diff.toFixed(dec),
+    deltaText: firstLabel + ' 대비 ' + sign + diff.toFixed(dec),
     deltaColor: improved ? '#67D7DF' : '#E0A06A',
     deltaBg: improved ? 'rgba(46,155,166,.18)' : 'rgba(224,138,94,.2)',
   }

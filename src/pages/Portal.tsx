@@ -57,6 +57,7 @@ export default function Portal() {
   const [chEnd, setChEnd] = useState('')
   const [editChallengeId, setEditChallengeId] = useState<string | null>(null)
   const [roomMenu, setRoomMenu] = useState(false)
+  const [chProgInfo, setChProgInfo] = useState(false)
   const [editNoteId, setEditNoteId] = useState<string | null>(null)
   const [editNoteText, setEditNoteText] = useState('')
   const [measEdit, setMeasEdit] = useState<{ id: string; date: string; iso: string; values: Record<string, string> } | null>(null)
@@ -961,7 +962,7 @@ export default function Portal() {
                 </svg>
                 <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginTop: 8, fontSize: 11, color: 'rgba(231,239,234,.5)' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 3, background: '#67D7DF', borderRadius: 2 }} />현재</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 0, borderTop: '2px dashed #C9A24B' }} />1월</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 0, borderTop: '2px dashed #C9A24B' }} />{(D[0] ?? '').split(' ')[0] || '처음'}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7BD88F' }} />Good</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#E0875C' }} />Bad</span>
                 </div>
@@ -1124,7 +1125,7 @@ export default function Portal() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
                   {be.challenges.map((c) => (
                     <div key={c.id} style={{ ...card, borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <button onClick={() => { setCgMetric(''); setCgTarget(''); setCgMode('relative'); setInviteOpen(false); setMemberQuery(''); be.openChallenge(c) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                      <button onClick={() => { setCgMetric(''); setCgTarget(''); setCgMode('relative'); setInviteOpen(false); setMemberQuery(''); setChProgInfo(false); be.openChallenge(c) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 14, fontWeight: 700, color: '#EAF3F1' }}>{c.title}</span>
                           <span style={{ fontSize: 10, fontWeight: 600, color: '#67D7DF', background: 'rgba(103,215,223,.14)', borderRadius: 8, padding: '1px 7px' }}>D-{c.daysLeft}</span>
@@ -1654,7 +1655,15 @@ export default function Portal() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="#F2C94C"><path d="M5 16l-2-9 5 4 4-7 4 7 5-4-2 9z" /></svg>
                       <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>전체 성취도 · 순위</div>
+                      <button onClick={() => setChProgInfo((v) => !v)} aria-label="성취도 계산 설명" style={{ all: 'unset', cursor: 'pointer', width: 15, height: 15, borderRadius: '50%', border: `1px solid ${chProgInfo ? '#67D7DF' : 'rgba(157,175,203,.5)'}`, color: chProgInfo ? '#67D7DF' : 'rgba(157,175,203,.7)', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>i</button>
                     </div>
+                    {chProgInfo && (
+                      <div style={{ fontSize: 11.5, lineHeight: 1.65, color: 'rgba(231,239,234,.72)', background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.2)', borderRadius: 10, padding: '10px 13px', marginBottom: 12 }}>
+                        <b style={{ color: '#9FE2E8' }}>전체 성취도</b> = 목표 설정 시점의 내 수치(기준값)에서 현재까지 목표에 얼마나 다가갔는지. <span style={{ fontFamily: "'IBM Plex Mono',monospace" }}>(현재−기준) ÷ (목표−기준) × 100</span>, 0~100%.<br />
+                        <b style={{ color: '#9FE2E8' }}>이번 주 성취도</b> = 직전 측정 → 최근 측정 사이의 진행분을 목표 대비 비율로. <span style={{ fontFamily: "'IBM Plex Mono',monospace" }}>(현재−직전) ÷ (목표−기준) × 100</span>.<br />
+                        <span style={{ color: 'rgba(231,239,234,.5)' }}>‘변화’ 목표(예: 체지방 −3)는 목표−기준을 그 변화량으로, ‘달성’ 목표(예: 골격근 35)는 목표값을 그대로 씁니다. 측정값이 새로 들어올 때마다 갱신돼요.</span>
+                      </div>
+                    )}
                     {board((p) => p.pct)}
                   </div>
                   {/* 이번 주 성취도 (하단) */}

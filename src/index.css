@@ -76,10 +76,19 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
   .hwl-hero{padding:20px 18px!important}
   .hwl-hero-stats{margin-left:0!important;width:100%}
   .hwl-roster-inner{min-width:560px}
-  /* fixed block so the message list scrolls inside it (not the page) and the
-     input bar stays visible. Subtract header + tab bar + BOTH safe-area insets
-     so it fits above the bottom tab bar on notched phones. */
-  .hwl-chat-panel{height:calc(100dvh - 144px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;min-height:0}
+  /* Pin the chat panel to the visible (visual) viewport: from just below the
+     app header down to the keyboard top (when open) or the tab bar (when
+     closed). --hdr = header height, --kb = keyboard height; both set in JS.
+     This keeps the message list + input bar fully on screen and puts the
+     input right above the keyboard. */
+  .hwl-chat-panel{
+    position:fixed!important; left:0; right:0; z-index:10;
+    top:var(--hdr,54px);
+    bottom:max(calc(54px + env(safe-area-inset-bottom)), var(--kb,0px));
+    height:auto!important; min-height:0; margin:0!important;
+    border-radius:0!important; border-left:none; border-right:none;
+  }
+  .hwl-chat-aside{display:none!important}
 
   /* prevent iOS zoom-on-focus: inputs must be >=16px */
   input,textarea,select{font-size:16px!important}

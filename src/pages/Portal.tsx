@@ -1299,18 +1299,24 @@ export default function Portal() {
           {s.view === 'chat' && (
             <div className="hwl-chat-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 20, animation: 'hwl-rise .4s ease both' }}>
               <section className="hwl-chat-panel" style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)', overflow: 'hidden' }}>
-                <div style={{ position: 'relative', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'nowrap', zIndex: 6 }}>
+                <div style={{ position: 'relative', padding: '12px 18px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 10, zIndex: 6 }}>
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)', flexShrink: 0 }} />
-                  <button onClick={() => be.configured && chatRooms != null && setRoomMenu((v) => !v)} style={{ all: 'unset', cursor: be.configured && chatRooms != null ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-                    <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roomTitle}</span>
-                    {be.configured && chatRooms != null && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.8)" strokeWidth="2" style={{ flexShrink: 0, transform: roomMenu ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-                  </button>
-                  {activeRoom?.isPrivate && <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 10, padding: '2px 8px' }}>비공개</span>}
-                  {activeRoom?.isPrivate && activeRoom.joinCode && (
-                    <button onClick={() => { navigator.clipboard?.writeText(activeRoom.joinCode!).then(() => { setChatErr(''); setRoomMenu(false) }).catch(() => {}) }} title="코드 복사" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, marginLeft: 'auto', fontFamily: "'IBM Plex Mono',monospace", fontSize: 12.5, fontWeight: 600, letterSpacing: '1.5px', color: '#67D7DF', background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.25)', borderRadius: 10, padding: '4px 10px', whiteSpace: 'nowrap' }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" /></svg>{activeRoom.joinCode}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <button onClick={() => be.configured && chatRooms != null && setRoomMenu((v) => !v)} style={{ all: 'unset', cursor: be.configured && chatRooms != null ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, maxWidth: '100%' }}>
+                      <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roomTitle}</span>
+                      {be.configured && chatRooms != null && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.8)" strokeWidth="2" style={{ flexShrink: 0, transform: roomMenu ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                     </button>
-                  )}
+                    {activeRoom?.isPrivate && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                        <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 7, padding: '1px 6px', letterSpacing: '.3px' }}>비공개</span>
+                        {activeRoom.joinCode && (
+                          <button onClick={() => { navigator.clipboard?.writeText(activeRoom.joinCode!).then(() => { setChatErr(''); setRoomMenu(false) }).catch(() => {}) }} title="코드 복사" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: '1px', color: '#67D7DF', background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.25)', borderRadius: 7, padding: '1px 7px', whiteSpace: 'nowrap' }}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" /></svg>{activeRoom.joinCode}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   {roomMenu && chatRooms != null && (
                     <>
                       <div onClick={() => setRoomMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
@@ -1329,9 +1335,9 @@ export default function Portal() {
                       </div>
                     </>
                   )}
-                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                     {be.configured && activeRoom && (
-                      <button onClick={() => { setAnonOn(be.myRoomAlias?.anonymous ?? false); setAnonName(be.myRoomAlias?.aliasName ?? ''); setAnonPhoto(null); setAliasModal(true) }} title="입장 설정" style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: be.myRoomAlias?.anonymous ? '#C9A24B' : '#9DAFCB', background: be.myRoomAlias?.anonymous ? 'rgba(201,162,75,.14)' : 'rgba(255,249,238,.05)', border: `1px solid ${be.myRoomAlias?.anonymous ? 'rgba(201,162,75,.3)' : 'rgba(255,247,232,.12)'}`, borderRadius: 14, padding: '5px 10px' }}>
+                      <button onClick={() => { setAnonOn(be.myRoomAlias?.anonymous ?? false); setAnonName(be.myRoomAlias?.aliasName ?? ''); setAnonPhoto(null); setAliasModal(true) }} title="입장 설정" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', color: be.myRoomAlias?.anonymous ? '#C9A24B' : '#9DAFCB', background: be.myRoomAlias?.anonymous ? 'rgba(201,162,75,.14)' : 'rgba(255,249,238,.05)', border: `1px solid ${be.myRoomAlias?.anonymous ? 'rgba(201,162,75,.3)' : 'rgba(255,247,232,.12)'}`, borderRadius: 14, padding: '5px 10px' }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" strokeLinecap="round" /></svg>{be.myRoomAlias?.anonymous ? '익명' : '프로필'}
                       </button>
                     )}

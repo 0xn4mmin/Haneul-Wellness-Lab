@@ -16,17 +16,21 @@ const TABS: { key: View; label: string }[] = [
   { key: 'profile', label: '프로필' },
 ]
 
+const STUDIO_ICON = <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M9 7h6M9 11h6M9 15h4" strokeLinecap="round" /></>
+
 /** Mobile bottom tab bar (hidden on desktop via CSS). */
-export default function TabBar({ view, go, chatBadge }: { view: View; go: (v: View) => void; chatBadge?: number }) {
+export default function TabBar({ view, go, chatBadge, isAdmin }: { view: View; go: (v: View) => void; chatBadge?: number; isAdmin?: boolean }) {
   return (
     <nav className="hwl-tabbar">
       {TABS.map((t) => {
-        const active = view === t.key || (t.key === 'profile' && view === 'profile')
+        const studioSlot = t.key === 'health' && isAdmin
+        const active = studioSlot ? view === 'trainer' : view === t.key
         const color = active ? '#67D7DF' : '#7C8AAE'
+        const label = studioSlot ? '스튜디오' : t.label
         return (
-          <button key={t.key} className="hwl-tab" onClick={() => go(t.key)} aria-label={t.label} style={{ all: 'unset', position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '9px 2px 8px', minHeight: 54, cursor: 'pointer' }}>
-            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8">{ICONS[t.key]}</svg>
-            <span className="hwl-tab-label" style={{ color }}>{t.label}</span>
+          <button key={t.key} className="hwl-tab" onClick={() => go(t.key)} aria-label={label} style={{ all: 'unset', position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '9px 2px 8px', minHeight: 54, cursor: 'pointer' }}>
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8">{studioSlot ? STUDIO_ICON : ICONS[t.key]}</svg>
+            <span className="hwl-tab-label" style={{ color }}>{label}</span>
             {t.key === 'chat' && chatBadge ? (
               <span style={{ position: 'absolute', top: 4, right: '50%', marginRight: -22, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#2E9BA6', color: '#06110F', fontSize: 9.5, fontWeight: 700, fontFamily: "'IBM Plex Mono',monospace", display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{chatBadge}</span>
             ) : null}

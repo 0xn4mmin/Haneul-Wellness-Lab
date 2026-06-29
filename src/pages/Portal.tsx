@@ -131,11 +131,25 @@ export default function Portal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curUserId])
 
+  // admins default to trainer view (no 나의 건강) once the profile resolves
+  const adminApplied = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (be.isAdmin && adminApplied.current !== curUserId) {
+      adminApplied.current = curUserId
+      set({ role: 'trainer', view: 'trainer' })
+    } else if (!be.isAdmin) {
+      adminApplied.current = undefined
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [be.isAdmin, curUserId])
+
   // ---- handlers -----------------------------------------------------------
   // switching tabs always lands on that tab's first screen (no leftover detail
   // view / open modal / scroll from last time)
   const go = (v: View) => {
-    set({ view: v, activeMember: null, scanOpen: false, showChallengeForm: false, chDone: '', profileSaved: '' })
+    // admins have no 나의 건강 — that slot is the 트레이너 스튜디오
+    const target = (v === 'health' && be.isAdmin) ? 'trainer' : v
+    set({ view: target, role: target === 'trainer' ? 'trainer' : s.role, activeMember: null, scanOpen: false, showChallengeForm: false, chDone: '', profileSaved: '' })
     if (be.configured) be.closeMember()
     setMobileNav(false); setNotifOpen(false); setCycleModal(false); setGoalModal(false); setGaugeInfo(null); setMemberQuery(''); setPostImg(null); setChatImg(null)
     if (typeof window !== 'undefined') window.scrollTo({ top: 0 })
@@ -538,10 +552,14 @@ export default function Portal() {
         </a>
 
         {(['health', 'community', 'chat', 'members'] as View[]).map((k) => {
-          const ns = navColor(k)
-          const labels: Record<string, string> = { health: '나의 건강', community: '커뮤니티', chat: '그룹 채팅', members: '멤버' }
+          const studioSlot = k === 'health' && be.isAdmin
+          const active = studioSlot ? s.view === 'trainer' : s.view === k
+          const ns = { bg: active ? 'linear-gradient(110deg,#2E9BA6,#247E88)' : 'transparent', fg: active ? '#060B17' : '#9DAFCB' }
+          const labels: Record<string, string> = { health: studioSlot ? '트레이너 스튜디오' : '나의 건강', community: '커뮤니티', chat: '그룹 채팅', members: '멤버' }
           const icons: Record<string, React.ReactNode> = {
-            health: <><circle cx="12" cy="12" r="8.5" /><path d="M5 12h3l2-4 3 8 2-4h4" strokeLinecap="round" strokeLinejoin="round" /></>,
+            health: studioSlot
+              ? <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M9 7h6M9 11h6M9 15h4" strokeLinecap="round" /></>
+              : <><circle cx="12" cy="12" r="8.5" /><path d="M5 12h3l2-4 3 8 2-4h4" strokeLinecap="round" strokeLinejoin="round" /></>,
             community: <><rect x="3.5" y="4.5" width="17" height="6" rx="2.5" /><rect x="3.5" y="13.5" width="11" height="6" rx="2.5" /></>,
             chat: <path d="M4.5 5.5h15v10h-9l-4 4v-4h-2z" strokeLinejoin="round" />,
             members: <><circle cx="8.5" cy="9" r="3.2" /><circle cx="16" cy="10.5" r="2.7" /><path d="M3.5 19c.6-3 2.6-4.6 5-4.6s4.4 1.6 5 4.6" strokeLinecap="round" /></>,
@@ -1804,7 +1822,7 @@ export default function Portal() {
         </div>
       </main>
 
-      {!showLogin && !loading && <TabBar view={s.view} go={go} chatBadge={be.configured ? (be.unreadChat || undefined) : undefined} />}
+      {!showLogin && !loading && <TabBar view={s.view} go={go} chatBadge={be.configured ? (be.unreadChat || undefined) : undefined} isAdmin={be.isAdmin} />}
 
       {/* 결과지 라이트박스 */}
       {s.scanOpen && (

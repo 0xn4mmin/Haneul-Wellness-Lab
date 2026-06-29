@@ -1622,7 +1622,7 @@ export default function Portal() {
                           <span style={{ fontSize: 12.5, fontWeight: i < 3 ? 700 : 600, color: '#EAF3F1' }}>{p.name}{p.isMe ? ' (나)' : ''}</span>
                           <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: pv >= 100 ? '#7BD88F' : '#67D7DF' }}>{pv}%</span>
                         </div>
-                        <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pv}%`, background: pv >= 100 ? '#7BD88F' : (i === 0 ? `linear-gradient(90deg,${MEDAL[0]},#67D7DF)` : 'linear-gradient(90deg,#2E9BA6,#67D7DF)') }} /></div>
+                        <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.min(100, pv)}%`, background: pv >= 100 ? '#7BD88F' : (i === 0 ? `linear-gradient(90deg,${MEDAL[0]},#67D7DF)` : 'linear-gradient(90deg,#2E9BA6,#67D7DF)') }} /></div>
                         <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>{goalText(p)} · 현재 {p.current != null ? fmtN(p.current) + p.unit : '—'}</div>
                       </div>
                     </div>
@@ -1661,7 +1661,7 @@ export default function Portal() {
                       <div style={{ fontSize: 11.5, lineHeight: 1.65, color: 'rgba(231,239,234,.72)', background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.2)', borderRadius: 10, padding: '10px 13px', marginBottom: 12 }}>
                         <b style={{ color: '#9FE2E8' }}>전체 성취도</b> = 목표 설정 시점의 내 수치(기준값)에서 현재까지 목표에 얼마나 다가갔는지. <span style={{ fontFamily: "'IBM Plex Mono',monospace" }}>(현재−기준) ÷ (목표−기준) × 100</span>, 0~100%.<br />
                         <b style={{ color: '#9FE2E8' }}>이번 주 성취도</b> = 직전 측정 → 최근 측정 사이의 진행분을 목표 대비 비율로. <span style={{ fontFamily: "'IBM Plex Mono',monospace" }}>(현재−직전) ÷ (목표−기준) × 100</span>.<br />
-                        <span style={{ color: 'rgba(231,239,234,.5)' }}>‘변화’ 목표(예: 체지방 −3)는 목표−기준을 그 변화량으로, ‘달성’ 목표(예: 골격근 35)는 목표값을 그대로 씁니다. 측정값이 새로 들어올 때마다 갱신돼요.</span>
+                        <span style={{ color: 'rgba(231,239,234,.5)' }}>모두 ‘자기 목표의 몇 %’로 환산하므로 지표·목표가 달라도 공정하게 순위가 매겨져요(예: 체지방 −3 목표 50% vs 골격근 35 목표 50%는 동률). 목표를 넘기면 100%를 넘겨(예: 130%) 표시돼 더 앞 순위가 됩니다.</span>
                       </div>
                     )}
                     {board((p) => p.pct)}

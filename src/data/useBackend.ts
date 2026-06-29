@@ -631,10 +631,13 @@ export function useBackend(): Backend {
       const base = r.baseline ?? r.current ?? 0
       const goalDelta = r.mode === 'relative' ? Number(r.target) : (Number(r.target) - base)
       const cur = r.current ?? base
-      const clampPct = (v: number) => Math.max(0, Math.min(100, Math.round(v)))
-      const pct = goalDelta === 0 ? (cur - base === 0 ? 100 : 0) : clampPct(((cur - base) / goalDelta) * 100)
+      // % of each person's own goal — fair across 변화/달성 goals and different
+      // metrics. Floor at 0 (wrong-way = no progress); NO upper cap, so
+      // over-achievers (e.g. 130%) rank above someone exactly at 100%.
+      const floor0 = (v: number) => Math.max(0, Math.round(v))
+      const pct = goalDelta === 0 ? (cur - base === 0 ? 100 : 0) : floor0(((cur - base) / goalDelta) * 100)
       // this week = progress in the latest measurement step (prev → current)
-      const weeklyPct = (r.prev == null || goalDelta === 0) ? pct : clampPct(((cur - Number(r.prev)) / goalDelta) * 100)
+      const weeklyPct = (r.prev == null || goalDelta === 0) ? pct : floor0(((cur - Number(r.prev)) / goalDelta) * 100)
       return {
         userId: r.user_id, name: r.name, initials: r.initials, color: r.color, photo: api.avatarUrl(r.photo_path),
         metricKey: r.metric_key, metricLabel: m?.label ?? r.metric_key, unit: m?.unit ?? '',

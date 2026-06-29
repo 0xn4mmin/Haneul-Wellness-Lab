@@ -383,6 +383,17 @@ export async function setChallengeGoal(challengeId: string, metricKey: string, m
   return requireSupabase().from('challenge_goals')
     .upsert({ challenge_id: challengeId, user_id: me, metric_key: metricKey, mode, target, baseline }, { onConflict: 'challenge_id,user_id,metric_key' })
 }
+/** Trainer/admin: set a goal for a specific member (not necessarily self). */
+export async function setChallengeGoalFor(challengeId: string, userId: string, metricKey: string, mode: 'absolute' | 'relative', target: number, baseline: number | null) {
+  return requireSupabase().from('challenge_goals')
+    .upsert({ challenge_id: challengeId, user_id: userId, metric_key: metricKey, mode, target, baseline }, { onConflict: 'challenge_id,user_id,metric_key' })
+}
+/** A member's readings for one metric (date + value), for the baseline picker. */
+export async function fetchMemberMetricReadings(userId: string, metricKey: string): Promise<{ date: string; value: number }[]> {
+  const { data } = await requireSupabase().from('metric_readings')
+    .select('date, value').eq('user_id', userId).eq('metric_key', metricKey).order('date', { ascending: true })
+  return ((data ?? []) as { date: string; value: number }[]).map((r) => ({ date: r.date, value: Number(r.value) }))
+}
 export async function deleteChallengeGoal(challengeId: string, metricKey: string) {
   const me = await uid()
   return requireSupabase().from('challenge_goals').delete().eq('challenge_id', challengeId).eq('user_id', me).eq('metric_key', metricKey)

@@ -69,6 +69,7 @@ export default function Portal() {
   const [cgTarget, setCgTarget] = useState('')
   const [cgBaseSel, setCgBaseSel] = useState('')      // '' none · '__manual__' · else a picked value
   const [cgBaseManual, setCgBaseManual] = useState('')
+  const [goalEdit, setGoalEdit] = useState<{ userId: string; name: string; metricKey: string; metricLabel: string; unit: string; mode: 'absolute' | 'relative'; target: string; baseSel: string; baseManual: string; options: { date: string; value: number }[] } | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [msgActions, setMsgActions] = useState<string | null>(null)
   const [replyTarget, setReplyTarget] = useState<{ id: string; author: string; text: string } | null>(null)
@@ -1503,6 +1504,42 @@ export default function Portal() {
             </div>
           )}
 
+          {/* 멤버 목표 수정 모달 (관리자) */}
+          {goalEdit && (() => {
+            const baseVal = goalEdit.baseSel === '__manual__' ? parseFloat(goalEdit.baseManual) : parseFloat(goalEdit.baseSel)
+            const canSave = !isNaN(parseFloat(goalEdit.target)) && !isNaN(baseVal)
+            return (
+              <div onClick={() => setGoalEdit(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 123, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
+                <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto', background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                  <div style={eyebrow}>Coach · Member Goal</div><div style={cardTitle}>{goalEdit.name}님 목표 수정</div>
+                  <div style={{ fontSize: 12.5, color: '#9FE2E8', fontWeight: 600, margin: '4px 0 16px' }}>{goalEdit.metricLabel}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,.12)' }}>
+                      {([['relative', '변화'], ['absolute', '달성']] as const).map(([m, l]) => (
+                        <button key={m} onClick={() => setGoalEdit((g) => g ? { ...g, mode: m } : g)} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12.5, fontWeight: 600, padding: '9px 0', background: goalEdit.mode === m ? '#2E9BA6' : 'transparent', color: goalEdit.mode === m ? '#060B17' : '#9DAFCB' }}>{l}</button>
+                      ))}
+                    </div>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>{goalEdit.mode === 'relative' ? '목표 변화량' : '목표 달성값'}</label>
+                      <input value={goalEdit.target} onChange={(e) => setGoalEdit((g) => g ? { ...g, target: e.target.value } : g)} type="number" step="0.1" placeholder={goalEdit.mode === 'relative' ? '예) -3' : '예) 35'} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>시작 기준값</label>
+                      <select value={goalEdit.baseSel} onChange={(e) => setGoalEdit((g) => g ? { ...g, baseSel: e.target.value } : g)} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }}>
+                        <option value="">측정 기록 선택</option>
+                        {goalEdit.options.map((o, i) => <option key={i} value={String(o.value)}>{o.date.replace(/-/g, '.')} · {o.value}{goalEdit.unit}</option>)}
+                        <option value="__manual__">직접 입력…</option>
+                      </select>
+                      {goalEdit.baseSel === '__manual__' && <input value={goalEdit.baseManual} onChange={(e) => setGoalEdit((g) => g ? { ...g, baseManual: e.target.value } : g)} type="number" step="0.1" placeholder={`기준값 직접 입력${goalEdit.unit ? ` (${goalEdit.unit})` : ''}`} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13, marginTop: 7 }} />}
+                      {goalEdit.options.length === 0 && goalEdit.baseSel !== '__manual__' && <div style={{ fontSize: 11, color: 'rgba(224,160,106,.85)', marginTop: 5 }}>이 멤버의 측정 기록이 없어요 — 직접 입력하세요.</div>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                    <button onClick={() => setGoalEdit(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '12px 20px', borderRadius: 22 }}>취소</button>
+                    <button disabled={!canSave} onClick={() => { if (canSave) { void be.editChallengeGoalFor(goalEdit.userId, goalEdit.metricKey, goalEdit.mode, parseFloat(goalEdit.target), baseVal); setGoalEdit(null) } }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSave ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSave ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>저장</button>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* 측정값 수정 모달 */}
           {measEdit && (
             <div onClick={() => setMeasEdit(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 122, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
@@ -1625,7 +1662,14 @@ export default function Portal() {
                 <span style={{ width: 22, height: 22, borderRadius: '50%', background: MEDAL[i], color: '#1a1206', fontSize: 11, fontWeight: 800, fontFamily: "'IBM Plex Mono',monospace", display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 10px ${MEDAL[i]}66` }}>{i + 1}</span>
               </span>
             ) : <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: 'rgba(231,239,234,.4)', width: 22, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
-            const board = (getPct: (p: typeof cd.progress[number]) => number, items: typeof cd.progress = cd.progress) => {
+            const openGoalEdit = (p: typeof cd.progress[number]) => {
+              void be.fetchMemberReadings(p.userId, p.metricKey).then((opts) => setGoalEdit({
+                userId: p.userId, name: p.name, metricKey: p.metricKey, metricLabel: p.metricLabel, unit: p.unit,
+                mode: p.mode, target: String(p.target),
+                baseSel: p.baseline != null ? '__manual__' : '', baseManual: p.baseline != null ? String(p.baseline) : '', options: opts,
+              }))
+            }
+            const board = (getPct: (p: typeof cd.progress[number]) => number, items: typeof cd.progress = cd.progress, editable = false) => {
               const rows = [...items].sort((a, b) => getPct(b) - getPct(a))
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
@@ -1641,6 +1685,9 @@ export default function Portal() {
                         <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.min(100, pv)}%`, background: pv >= 100 ? '#7BD88F' : (i === 0 ? `linear-gradient(90deg,${MEDAL[0]},#67D7DF)` : 'linear-gradient(90deg,#2E9BA6,#67D7DF)') }} /></div>
                         <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>{goalText(p)} · 현재 {p.current != null ? fmtN(p.current) + p.unit : '—'}</div>
                       </div>
+                      {editable && be.isAdmin && (
+                        <button onClick={() => openGoalEdit(p)} title="이 멤버 목표 수정" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 12, padding: '4px 10px' }}>수정</button>
+                      )}
                     </div>
                   ) })}
                 </div>
@@ -1680,7 +1727,7 @@ export default function Portal() {
                         <span style={{ color: 'rgba(231,239,234,.5)' }}>모두 ‘자기 목표의 몇 %’로 환산하므로 지표·목표가 달라도 공정하게 순위가 매겨져요(예: 체지방 −3 목표 50% vs 골격근 35 목표 50%는 동률). 목표를 넘기면 100%를 넘겨(예: 130%) 표시돼 더 앞 순위가 됩니다.</span>
                       </div>
                     )}
-                    {board((p) => p.pct)}
+                    {board((p) => p.pct, cd.progress, true)}
                   </div>
                   {/* 이번 주 성취도 (하단) — 직전 측정이 없는 사람은 집계 제외 */}
                   <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>

@@ -140,6 +140,8 @@ export interface Backend {
   leaveChallenge: () => Promise<void>
   setChallengeGoal: (metricKey: string, mode: 'absolute' | 'relative', target: number, baseline: number) => Promise<void>
   deleteChallengeGoal: (metricKey: string) => Promise<void>
+  editChallengeGoalFor: (userId: string, metricKey: string, mode: 'absolute' | 'relative', target: number, baseline: number) => Promise<void>
+  fetchMemberReadings: (userId: string, metricKey: string) => Promise<{ date: string; value: number }[]>
   // members
   members: MemberView[] | null
   activeMember: ActiveMemberDetail | null
@@ -692,6 +694,13 @@ export function useBackend(): Backend {
     await api.deleteChallengeGoal(challengeDetail.id, metricKey)
     const cv = (challenges ?? []).find((c) => c.id === challengeDetail.id); if (cv) await loadChallengeDetail(cv)
   }, [challengeDetail, challenges, loadChallengeDetail])
+  // trainer/admin: edit any member's goal + read their readings for the picker
+  const editChallengeGoalFor = useCallback(async (userId: string, metricKey: string, mode: 'absolute' | 'relative', target: number, baseline: number) => {
+    if (!challengeDetail) return
+    await api.setChallengeGoalFor(challengeDetail.id, userId, metricKey, mode, target, baseline)
+    const cv = (challenges ?? []).find((c) => c.id === challengeDetail.id); if (cv) await loadChallengeDetail(cv)
+  }, [challengeDetail, challenges, loadChallengeDetail])
+  const fetchMemberReadings = useCallback((userId: string, metricKey: string) => api.fetchMemberMetricReadings(userId, metricKey), [])
 
   // ── members ──
   const openMember = useCallback((id: string) => {
@@ -831,7 +840,7 @@ export function useBackend(): Backend {
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom,
     challenges, createChallenge, deleteChallenge, updateChallenge,
-    challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal,
+    challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,
     members, activeMember, openMember, closeMember, addMemberCheer,
     chartComments, loadChartComments, addChartComment, coachFeedback, addCoachFeedback,
     roster, addCoachNote, coachNotes, loadCoachNotes, editCoachNote,

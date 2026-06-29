@@ -58,7 +58,7 @@ export interface ChallengeDetail {
   progress: ChallengeProgressItem[]
 }
 const METRIC_LABEL: Record<string, string> = { weight: '체중', smm: '골격근량', pbf: '체지방률', bodyFatMass: '체지방량', bmi: 'BMI', bmr: '기초대사량', visceral: '내장지방', tbw: '체수분', score: '인바디 점수' }
-export interface NotificationView { id: string; type: string; text: string; read: boolean; time: string; actorInitials: string; actorColor: string; actorPhoto?: string | null }
+export interface NotificationView { id: string; type: string; text: string; read: boolean; time: string; ref: string | null; actorInitials: string; actorColor: string; actorPhoto?: string | null }
 export interface MemberView { id: string; name: string; initials: string; color: string; photo?: string | null; role: 'client' | 'trainer'; bio: string; bio2: string; score: number; pub: string[] }
 export interface ActiveMemberDetail {
   id: string; name: string; initials: string; color: string; photo: string | null; role: 'client' | 'trainer'; bio2: string; score: number
@@ -310,7 +310,7 @@ export function useBackend(): Backend {
   const reloadNotifications = useCallback(async () => {
     const rows = await api.fetchNotifications()
     setNotifications(rows.map((n) => ({
-      id: n.id, type: n.type, text: n.text, read: n.read, time: relTime(n.created_at),
+      id: n.id, type: n.type, text: n.text, read: n.read, time: relTime(n.created_at), ref: n.ref,
       actorInitials: n.actor?.initials ?? '·', actorColor: n.actor?.color ?? '#5E97A0', actorPhoto: n.actor?.photo ?? null,
     })))
   }, [])
@@ -404,7 +404,15 @@ export function useBackend(): Backend {
   // realtime: new notification → reload
   useEffect(() => {
     if (!supabase || !meId) return
-    return api.subscribeNotifications(meId, () => { void reloadNotifications() })
+    return api.subscribeNotifications(meId, (row) => {
+      void reloadNotifications()
+      // best-effort phone/desktop popup (works while the app is open/alive)
+      if (row?.text && typeof Notification !== 'undefined' && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.ready
+          .then((reg) => reg.showNotification('하늘 웰니스 랩', { body: row.text, icon: '/assets/logo-mark.png', badge: '/assets/logo-mark.png' }))
+          .catch(() => {})
+      }
+    })
   }, [meId, reloadNotifications])
 
   // realtime: a new briefing finished → show it, clear busy, count manual usage

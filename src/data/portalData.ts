@@ -159,9 +159,10 @@ export function buildTrend(
   const lo = min - span * 0.35, hi = max + span * 0.35, rng = hi - lo
   const xs = vals.map((_v, i) => pL + (i / (vals.length - 1)) * (W - pL - pR))
   const ys = vals.map((v) => pT + (1 - (v - lo) / rng) * (H - pT - pB))
+  const md = (d: string) => d.replace('월 ', '/').replace('일', '').trim()  // "6월 14일" → "6/14"
   const pts: TrendPoint[] = xs.map((x, i) => ({
     x: +x.toFixed(1), y: +ys[i].toFixed(1), v: vals[i],
-    label: datesData[i].split(' ')[0], full: datesData[i],
+    label: md(datesData[i] ?? ''), full: datesData[i],
     disp: vals[i] + (m.unit ? ' ' + m.unit : ''), ly: +(ys[i] - 12).toFixed(1),
   }))
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ')
@@ -176,7 +177,7 @@ export function buildTrend(
   const improved = (m.good === 'up') ? diff >= 0 : diff <= 0
   const dec = (m.unit === '%' || ['smm', 'tbw', 'bodyFatMass', 'weight', 'bmi'].includes(selectedMetric)) ? 1 : 0
   const sign = diff > 0 ? '+' : ''
-  const firstLabel = (datesData[0] ?? '').split(' ')[0] || '처음'
+  const firstLabel = md(datesData[0] ?? '') || '처음'
   return {
     title: m.label, latest: last + (m.unit ? ' ' + m.unit : ''), line, area, pts, grid,
     deltaText: firstLabel + ' 대비 ' + sign + diff.toFixed(dec),

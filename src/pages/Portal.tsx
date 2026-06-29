@@ -58,6 +58,7 @@ export default function Portal() {
   const [editChallengeId, setEditChallengeId] = useState<string | null>(null)
   const [roomMenu, setRoomMenu] = useState(false)
   const [chProgInfo, setChProgInfo] = useState(false)
+  const [notifPerm, setNotifPerm] = useState<string>(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
   const [editNoteId, setEditNoteId] = useState<string | null>(null)
   const [editNoteText, setEditNoteText] = useState('')
   const [measEdit, setMeasEdit] = useState<{ id: string; date: string; iso: string; values: Record<string, string> } | null>(null)
@@ -171,6 +172,14 @@ export default function Portal() {
     setMobileNav(false); setNotifOpen(false); setCycleModal(false); setGoalModal(false); setGaugeInfo(null); setMemberQuery(''); setPostImg(null); setChatImg(null)
     if (typeof window !== 'undefined') window.scrollTo({ top: 0 })
     const el = document.querySelector('.hwl-content'); if (el) el.scrollTop = 0
+  }
+  // clicking a notification jumps to where its content lives
+  const goToNotif = (n: { type: string; ref: string | null }) => {
+    setNotifOpen(false)
+    if (n.type === 'chat' && n.ref) { go('chat'); be.selectRoom(n.ref); return }
+    if (n.type === 'challenge' && n.ref) { go('community'); const cv = (be.challenges ?? []).find((c) => c.id === n.ref); if (cv) be.openChallenge(cv); return }
+    if (n.type === 'feedback') { go('health'); return }
+    go('community')  // comment / reply / cheer
   }
   const togglePrivacy = (key: string) => setFn((p) => ({ privacy: { ...p.privacy, [key]: p.privacy[key] === 'public' ? 'private' : 'public' } }))
   const onProfileField = (k: keyof PortalState['profile'], v: string) => setFn((p) => ({ profile: { ...p.profile, [k]: v } }))
@@ -659,15 +668,20 @@ export default function Portal() {
                     <div onClick={() => setNotifOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
                     <div style={{ position: 'absolute', top: 48, right: 0, zIndex: 50, width: 300, maxHeight: 420, overflowY: 'auto', background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 16, boxShadow: '0 30px 70px -30px rgba(0,0,0,.85)', padding: 8 }}>
                       <div style={{ fontSize: 11, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', padding: '8px 10px 6px' }}>알림</div>
+                      {notifPerm === 'default' && (
+                        <button onClick={() => { if (typeof Notification !== 'undefined') void Notification.requestPermission().then((p) => setNotifPerm(p)) }} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, margin: '0 8px 8px', padding: '9px 11px', borderRadius: 10, background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', color: '#9FE2E8', fontSize: 12 }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.7 21a2 2 0 0 1-3.4 0" strokeLinecap="round" /></svg>휴대폰 알림 켜기
+                        </button>
+                      )}
                       {(be.notifications ?? []).length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '14px 10px' }}>새 알림이 없어요.</div>}
                       {(be.notifications ?? []).map((n) => (
-                        <div key={n.id} style={{ display: 'flex', gap: 10, padding: '9px 10px', borderRadius: 11, background: n.read ? 'transparent' : 'rgba(46,155,166,.1)' }}>
+                        <button key={n.id} onClick={() => goToNotif(n)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', gap: 10, padding: '9px 10px', borderRadius: 11, background: n.read ? 'transparent' : 'rgba(46,155,166,.1)' }}>
                           <Avatar initials={n.actorInitials} color={n.actorColor} photo={n.actorPhoto} size={30} fontSize={10.5} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 12.5, color: '#EAF3F1', lineHeight: 1.45 }}>{n.text}</div>
                             <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginTop: 2 }}>{n.time}</div>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </>
@@ -962,7 +976,7 @@ export default function Portal() {
                 </svg>
                 <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginTop: 8, fontSize: 11, color: 'rgba(231,239,234,.5)' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 3, background: '#67D7DF', borderRadius: 2 }} />현재</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 0, borderTop: '2px dashed #C9A24B' }} />{(D[0] ?? '').split(' ')[0] || '처음'}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 0, borderTop: '2px dashed #C9A24B' }} />{(D[0] ?? '').replace('월 ', '/').replace('일', '').trim() || '처음'}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7BD88F' }} />Good</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#E0875C' }} />Bad</span>
                 </div>

@@ -397,17 +397,17 @@ export async function fetchChallengeProgress(challengeId: string): Promise<Chall
 }
 
 export interface NotificationRow {
-  id: string; type: string; text: string; read: boolean; created_at: string
+  id: string; type: string; text: string; read: boolean; created_at: string; ref: string | null
   actor: { name: string; initials: string; color: string; photo: string | null } | null
 }
 export async function fetchNotifications(): Promise<NotificationRow[]> {
   const me = await uid()
   const { data } = await requireSupabase().from('notifications')
-    .select('id, type, text, read, created_at, actor:profiles!notifications_actor_id_fkey(name, initials, avatar_color, photo_path)')
+    .select('id, type, text, read, ref, created_at, actor:profiles!notifications_actor_id_fkey(name, initials, avatar_color, photo_path)')
     .eq('user_id', me).order('created_at', { ascending: false }).limit(50)
   return ((data ?? []) as any[]).map((n) => {
     const a = Array.isArray(n.actor) ? n.actor[0] : n.actor
-    return { id: n.id, type: n.type, text: n.text, read: n.read, created_at: n.created_at,
+    return { id: n.id, type: n.type, text: n.text, read: n.read, ref: n.ref ?? null, created_at: n.created_at,
       actor: a ? { name: a.name, initials: a.initials, color: a.avatar_color, photo: avatarUrl(a.photo_path) } : null }
   })
 }
@@ -421,10 +421,10 @@ export async function markRoomNotificationsRead(roomId: string) {
   return requireSupabase().from('notifications').update({ read: true })
     .eq('user_id', me).eq('type', 'chat').eq('ref', roomId).eq('read', false)
 }
-export function subscribeNotifications(userId: string, onChange: () => void) {
+export function subscribeNotifications(userId: string, onChange: (row?: { text?: string }) => void) {
   const sb = requireSupabase()
   const channel = sb.channel(`notif:${userId}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => onChange())
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, (p) => onChange(p.new as { text?: string }))
     .subscribe()
   return () => { sb.removeChannel(channel) }
 }

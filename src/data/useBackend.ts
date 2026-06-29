@@ -61,7 +61,7 @@ const METRIC_LABEL: Record<string, string> = { weight: '체중', smm: '골격근
 export interface NotificationView { id: string; type: string; text: string; read: boolean; time: string; actorInitials: string; actorColor: string; actorPhoto?: string | null }
 export interface MemberView { id: string; name: string; initials: string; color: string; photo?: string | null; role: 'client' | 'trainer'; bio: string; bio2: string; score: number; pub: string[] }
 export interface ActiveMemberDetail {
-  id: string; name: string; initials: string; color: string; photo: string | null; bio2: string; score: number
+  id: string; name: string; initials: string; color: string; photo: string | null; role: 'client' | 'trainer'; bio2: string; score: number
   measureCount: number; lastDate: string | null; publicCount: number; lockedCount: number
   metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]
   comments: PostComment[]
@@ -96,6 +96,7 @@ export interface Backend {
   privacy: Record<string, 'public' | 'private'> | null
   togglePrivacy: (key: string) => void
   profile: BackendProfile | null
+  isAdmin: boolean   // trainer/admin — can see + manage all challenges and chats
   updateProfile: (patch: { name: string; birth: string; gender: string; phone: string }) => Promise<void>
   uploadAvatar: (file: File) => Promise<void>
   // social
@@ -197,6 +198,7 @@ export function useBackend(): Backend {
   const [briefingMsg, setBriefingMsg] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const roomId = useRef<string | null>(null)
+  const isAdminRef = useRef(false)
   const postUi = useRef<Record<string, { open: boolean; draft: string; replyTo: string | null }>>({})
 
   const meId = session?.user?.id ?? null
@@ -315,8 +317,8 @@ export function useBackend(): Backend {
   }, [meId])
 
   const reloadRooms = useCallback(async () => {
-    const rows = await api.fetchMyRooms()
-    setRooms(rows.map((r) => ({ id: r.id, name: r.name, isPrivate: r.is_private, joinCode: r.join_code, isOwn: r.created_by === meId })))
+    const rows = isAdminRef.current ? await api.fetchAllRooms() : await api.fetchMyRooms()
+    setRooms(rows.map((r) => ({ id: r.id, name: r.name, isPrivate: r.is_private, joinCode: r.join_code, isOwn: r.created_by === meId || isAdminRef.current })))
     return rows
   }, [meId])
 
@@ -334,6 +336,7 @@ export function useBackend(): Backend {
       setBriefing(null); setBriefingUsed(0); setBriefingBusy(false); setBriefingMsg('')
       setRooms(null); setActiveRoomId(null); setRoomMembers([]); setCoachFeedback(null); setChallenges(null); setChallengeDetail(null); setNotifications(null)
       roomId.current = null
+      isAdminRef.current = false
       setLoaded(false)
       return
     }
@@ -358,6 +361,7 @@ export function useBackend(): Backend {
           const photoUrl = prof.photo_path
             ? supabase.storage.from('avatars').getPublicUrl(prof.photo_path).data.publicUrl
             : null
+          isAdminRef.current = prof.role === 'trainer'
           setProfile({ name: prof.name, initials: prof.initials, color: prof.avatar_color, role: prof.role, birth: prof.birth, gender: prof.gender, phone: prof.phone, photoUrl })
           setCycleDays(prof.measure_cycle_days ?? 28)
         }
@@ -677,7 +681,7 @@ export function useBackend(): Backend {
         const scorePublic = priv.score === 'public' && !!series.score?.length
         setActiveMember({
           id, name: prof?.name ?? '', initials: prof?.initials ?? '', color: prof?.avatar_color ?? '#5E97A0',
-          photo: api.avatarUrl(prof?.photo_path), bio2: prof?.bio2 ?? '', score: scorePublic ? series.score![series.score!.length - 1] : 0,
+          photo: api.avatarUrl(prof?.photo_path), role: prof?.role ?? 'client', bio2: prof?.bio2 ?? '', score: scorePublic ? series.score![series.score!.length - 1] : 0,
           measureCount: dates.length, lastDate: dates.length ? fmtDate(dates[dates.length - 1]) : null,
           publicCount, lockedCount: METRIC_CARD_KEYS.length - publicCount,
           metrics: mc,
@@ -770,7 +774,7 @@ export function useBackend(): Backend {
     unreadChat: (notifications ?? []).filter((n) => n.type === 'chat' && !n.read).length,
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
-    privacy, togglePrivacy, profile, updateProfile, uploadAvatar,
+    privacy, togglePrivacy, profile, isAdmin: profile?.role === 'trainer', updateProfile, uploadAvatar,
     posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, selectRoom, createRoom, joinRoom, deleteRoom,

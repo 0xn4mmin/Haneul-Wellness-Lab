@@ -384,14 +384,14 @@ export default function Portal() {
   const metricKeysForCard: MetricKey[] = ['score', 'weight', 'smm', 'pbf', 'bmi', 'tbw']
   const membersSource = be.configured ? (be.members ?? []) : s.members
   const membersDisp = membersSource.map((m) => ({ ...m, publicCount: m.pub.length, lockedCount: metricKeysForCard.length - m.pub.filter((k) => metricKeysForCard.includes(k as MetricKey)).length }))
-  type ActiveMember = { id: string; name: string; initials: string; color: string; photo?: string | null; bio2: string; score: number; measureCount?: number; lastDate?: string | null; metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]; comments: { author: string; initials: string; color: string; photo?: string | null; text: string }[] }
+  type ActiveMember = { id: string; name: string; initials: string; color: string; photo?: string | null; role?: 'client' | 'trainer'; bio2: string; score: number; measureCount?: number; lastDate?: string | null; metrics: { label: string; unit: string; locked: boolean; shown: boolean; value: number; spark: string }[]; comments: { author: string; initials: string; color: string; photo?: string | null; text: string }[] }
   let activeMember: ActiveMember | null = null
   if (be.configured) {
     activeMember = be.activeMember
   } else if (s.activeMember) {
     const m = s.members.find((x) => x.id === s.activeMember)!
     const mc = metricKeysForCard.map((k) => { const open = m.pub.includes(k); const met = metrics[k]; return { label: met.label, unit: met.unit, locked: !open, shown: open, value: met.series[met.series.length - 1], spark: buildSpark(met.series) } })
-    activeMember = { id: m.id, name: m.name, initials: m.initials, color: m.color, photo: null, bio2: m.bio2, score: m.score, measureCount: dates.length, lastDate: dates[dates.length - 1], metrics: mc, comments: s.memberComments[m.id] || [] }
+    activeMember = { id: m.id, name: m.name, initials: m.initials, color: m.color, photo: null, role: m.role ?? 'client', bio2: m.bio2, score: m.score, measureCount: dates.length, lastDate: dates[dates.length - 1], metrics: mc, comments: s.memberComments[m.id] || [] }
   }
   const memberOpen = be.configured ? !!be.activeMember : !!s.activeMember
 
@@ -1075,8 +1075,8 @@ export default function Portal() {
                         </div>
                       </button>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.5)" strokeWidth="2" style={{ flexShrink: 0 }}><path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                      {c.isOwn && (
-                        <button onClick={() => { if (confirm('이 챌린지를 삭제할까요?')) void be.deleteChallenge(c.id) }} title="삭제" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(224,160,106,.8)' }}>
+                      {(c.isOwn || be.isAdmin) && (
+                        <button onClick={() => { if (confirm("이 챌린지를 삭제할까요?")) void be.deleteChallenge(c.id) }} title="삭제" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(224,160,106,.8)' }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
                         </button>
                       )}
@@ -1286,7 +1286,7 @@ export default function Portal() {
                             {['👍', '❤️', '😂', '😢', '😮', '😡'].map((e) => <button key={e} onClick={() => { be.toggleReaction(mid, e); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 15, padding: '2px 2px' }}>{e}</button>)}
                             <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,.14)', margin: '0 3px', flexShrink: 0 }} />
                             <button onClick={() => { setReplyTarget({ id: mid, author: m.author, text: m.text || '사진' }); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: '#9DAFCB', padding: '2px 6px', whiteSpace: 'nowrap' }}>답글</button>
-                            {isMine && <button onClick={() => { if (confirm('메시지를 삭제할까요?')) be.deleteMessage(mid); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: 'rgba(224,135,92,.9)', padding: '2px 6px', whiteSpace: 'nowrap' }}>삭제</button>}
+                            {(isMine || be.isAdmin) && <button onClick={() => { if (confirm('메시지를 삭제할까요?')) be.deleteMessage(mid); setMsgActions(null) }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: 'rgba(224,135,92,.9)', padding: '2px 6px', whiteSpace: 'nowrap' }}>삭제</button>}
                           </div>
                         )}
                       </div>
@@ -1555,7 +1555,7 @@ export default function Portal() {
                     <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)', marginTop: 4 }}>{cd.startDate.slice(5).replace('-', '.')} ~ {cd.endDate.slice(5).replace('-', '.')} · D-{cd.daysLeft} · 지표 {cd.metricLabels.join(', ')}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    {cd.isOwn && <button onClick={editChallengeForm} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 14, padding: '5px 11px' }}>수정</button>}
+                    {(cd.isOwn || be.isAdmin) && <button onClick={editChallengeForm} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 14, padding: '5px 11px' }}>수정</button>}
                     <button onClick={be.closeChallenge} style={{ all: 'unset', cursor: 'pointer', fontSize: 20, color: 'rgba(231,239,234,.5)', lineHeight: 1 }}>×</button>
                   </div>
                 </div>
@@ -1610,9 +1610,9 @@ export default function Portal() {
                 <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>참여 멤버 {cd.members.length}</div>
-                    {cd.isOwn && <button onClick={() => setInviteOpen((v) => !v)} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 16, padding: '5px 11px' }}>{inviteOpen ? '닫기' : '＋ 회원 초대'}</button>}
+                    {(cd.isOwn || be.isAdmin) && <button onClick={() => setInviteOpen((v) => !v)} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 16, padding: '5px 11px' }}>{inviteOpen ? '닫기' : '＋ 회원 초대'}</button>}
                   </div>
-                  {inviteOpen && cd.isOwn && (
+                  {inviteOpen && (cd.isOwn || be.isAdmin) && (
                     <div style={{ marginBottom: 12 }}>
                       <input value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} placeholder="이름으로 검색…" style={{ ...inputStyle, padding: '8px 12px', fontSize: 12.5, marginBottom: 8 }} />
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
@@ -1634,7 +1634,7 @@ export default function Portal() {
                       <div key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 16, padding: '4px 9px 4px 4px' }}>
                         <Avatar initials={m.initials} color={m.color} photo={m.photo} size={24} fontSize={9} />
                         <span style={{ fontSize: 12, color: '#EAF3F1' }}>{m.name}{m.isMe ? ' (나)' : ''}</span>
-                        {cd.isOwn && !m.isMe && <button onClick={() => void be.removeChallengeMember(m.userId)} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: 'rgba(224,135,92,.7)' }}>×</button>}
+                        {(cd.isOwn || be.isAdmin) && !m.isMe && <button onClick={() => void be.removeChallengeMember(m.userId)} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: 'rgba(224,135,92,.7)' }}>×</button>}
                       </div>
                     ))}
                   </div>
@@ -1655,9 +1655,9 @@ export default function Portal() {
                   <button onClick={closeMember} style={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'rgba(231,239,234,.6)', marginBottom: 16 }}>‹ 멤버 목록으로</button>
                   <section style={{ ...card, padding: 24 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 15, marginBottom: 6 }}>
-                      <Avatar initials={activeMember.initials} color={activeMember.color} photo={activeMember.photo} size={58} fontSize={17} />
+                      <Avatar initials={activeMember.initials} color={activeMember.color} photo={activeMember.photo} size={58} fontSize={17} ring={activeMember.role === 'trainer' ? '0 0 0 2px #2E9BA6' : undefined} />
                       <div>
-                        <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#F2F7F3' }}>{activeMember.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#F2F7F3' }}>{activeMember.name}</span>{activeMember.role === 'trainer' && <span style={{ fontSize: 10, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 8, padding: '2px 8px' }}>코치</span>}</div>
                         <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)' }}>{activeMember.bio2}</div>
                         {activeMember.measureCount != null && activeMember.measureCount > 0 && (
                           <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.4)', marginTop: 3, fontFamily: "'IBM Plex Mono',monospace" }}>측정 {activeMember.measureCount}회{activeMember.lastDate ? ` · 최근 ${activeMember.lastDate}` : ''}</div>

@@ -245,6 +245,15 @@ export async function fetchMyRooms(): Promise<RoomRow[]> {
   return rooms
 }
 
+/** Every room (trainer/admin only; RLS lets trainers read all rooms). */
+export async function fetchAllRooms(): Promise<RoomRow[]> {
+  const { data } = await requireSupabase().from('chat_rooms')
+    .select('id, name, is_private, join_code, created_by').order('created_at', { ascending: true })
+  const rooms = (data ?? []) as RoomRow[]
+  rooms.sort((a, b) => (a.name === '하늘 라운지' ? -1 : b.name === '하늘 라운지' ? 1 : a.name.localeCompare(b.name)))
+  return rooms
+}
+
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 function genCode(): string {
   // deterministic-enough randomness without Math.random in workflows; fine here in the app
@@ -508,8 +517,8 @@ export async function addMemberCheer(id: string, text: string) {
 }
 export async function fetchMemberProfile(id: string) {
   const { data } = await requireSupabase().from('profiles')
-    .select('name, initials, avatar_color, bio, bio2, photo_path').eq('id', id).single()
-  return data as { name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null } | null
+    .select('name, initials, avatar_color, bio, bio2, photo_path, role').eq('id', id).single()
+  return data as { name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null; role: 'client' | 'trainer' } | null
 }
 
 // ───────────────────── trainer studio ───────────────────

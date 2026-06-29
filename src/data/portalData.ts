@@ -9,8 +9,14 @@ export interface Metric {
   short: string
   unit: string
   good: 'up' | 'down'
-  series: number[]
+  series: (number | null)[]
 }
+
+/** Last / first recorded (non-null) value of a gap-aware series, or null. */
+export const lastNum = (s: (number | null)[]): number | null => { for (let i = s.length - 1; i >= 0; i--) if (s[i] != null) return s[i] as number; return null }
+export const firstNum = (s: (number | null)[]): number | null => { for (let i = 0; i < s.length; i++) if (s[i] != null) return s[i] as number; return null }
+/** Non-null points with their original index. */
+export const recorded = (s: (number | null)[]): { v: number; i: number }[] => s.map((v, i) => ({ v, i })).filter((p) => p.v != null) as { v: number; i: number }[]
 
 export const dates = ['1월 12일', '2월 9일', '3월 15일', '4월 12일', '5월 10일', '6월 14일']
 
@@ -124,13 +130,15 @@ export function segColor(pct: number): string {
 
 export const norm = (v: number, a: number, b: number) => Math.max(0, Math.min(1, (v - a) / (b - a)))
 
-export function buildSpark(series: number[]): string {
-  const min = Math.min(...series)
-  const max = Math.max(...series)
+export function buildSpark(series: (number | null)[]): string {
+  const vals = recorded(series).map((p) => p.v)
+  if (vals.length < 2) return ''
+  const min = Math.min(...vals)
+  const max = Math.max(...vals)
   const sp = (max - min) || 1
-  return series
+  return vals
     .map((v, i) => {
-      const x = (i / (series.length - 1)) * 116 + 2
+      const x = (i / (vals.length - 1)) * 116 + 2
       const y = 30 - ((v - min) / sp) * 26
       return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1)
     })
@@ -141,7 +149,7 @@ export interface TrendPoint {
   x: number; y: number; v: number; label: string; full: string; disp: string; ly: number
 }
 export interface TrendData {
-  title: string; latest: string; line: string; area: string
+  title: string; latest: string; line: string; area: string; hasData: boolean
   pts: TrendPoint[]
   grid: { y: number; ty: number; label: string }[]
   deltaText: string; deltaColor: string; deltaBg: string
@@ -153,16 +161,19 @@ export function buildTrend(
   datesData: string[] = dates,
 ): TrendData {
   const m = metricsData[selectedMetric]
-  const vals = m.series
+  const md = (d: string) => d.replace('월 ', '/').replace('일', '').trim()  // "6월 14일" → "6/14"
+  const rec = recorded(m.series)              // only recorded points, with their date index
+  const vals = rec.map((p) => p.v)
   const W = 560, H = 260, pL = 44, pR = 20, pT = 26, pB = 42
+  const empty: TrendData = { title: m.label, latest: '기록 없음', line: '', area: '', hasData: false, pts: [], grid: [], deltaText: '', deltaColor: '#9DAFCB', deltaBg: 'rgba(255,255,255,.06)' }
+  if (vals.length === 0) return empty
   const min = Math.min(...vals), max = Math.max(...vals), span = (max - min) || 1
   const lo = min - span * 0.35, hi = max + span * 0.35, rng = hi - lo
-  const xs = vals.map((_v, i) => pL + (i / (vals.length - 1)) * (W - pL - pR))
+  const xs = vals.map((_v, i) => pL + (vals.length === 1 ? 0.5 : i / (vals.length - 1)) * (W - pL - pR))
   const ys = vals.map((v) => pT + (1 - (v - lo) / rng) * (H - pT - pB))
-  const md = (d: string) => d.replace('월 ', '/').replace('일', '').trim()  // "6월 14일" → "6/14"
   const pts: TrendPoint[] = xs.map((x, i) => ({
     x: +x.toFixed(1), y: +ys[i].toFixed(1), v: vals[i],
-    label: md(datesData[i] ?? ''), full: datesData[i],
+    label: md(datesData[rec[i].i] ?? ''), full: datesData[rec[i].i],
     disp: vals[i] + (m.unit ? ' ' + m.unit : ''), ly: +(ys[i] - 12).toFixed(1),
   }))
   const line = pts.map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ')
@@ -177,17 +188,17 @@ export function buildTrend(
   const improved = (m.good === 'up') ? diff >= 0 : diff <= 0
   const dec = (m.unit === '%' || ['smm', 'tbw', 'bodyFatMass', 'weight', 'bmi'].includes(selectedMetric)) ? 1 : 0
   const sign = diff > 0 ? '+' : ''
-  const firstLabel = md(datesData[0] ?? '') || '처음'
+  const firstLabel = md(datesData[rec[0].i] ?? '') || '처음'
   return {
-    title: m.label, latest: last + (m.unit ? ' ' + m.unit : ''), line, area, pts, grid,
-    deltaText: firstLabel + ' 대비 ' + sign + diff.toFixed(dec),
+    title: m.label, latest: last + (m.unit ? ' ' + m.unit : ''), line, area, hasData: true, pts, grid,
+    deltaText: vals.length < 2 ? '기준 1회' : firstLabel + ' 대비 ' + sign + diff.toFixed(dec),
     deltaColor: improved ? '#67D7DF' : '#E0A06A',
     deltaBg: improved ? 'rgba(46,155,166,.18)' : 'rgba(224,138,94,.2)',
   }
 }
 
 export interface GaugeGeom {
-  key: string; label: string; unit: string; value: number
+  key: string; label: string; unit: string; value: number | null; noData: boolean
   status: string; statusColor: string; verdict: '' | 'Good' | 'Bad'
   markerPct: number; underW: number; normW: number; overW: number
   nMin: number; nMax: number
@@ -209,8 +220,12 @@ export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics, ra
   return Object.keys(gconf).map((key) => {
     const m = metricsData[key as MetricKey]
     const c = gconf[key]
-    const val = m.series[m.series.length - 1]
     const [nMin, nMax] = normFor(key as MetricKey, ranges) ?? c.norm
+    const val = lastNum(m.series)
+    if (val == null) return {
+      key, label: m.label, unit: m.unit, value: null, noData: true, status: '기록 없음', statusColor: '#9DAFCB', verdict: '' as const,
+      markerPct: 0, underW: 0, normW: 100, overW: 0, nMin, nMax,
+    }
     // widen the display range so a personalized normal band still fits the bar
     const dMin = Math.min(c.disp[0], nMin, val)
     const dMax = Math.max(c.disp[1], nMax, val)
@@ -228,7 +243,7 @@ export function buildGauges(metricsData: Record<MetricKey, Metric> = metrics, ra
       sc = isGood ? '#7BD88F' : '#E0875C'
     }
     return {
-      key, label: m.label, unit: m.unit, value: val, status, statusColor: sc, verdict,
+      key, label: m.label, unit: m.unit, value: val, noData: false, status, statusColor: sc, verdict,
       markerPct: +markerPct.toFixed(1), underW: +underW.toFixed(1),
       normW: +normW.toFixed(1), overW: +overW.toFixed(1),
       nMin, nMax,
@@ -246,18 +261,23 @@ export interface RadarData {
 }
 export function buildRadar(metricsData: Record<MetricKey, Metric> = metrics, ranges?: RangeMap): RadarData {
   const cx = 120, cy = 120, R = 88
-  const last = (k: MetricKey) => metricsData[k].series[metricsData[k].series.length - 1]
-  const first = (k: MetricKey) => metricsData[k].series[0]
+  const last = (k: MetricKey) => lastNum(metricsData[k].series)
+  const first = (k: MetricKey) => firstNum(metricsData[k].series) ?? lastNum(metricsData[k].series) ?? 0
   // each axis is normalized so "further out = better"; mk carries the metric so
-  // we can judge Good/Bad against its (personal) standard range.
-  const axes: { k: string; mk: MetricKey; cur: number; prev: number; raw: string }[] = [
-    { k: '근육', mk: 'smm', cur: norm(last('smm'), 24, 36), prev: norm(first('smm'), 24, 36), raw: '골격근량 ' + last('smm') + 'kg' },
-    { k: '체지방', mk: 'pbf', cur: 1 - norm(last('pbf'), 8, 32), prev: 1 - norm(first('pbf'), 8, 32), raw: '체지방률 ' + last('pbf') + '%' },
-    { k: '수분', mk: 'tbw', cur: norm(last('tbw'), 36, 44), prev: norm(first('tbw'), 36, 44), raw: '체수분 ' + last('tbw') + 'L' },
-    { k: '점수', mk: 'score', cur: norm(last('score'), 55, 100), prev: norm(first('score'), 55, 100), raw: '인바디 ' + last('score') + '점' },
-    { k: 'BMI', mk: 'bmi', cur: 1 - norm(Math.abs(last('bmi') - 21.7), 0, 6), prev: 1 - norm(Math.abs(first('bmi') - 21.7), 0, 6), raw: 'BMI ' + last('bmi') },
-    { k: '내장', mk: 'visceral', cur: 1 - norm(last('visceral'), 3, 12), prev: 1 - norm(first('visceral'), 3, 12), raw: '내장지방 Lv.' + last('visceral') },
+  // we can judge Good/Bad against its (personal) standard range. Axes whose
+  // metric has no recorded value are dropped (excluded from the balance).
+  const axisDefs: { k: string; mk: MetricKey; cur: (v: number) => number; prev: (v: number) => number; raw: (v: number) => string }[] = [
+    { k: '근육', mk: 'smm', cur: (v) => norm(v, 24, 36), prev: (v) => norm(v, 24, 36), raw: (v) => '골격근량 ' + v + 'kg' },
+    { k: '체지방', mk: 'pbf', cur: (v) => 1 - norm(v, 8, 32), prev: (v) => 1 - norm(v, 8, 32), raw: (v) => '체지방률 ' + v + '%' },
+    { k: '수분', mk: 'tbw', cur: (v) => norm(v, 36, 44), prev: (v) => norm(v, 36, 44), raw: (v) => '체수분 ' + v + 'L' },
+    { k: '점수', mk: 'score', cur: (v) => norm(v, 55, 100), prev: (v) => norm(v, 55, 100), raw: (v) => '인바디 ' + v + '점' },
+    { k: 'BMI', mk: 'bmi', cur: (v) => 1 - norm(Math.abs(v - 21.7), 0, 6), prev: (v) => 1 - norm(Math.abs(v - 21.7), 0, 6), raw: (v) => 'BMI ' + v },
+    { k: '내장', mk: 'visceral', cur: (v) => 1 - norm(v, 3, 12), prev: (v) => 1 - norm(v, 3, 12), raw: (v) => '내장지방 Lv.' + v },
   ]
+  const axes = axisDefs.filter((a) => last(a.mk) != null).map((a) => {
+    const cv = last(a.mk) as number, pv = first(a.mk)
+    return { k: a.k, mk: a.mk, cur: a.cur(cv), prev: a.prev(pv), raw: a.raw(cv) }
+  })
   const ang = (i: number) => ((-90 + i * (360 / axes.length)) * Math.PI) / 180
   const pt = (i: number, r: number): [number, number] => [
     +(cx + Math.cos(ang(i)) * R * r).toFixed(1),
@@ -267,14 +287,14 @@ export function buildRadar(metricsData: Record<MetricKey, Metric> = metrics, ran
   const spokes = axes.map((_a, i) => { const [x, y] = pt(i, 1); return { x, y } })
   const curDots = axes.map((a, i) => {
     const [x, y] = pt(i, a.cur)
-    const v = assess(a.mk, last(a.mk), metricsData, ranges)
+    const v = assess(a.mk, last(a.mk) as number, metricsData, ranges)
     return { x, y, k: a.k, raw: a.raw, pctText: Math.round(a.cur * 100) + '%', state: v.state, verdict: v.label, color: v.color }
   })
   const labels = axes.map((a, i) => {
     const [x, y] = pt(i, 1.2)
     let anchor: 'start' | 'middle' | 'end' = 'middle'
     if (x < cx - 6) anchor = 'end'; else if (x > cx + 6) anchor = 'start'
-    const v = assess(a.mk, last(a.mk), metricsData, ranges)
+    const v = assess(a.mk, last(a.mk) as number, metricsData, ranges)
     return { k: a.k, x: +x.toFixed(1), y: +(y + 3).toFixed(1), anchor, color: v.state === 'normal' ? 'rgba(231,239,234,.55)' : v.color }
   })
   return {

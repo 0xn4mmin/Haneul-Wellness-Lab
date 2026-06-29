@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import * as api from './api'
-import { metrics as MOCK_METRICS, dates as MOCK_DATES, buildSpark, type Metric, type MetricKey } from './portalData'
+import { metrics as MOCK_METRICS, dates as MOCK_DATES, buildSpark, lastNum, type Metric, type MetricKey } from './portalData'
 
 const METRIC_CARD_KEYS: MetricKey[] = ['score', 'weight', 'smm', 'pbf', 'bmi', 'tbw']
 
@@ -92,6 +92,7 @@ export interface Backend {
   setGoal: (metricKey: string, target: number | null) => void
   viewResultSheet: (path: string) => void
   deleteMeasurement: (id: string, resultPath?: string | null) => Promise<void>
+  addManualMeasurement: (date: string, values: Partial<Record<MetricKey, number>>) => Promise<void>
   updateMeasurement: (id: string, date: string | null, values: Record<string, number>) => Promise<void>
   fetchMeasurementValues: (id: string) => Promise<Record<string, number>>
   unreadChat: number
@@ -361,7 +362,8 @@ export function useBackend(): Backend {
           const built = {} as Record<MetricKey, Metric>
           for (const k of Object.keys(MOCK_METRICS) as MetricKey[]) {
             const sv = series[k]
-            built[k] = { ...MOCK_METRICS[k], series: sv && sv.length ? sv : MOCK_METRICS[k].series }
+            // gap-aware: null-filled where unrecorded; all-null if never recorded
+            built[k] = { ...MOCK_METRICS[k], series: sv ?? dates.map(() => null) }
           }
           setRemoteMetrics(built); setRemoteDates(dates.map(fmtDate))
           setLastMeasureISO(dates[dates.length - 1])
@@ -499,6 +501,10 @@ export function useBackend(): Backend {
   }, [])
   const deleteMeasurement = useCallback(async (id: string, resultPath?: string | null) => {
     await api.deleteMeasurement(id, resultPath)
+    setReloadKey((k) => k + 1)
+  }, [])
+  const addManualMeasurement = useCallback(async (date: string, values: Partial<Record<MetricKey, number>>) => {
+    await api.commitManualMeasurement(date, values)
     setReloadKey((k) => k + 1)
   }, [])
   const updateMeasurement = useCallback(async (id: string, date: string | null, values: Record<string, number>) => {
@@ -715,16 +721,17 @@ export function useBackend(): Backend {
         const mc = METRIC_CARD_KEYS.map((k) => {
           const open = adminView || priv[k] === 'public'
           const sv = series[k]
+          const lv = sv ? lastNum(sv) : null
           return {
             label: MOCK_METRICS[k].label, unit: MOCK_METRICS[k].unit, locked: !open, shown: open,
-            value: sv && sv.length ? sv[sv.length - 1] : 0, spark: sv && sv.length ? buildSpark(sv) : '',
+            value: lv ?? 0, spark: sv ? buildSpark(sv) : '',
           }
         })
         const publicCount = mc.filter((m) => m.shown).length
-        const scorePublic = (adminView || priv.score === 'public') && !!series.score?.length
+        const scorePublic = (adminView || priv.score === 'public') && lastNum(series.score ?? []) != null
         setActiveMember({
           id, name: prof?.name ?? '', initials: prof?.initials ?? '', color: prof?.avatar_color ?? '#5E97A0',
-          photo: api.avatarUrl(prof?.photo_path), role: prof?.role ?? 'client', bio2: prof?.bio2 ?? '', score: scorePublic ? series.score![series.score!.length - 1] : 0,
+          photo: api.avatarUrl(prof?.photo_path), role: prof?.role ?? 'client', bio2: prof?.bio2 ?? '', score: scorePublic ? (lastNum(series.score!) ?? 0) : 0,
           measureCount: dates.length, lastDate: dates.length ? fmtDate(dates[dates.length - 1]) : null,
           publicCount, lockedCount: METRIC_CARD_KEYS.length - publicCount,
           metrics: mc,
@@ -831,7 +838,7 @@ export function useBackend(): Backend {
       ? Math.ceil((Date.parse(lastMeasureISO) + cycleDays * 86400000 - Date.now()) / 86400000)
       : null,
     setMeasureCycle, sleepLogs, addSleepLog, measurements, goals, setGoal, viewResultSheet,
-    deleteMeasurement, updateMeasurement, fetchMeasurementValues,
+    deleteMeasurement, updateMeasurement, fetchMeasurementValues, addManualMeasurement,
     unreadChat: (notifications ?? []).filter((n) => n.type === 'chat' && !n.read).length,
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,

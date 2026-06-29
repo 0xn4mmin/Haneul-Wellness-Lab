@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   dates, metrics, segData, research, goals, conditionLog, challenge,
   me as ME, coach as COACH, segColor, buildSpark, buildTrend, buildGauges, buildRadar, assess, METRIC_INFO,
+  lastNum, firstNum,
   type MetricKey,
 } from '../data/portalData'
 import { initialState, type PortalState, type View } from '../data/portalState'
@@ -62,6 +63,9 @@ export default function Portal() {
   const [editNoteId, setEditNoteId] = useState<string | null>(null)
   const [editNoteText, setEditNoteText] = useState('')
   const [measEdit, setMeasEdit] = useState<{ id: string; date: string; iso: string; values: Record<string, string> } | null>(null)
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualDate, setManualDate] = useState('')
+  const [manualVals, setManualVals] = useState<Record<string, string>>({})
   const [postImg, setPostImg] = useState<File | null>(null)
   const [chatImg, setChatImg] = useState<File | null>(null)
   const [cgMetric, setCgMetric] = useState('')
@@ -385,7 +389,7 @@ export default function Portal() {
     : { text: '비공개 · 나와 코치만 볼 수 있어요', color: 'rgba(231,239,234,.6)', bg: 'rgba(255,255,255,.06)', dot: 'rgba(231,239,234,.4)' }
 
   // brief
-  const _f = (k: MetricKey, i: number) => M[k].series[i]
+  const _f = (k: MetricKey, i: number) => M[k].series[i] ?? lastNum(M[k].series) ?? 0
   const _l5 = M.smm.series.length - 1
   const dPbf = +(_f('pbf', _l5) - _f('pbf', 0)).toFixed(1)
   const dSmm = +(_f('smm', _l5) - _f('smm', 0)).toFixed(1)
@@ -408,8 +412,8 @@ export default function Portal() {
   const briefBackend = be.configured && !!be.session
   const brief = (briefBackend && be.briefing) ? be.briefing : ruleBrief
 
-  const lastV = (k: MetricKey) => M[k].series[M[k].series.length - 1]
-  const firstV = (k: MetricKey) => M[k].series[0]
+  const lastV = (k: MetricKey) => lastNum(M[k].series)
+  const firstV = (k: MetricKey) => firstNum(M[k].series)
   const ringDefs: { key: MetricKey; label: string; unit: string; down: boolean; color: string }[] = [
     { key: 'score', label: '인바디 점수', unit: '점', down: false, color: '#67D7DF' },
     { key: 'smm', label: '골격근량', unit: 'kg', down: false, color: '#8FD89E' },
@@ -420,11 +424,12 @@ export default function Portal() {
   const goalsMap: Record<string, number | undefined> = be.configured ? (be.goals ?? {}) : { score: 90, smm: 34, pbf: 15, weight: 66 }
   const rings = ringDefs.map((d) => {
     const cur = lastV(d.key); const start = firstV(d.key); const goal = goalsMap[d.key]
-    const hasGoal = typeof goal === 'number'
+    const noData = cur == null
+    const hasGoal = typeof goal === 'number' && !noData
     let p = 0
-    if (hasGoal) { p = d.down ? (start - cur) / ((start - (goal as number)) || 1) : cur / ((goal as number) || 1); p = Math.max(0, Math.min(1, p)) }
+    if (hasGoal && start != null) { p = d.down ? (start - cur) / ((start - (goal as number)) || 1) : cur / ((goal as number) || 1); p = Math.max(0, Math.min(1, p)) }
     const fix = d.unit === '점' ? 0 : 1
-    return { ...d, cur, hasGoal, goalVal: goal, value: cur.toFixed(fix) + d.unit, goalLabel: hasGoal ? '목표 ' + goal + d.unit : '목표 미설정', pct: hasGoal ? Math.round(p * 100) : null, dashArray: (ringCirc * (hasGoal ? p : 0)).toFixed(1) + ' ' + ringCirc.toFixed(1) }
+    return { ...d, cur, noData, hasGoal, goalVal: goal, value: noData ? '기록 없음' : (cur as number).toFixed(fix) + d.unit, goalLabel: noData ? '' : hasGoal ? '목표 ' + goal + d.unit : '목표 미설정', pct: hasGoal ? Math.round(p * 100) : null, dashArray: (ringCirc * (hasGoal ? p : 0)).toFixed(1) + ' ' + ringCirc.toFixed(1) }
   })
 
   const cmpKeys: MetricKey[] = ['weight', 'smm', 'pbf', 'bmi', 'tbw', 'score']
@@ -432,7 +437,9 @@ export default function Portal() {
   const cmpFromIdx = Math.min(Math.max(0, s.cmpFrom), Math.max(0, D.length - 1))
   const cmpToIdx = Math.min(Math.max(0, s.cmpTo), Math.max(0, D.length - 1))
   const compare = cmpKeys.map((k) => {
-    const m = M[k]; const a = m.series[cmpFromIdx]; const b = m.series[cmpToIdx]; const d = +(b - a).toFixed(1)
+    const m = M[k]; const a = m.series[cmpFromIdx]; const b = m.series[cmpToIdx]
+    if (a == null || b == null) return { label: m.label, unit: m.unit, before: a, after: b, delta: '기록 없음', deltaColor: '#9DAFCB', deltaBg: 'rgba(255,255,255,.06)' }
+    const d = +(b - a).toFixed(1)
     const improved = (m.good === 'up') ? d >= 0 : d <= 0
     return { label: m.label, unit: m.unit, before: a, after: b, delta: (d > 0 ? '+' : '') + d, deltaColor: improved ? '#67D7DF' : '#E0A06A', deltaBg: improved ? 'rgba(46,155,166,.16)' : 'rgba(224,138,94,.18)' }
   })
@@ -450,7 +457,7 @@ export default function Portal() {
     activeMember = be.activeMember
   } else if (s.activeMember) {
     const m = s.members.find((x) => x.id === s.activeMember)!
-    const mc = metricKeysForCard.map((k) => { const open = m.pub.includes(k); const met = metrics[k]; return { label: met.label, unit: met.unit, locked: !open, shown: open, value: met.series[met.series.length - 1], spark: buildSpark(met.series) } })
+    const mc = metricKeysForCard.map((k) => { const open = m.pub.includes(k); const met = metrics[k]; return { label: met.label, unit: met.unit, locked: !open, shown: open, value: lastNum(met.series) ?? 0, spark: buildSpark(met.series) } })
     activeMember = { id: m.id, name: m.name, initials: m.initials, color: m.color, photo: null, role: m.role ?? 'client', bio2: m.bio2, score: m.score, measureCount: dates.length, lastDate: dates[dates.length - 1], metrics: mc, comments: s.memberComments[m.id] || [] }
   }
   const memberOpen = be.configured ? !!be.activeMember : !!s.activeMember
@@ -460,7 +467,7 @@ export default function Portal() {
     ? (be.roster ?? []).map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo as string | null, score: r.score, pbf: r.pbf, smm: r.smm, last: D[D.length - 1] }))
     : [
       { id: 'jiwoo', name: '박지우', initials: '지우', color: '#6E9B8E', photo: null as string | null, score: 78, pbf: 20.0, smm: 31.9, last: '6월 14일' },
-      ...s.members.map((m, i) => ({ id: m.id, name: m.name, initials: m.initials, color: m.color, photo: (m.photo ?? null) as string | null, score: m.score, pbf: metrics.pbf.series[5] + (m.score - 80) * -0.3, smm: metrics.smm.series[5] + (m.score - 80) * 0.1, last: ['6월 12일', '6월 13일', '6월 11일'][i] || '6월 10일' })),
+      ...s.members.map((m, i) => ({ id: m.id, name: m.name, initials: m.initials, color: m.color, photo: (m.photo ?? null) as string | null, score: m.score, pbf: (metrics.pbf.series[5] ?? 0) + (m.score - 80) * -0.3, smm: (metrics.smm.series[5] ?? 0) + (m.score - 80) * 0.1, last: ['6월 12일', '6월 13일', '6월 11일'][i] || '6월 10일' })),
     ]
   const roster = rosterSrc.map((r) => { const st = statusOf(r.score); const tsel = s.coachTargetId === r.id; return { ...r, pbf: r.pbf.toFixed(1), smm: r.smm.toFixed(1), status: st.t, statusFg: st.fg, statusBg: st.bg, selBg: tsel ? CTA : 'rgba(255,255,255,.06)', selFg: tsel ? '#060B17' : '#BFCCE6', selBorder: tsel ? 'transparent' : 'rgba(255,255,255,.16)' } })
   const coachTargetMember = roster.find((m) => m.id === s.coachTargetId)
@@ -536,10 +543,10 @@ export default function Portal() {
   const scans = scansSrc.map((r) => ({ id: r.id, iso: r.iso, date: r.date, path: r.path, label: r.has ? '결과지 보기' : '미첨부', cursor: r.has ? 'pointer' : 'default', chipBg: r.has ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.05)', chipFg: r.has ? '#67D7DF' : 'rgba(231,239,234,.35)', has: r.has }))
   // research detail: real from the latest measurement when available, else demo
   const researchSrc = latestMeasure
-    ? (() => { const dt = latestMeasure.detail || {}; const w = lastV('weight'); const ideal = dt.idealWeight ?? w; const adj = +(ideal - w).toFixed(1)
+    ? (() => { const dt = latestMeasure.detail || {}; const w = lastV('weight') ?? 0; const ideal = dt.idealWeight ?? w; const adj = +(ideal - w).toFixed(1); const bmrV = lastV('bmr'); const visV = lastV('visceral')
         return [
-          { k: '기초대사량', v: Math.round(lastV('bmr')).toLocaleString(), u: 'kcal' },
-          { k: '내장지방 레벨', v: String(lastV('visceral')), u: '레벨' },
+          { k: '기초대사량', v: bmrV != null ? Math.round(bmrV).toLocaleString() : '—', u: 'kcal' },
+          { k: '내장지방 레벨', v: visV != null ? String(visV) : '—', u: '레벨' },
           { k: '위상각', v: dt.phaseAngle != null ? Number(dt.phaseAngle).toFixed(1) : '—', u: '°' },
           { k: 'SMI', v: dt.smi != null ? Number(dt.smi).toFixed(1) : '—', u: 'kg/m²' },
           { k: '적정체중', v: ideal != null ? Number(ideal).toFixed(1) : '—', u: 'kg' },
@@ -731,7 +738,13 @@ export default function Portal() {
                     ['골격근량', 'smm', 'kg', 1],
                     ['기초대사량', 'bmr', 'kcal', 0],
                   ] as [string, MetricKey, string, number][]).map(([label, key, unit, fix]) => {
-                    const val = M[key].series[M[key].series.length - 1]
+                    const val = lastNum(M[key].series)
+                    if (val == null) return (
+                      <div key={label}>
+                        <div style={{ fontSize: 11, color: '#9DAFCB' }}>{label}</div>
+                        <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 20, color: 'rgba(231,239,234,.4)', marginTop: 1, whiteSpace: 'nowrap' }}>기록 없음</div>
+                      </div>
+                    )
                     const a = assess(key, val, M, measureRanges)
                     return (
                       <div key={label}>
@@ -795,9 +808,9 @@ export default function Portal() {
                           <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="7" />
                           {r.hasGoal && <circle cx="40" cy="40" r="34" fill="none" stroke={r.color} strokeWidth="7" strokeLinecap="round" strokeDasharray={r.dashArray} />}
                         </svg>
-                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Gowun Batang',serif", fontSize: r.hasGoal ? 18 : 22, color: r.hasGoal ? '#F2F7F3' : '#fff' }}>{r.hasGoal ? <>{r.pct}<span style={{ fontSize: 10, marginTop: 4 }}>%</span></> : r.cur.toFixed(r.unit === '점' ? 0 : 1)}</div>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Gowun Batang',serif", fontSize: r.hasGoal ? 18 : 22, color: r.hasGoal ? '#F2F7F3' : '#fff' }}>{r.hasGoal ? <>{r.pct}<span style={{ fontSize: 10, marginTop: 4 }}>%</span></> : (r.cur != null ? r.cur.toFixed(r.unit === '점' ? 0 : 1) : '—')}</div>
                       </div>
-                      <div style={{ textAlign: 'center' }}><div style={{ fontSize: 12, color: '#EAF3F1', fontWeight: 600 }}>{r.label}</div><div style={{ fontSize: 10, color: r.hasGoal ? 'rgba(231,239,234,.45)' : '#C9A24B', marginTop: 1 }}>{r.hasGoal ? `${r.value} · ${r.goalLabel}` : '목표 미설정'}</div></div>
+                      <div style={{ textAlign: 'center' }}><div style={{ fontSize: 12, color: '#EAF3F1', fontWeight: 600 }}>{r.label}</div><div style={{ fontSize: 10, color: r.hasGoal ? 'rgba(231,239,234,.45)' : '#C9A24B', marginTop: 1 }}>{r.hasGoal ? `${r.value} · ${r.goalLabel}` : (r.noData ? '기록 없음' : '목표 미설정')}</div></div>
                     </div>
                   ))}
                 </div>
@@ -836,6 +849,12 @@ export default function Portal() {
                   const gp = privacyMap[g.key]; const gpub = gp === 'public'
                   const fmt = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(1)
                   const tipOn = (side: 'min' | 'max') => gaugeTip?.key === g.key && gaugeTip.side === side
+                  if (g.noData) return (
+                    <div key={g.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: '#EAF3F1' }}>{g.label}</span>
+                      <span style={{ fontSize: 12, color: 'rgba(231,239,234,.4)' }}>기록 없음</span>
+                    </div>
+                  )
                   return (
                     <div key={g.key} style={{ display: 'flex', flexDirection: 'column', gap: 7, animation: 'hwl-rise .4s ease both' }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
@@ -931,6 +950,7 @@ export default function Portal() {
                 </div>
                 <svg viewBox="0 0 560 260" style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}>
                   <defs><linearGradient id="trendArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2E9BA6" stopOpacity="0.42" /><stop offset="100%" stopColor="#2E9BA6" stopOpacity="0" /></linearGradient></defs>
+                  {!trend.hasData && <text x="292" y="135" textAnchor="middle" fontSize="13" fill="rgba(231,239,234,.4)" fontFamily="Pretendard">이 지표의 측정 기록이 없어요</text>}
                   {trend.grid.map((gl, i) => (
                     <g key={i}>
                       <line x1="44" y1={gl.y} x2="540" y2={gl.y} stroke="rgba(255,255,255,.07)" strokeWidth="1" />
@@ -1030,6 +1050,9 @@ export default function Portal() {
                   ))}
                 </div>
                 {be.configured && be.session && <OcrUpload onCommitted={be.reload} />}
+                {be.configured && be.session && (
+                  <button onClick={() => { setManualVals({}); setManualDate(todayISO); setManualOpen(true) }} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%', textAlign: 'center', marginTop: 10, padding: '11px 0', borderRadius: 12, border: '1px dashed rgba(103,215,223,.4)', color: '#9FE2E8', fontSize: 13, fontWeight: 600 }}>✎ 직접 입력으로 측정 추가</button>
+                )}
               </section>
             </div>
 
@@ -1540,6 +1563,32 @@ export default function Portal() {
             )
           })()}
 
+          {/* 직접 입력 측정 추가 모달 */}
+          {manualOpen && (
+            <div onClick={() => setManualOpen(false)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 122, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto', background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                <div style={eyebrow}>Manual Entry</div><div style={cardTitle}>직접 입력으로 측정 추가</div>
+                <div style={{ fontSize: 12, color: 'rgba(231,239,234,.5)', marginTop: 4, marginBottom: 16 }}>채운 항목만 저장돼요. 비운 항목은 ‘기록 없음’으로 표시되고 모든 계산에서 제외됩니다.</div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>측정 날짜</label>
+                  <input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 11px', fontSize: 13 }} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
+                  {MEAS_FIELDS.map((f) => (
+                    <div key={f.key}>
+                      <label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>{f.label}{f.unit ? ` (${f.unit})` : ''}</label>
+                      <input type="number" step="0.1" value={manualVals[f.key] ?? ''} onChange={(e) => setManualVals((m) => ({ ...m, [f.key]: e.target.value }))} placeholder="기록 없음" style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                  <button onClick={() => setManualOpen(false)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
+                  <button onClick={() => { if (!manualDate) { alert('측정 날짜를 입력하세요.'); return } const vals: Record<string, number> = {}; for (const f of MEAS_FIELDS) { const n = parseFloat(manualVals[f.key]); if (!isNaN(n)) vals[f.key] = n } if (Object.keys(vals).length === 0) { alert('값을 하나 이상 입력하세요.'); return } void be.addManualMeasurement(manualDate, vals).then(() => setManualOpen(false)).catch((e) => alert(e instanceof Error ? e.message : '저장에 실패했어요.')) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>저장</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 측정값 수정 모달 */}
           {measEdit && (
             <div onClick={() => setMeasEdit(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 122, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
@@ -1600,7 +1649,7 @@ export default function Portal() {
                     <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#EAF3F1' }}>{d.label}</div>
-                        <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)' }}>현재 {lastV(d.key).toFixed(d.unit === '점' ? 0 : 1)}{d.unit}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)' }}>현재 {lastV(d.key) != null ? lastV(d.key)!.toFixed(d.unit === '점' ? 0 : 1) + d.unit : '기록 없음'}</div>
                       </div>
                       <input type="number" step="0.1" value={goalDraft[d.key] ?? ''} onChange={(e) => setGoalDraft((g) => ({ ...g, [d.key]: e.target.value }))} placeholder="목표" style={{ ...inputStyle, width: 92, flex: 'none' }} />
                       <span style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', width: 28 }}>{d.unit}</span>

@@ -58,7 +58,7 @@ export async function getMyProfile(): Promise<ProfileRow | null> {
 /** Per-metric series for a user. RLS hides metrics the viewer can't see. */
 export async function fetchMetricSeries(
   userId: string,
-): Promise<{ dates: string[]; series: Partial<Record<MetricKey, number[]>> }> {
+): Promise<{ dates: string[]; series: Partial<Record<MetricKey, (number | null)[]>> }> {
   const { data, error } = await requireSupabase()
     .from('metric_readings')
     .select('metric_key, date, value')
@@ -66,13 +66,37 @@ export async function fetchMetricSeries(
     .order('date', { ascending: true })
   if (error) throw error
 
-  const byDate = new Set<string>()
-  const series: Partial<Record<MetricKey, number[]>> = {}
+  // gap-aware: each metric's series is aligned to the global date axis, with
+  // null where that metric wasn't recorded on a given date (기록 없음).
+  const dateSet = new Set<string>()
+  const byMetric: Partial<Record<MetricKey, Map<string, number>>> = {}
   for (const r of (data ?? []) as { metric_key: MetricKey; date: string; value: number }[]) {
-    byDate.add(r.date)
-    ;(series[r.metric_key] ??= []).push(Number(r.value))
+    dateSet.add(r.date)
+    ;(byMetric[r.metric_key] ??= new Map()).set(r.date, Number(r.value))
   }
-  return { dates: [...byDate].sort(), series }
+  const dates = [...dateSet].sort()
+  const series: Partial<Record<MetricKey, (number | null)[]>> = {}
+  for (const k of Object.keys(byMetric) as MetricKey[]) {
+    const m = byMetric[k]!
+    series[k] = dates.map((d) => (m.has(d) ? (m.get(d) as number) : null))
+  }
+  return { dates, series }
+}
+/** Manual measurement: stores readings only for the metrics actually filled. */
+export async function commitManualMeasurement(date: string, values: Partial<Record<MetricKey, number>>): Promise<void> {
+  const sb = requireSupabase()
+  const me = await uid()
+  const { data: m, error: mErr } = await sb.from('measurements').upsert({
+    user_id: me, date, source: 'manual', segmental: {}, detail: {}, ranges: null, result_sheet_path: null,
+  }, { onConflict: 'user_id,date' }).select('id').single()
+  if (mErr) throw mErr
+  const measurementId = (m as { id: string }).id
+  await sb.from('metric_readings').delete().eq('user_id', me).eq('date', date)
+  const rows = (Object.keys(values) as MetricKey[])
+    .filter((k) => values[k] != null && !isNaN(values[k] as number))
+    .map((k) => ({ user_id: me, measurement_id: measurementId, metric_key: k, date, value: values[k] }))
+  if (rows.length) { const { error: rErr } = await sb.from('metric_readings').insert(rows); if (rErr) throw rErr }
+  await sb.rpc('request_briefing', { p_source: 'measurement' }).then(() => {}, () => {})
 }
 
 export interface MeasurementRow {

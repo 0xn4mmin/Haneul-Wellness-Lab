@@ -1317,23 +1317,27 @@ export default function Portal() {
                       <div onClick={() => setRoomMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
                       <div style={{ position: 'absolute', top: '100%', left: 20, right: 20, marginTop: 2, zIndex: 10, background: '#0E1A38', border: '1px solid rgba(255,247,232,.14)', borderRadius: 14, boxShadow: '0 24px 50px -20px rgba(0,0,0,.85)', overflow: 'hidden', maxHeight: 300, overflowY: 'auto' }}>
                         {chatRooms.map((r) => { const sel = r.id === be.activeRoomId; return (
-                          <button key={r.id} onClick={() => { be.selectRoom(r.id); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, width: '100%', boxSizing: 'border-box', fontSize: 13.5, fontWeight: 600, padding: '12px 15px', background: sel ? 'rgba(46,155,166,.16)' : 'transparent', color: sel ? '#67D7DF' : '#EAF3F1', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-                            {r.isPrivate && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
-                            <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
-                            {sel && <span style={{ fontSize: 10.5 }}>현재</span>}
-                          </button>
-                        ) })}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10 }}>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button onClick={() => { setChatErr(''); setChatModal('create'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(46,155,166,.14)', color: '#67D7DF', border: '1px solid rgba(103,215,223,.3)' }}>＋ 방 만들기</button>
-                            <button onClick={() => { setChatErr(''); setChatModal('join'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>코드로 입장</button>
+                          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 5, width: '100%', boxSizing: 'border-box', padding: '8px 12px', background: sel ? 'rgba(46,155,166,.16)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+                            <button onClick={() => { be.selectRoom(r.id); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: sel ? '#67D7DF' : '#EAF3F1' }}>
+                              {r.isPrivate && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
+                              <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
+                            </button>
+                            {r.isOwn && (
+                              <button onClick={() => { const n = prompt('새 방 이름', r.name); if (n && n.trim() && n.trim() !== r.name) void be.renameRoom(r.id, n.trim()) }} title="이름 수정" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 26, height: 26, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(157,175,203,.85)' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 20h4l10-10-4-4L4 16v4z" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.5 6.5l4 4" strokeLinecap="round" /></svg>
+                              </button>
+                            )}
+                            {r.isOwn && (
+                              <button onClick={() => { if (confirm(`'${r.name}' 방을 삭제할까요? 메시지도 모두 사라져요.`)) void be.deleteRoom(r.id) }} title="방 삭제" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 26, height: 26, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(224,160,106,.85)' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              </button>
+                            )}
+                            {sel && <span style={{ flexShrink: 0, fontSize: 10.5, color: '#67D7DF' }}>현재</span>}
                           </div>
-                          {(activeRoom?.isOwn || (be.isAdmin && activeRoom)) && (
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <button onClick={() => { const n = prompt('새 방 이름', activeRoom!.name); if (n && n.trim() && n.trim() !== activeRoom!.name) void be.renameRoom(activeRoom!.id, n.trim()); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>✎ 이름 수정</button>
-                              <button onClick={() => { if (confirm(`'${activeRoom!.name}' 방을 삭제할까요? 메시지도 모두 사라져요.`)) void be.deleteRoom(activeRoom!.id); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(224,138,94,.12)', color: '#E0A06A', border: '1px solid rgba(224,138,94,.3)' }}>🗑 방 삭제</button>
-                            </div>
-                          )}
+                        ) })}
+                        <div style={{ display: 'flex', gap: 8, padding: 10 }}>
+                          <button onClick={() => { setChatErr(''); setChatModal('create'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(46,155,166,.14)', color: '#67D7DF', border: '1px solid rgba(103,215,223,.3)' }}>＋ 방 만들기</button>
+                          <button onClick={() => { setChatErr(''); setChatModal('join'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>코드로 입장</button>
                         </div>
                       </div>
                     </>

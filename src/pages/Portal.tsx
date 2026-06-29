@@ -1711,7 +1711,8 @@ export default function Portal() {
                   <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 10 }}>내 목표</div>
                   {cd.myGoals.map((g) => (
                     <div key={g.metricKey} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#EAF3F1', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '8px 12px', marginBottom: 7 }}>
-                      <span style={{ flex: 1 }}>{METRIC_INFO[g.metricKey] ? '' : ''}<b style={{ color: '#9FE2E8' }}>{cd.metricLabels[cd.metricKeys.indexOf(g.metricKey)] ?? g.metricKey}</b> {g.mode === 'relative' ? `${g.target > 0 ? '+' : ''}${g.target}` : `${g.target} 달성`}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}><b style={{ color: '#9FE2E8' }}>{cd.metricLabels[cd.metricKeys.indexOf(g.metricKey)] ?? g.metricKey}</b> {g.mode === 'relative' ? `${g.target > 0 ? '+' : ''}${g.target}` : `${g.target} 달성`}<span style={{ color: g.baseline == null ? 'rgba(224,160,106,.85)' : 'rgba(231,239,234,.45)' }}> · 기준 {g.baseline == null ? '없음' : g.baseline}</span></span>
+                      <button onClick={() => { setCgMetric(g.metricKey); setCgMode(g.mode); setCgTarget(String(g.target)); if (g.baseline != null) { setCgBaseSel('__manual__'); setCgBaseManual(String(g.baseline)) } else { setCgBaseSel(''); setCgBaseManual('') } }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, color: '#67D7DF' }}>수정</button>
                       <button onClick={() => void be.deleteChallengeGoal(g.metricKey)} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, color: 'rgba(224,135,92,.8)' }}>삭제</button>
                     </div>
                   ))}

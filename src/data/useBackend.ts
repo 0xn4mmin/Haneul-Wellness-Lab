@@ -50,7 +50,7 @@ export interface MessageView {
 }
 export interface RoomView { id: string; name: string; isPrivate: boolean; joinCode: string | null; isOwn: boolean }
 export interface ChallengeView { id: string; title: string; metrics: string[]; metricKeys: string[]; scope: string; startDate: string; endDate: string; daysLeft: number; isOwn: boolean }
-export interface ChallengeProgressItem { userId: string; name: string; initials: string; color: string; photo: string | null; metricKey: string; metricLabel: string; unit: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null; current: number | null; pct: number; weeklyPct: number; needsBaseline: boolean; isMe: boolean }
+export interface ChallengeProgressItem { userId: string; name: string; initials: string; color: string; photo: string | null; metricKey: string; metricLabel: string; unit: string; mode: 'absolute' | 'relative'; target: number; baseline: number | null; current: number | null; pct: number; weeklyPct: number; needsBaseline: boolean; hasWeekly: boolean; isMe: boolean }
 export interface ChallengeDetail {
   id: string; title: string; metricKeys: string[]; metricLabels: string[]; startDate: string; endDate: string; scope: string; daysLeft: number; isOwn: boolean
   members: { userId: string; name: string; initials: string; color: string; photo: string | null; isMe: boolean }[]
@@ -138,7 +138,7 @@ export interface Backend {
   inviteToChallenge: (userId: string) => Promise<void>
   removeChallengeMember: (userId: string) => Promise<void>
   leaveChallenge: () => Promise<void>
-  setChallengeGoal: (metricKey: string, mode: 'absolute' | 'relative', target: number) => Promise<void>
+  setChallengeGoal: (metricKey: string, mode: 'absolute' | 'relative', target: number, baseline: number) => Promise<void>
   deleteChallengeGoal: (metricKey: string) => Promise<void>
   // members
   members: MemberView[] | null
@@ -639,6 +639,9 @@ export function useBackend(): Backend {
       // baseline = the start-date reading; null means the member has no
       // measurement on the challenge start date yet
       const needsBaseline = r.baseline == null
+      // weekly progress needs a previous measurement (prev) to compare against;
+      // members with only one reading are excluded from the weekly ranking
+      const hasWeekly = !needsBaseline && r.current != null && r.prev != null
       const floor0 = (v: number) => Math.max(0, Math.round(v))
       let pct = 0, weeklyPct = 0
       if (!needsBaseline && r.current != null) {
@@ -646,12 +649,12 @@ export function useBackend(): Backend {
         const goalDelta = r.mode === 'relative' ? Number(r.target) : (Number(r.target) - base)
         const cur = Number(r.current)
         pct = goalDelta === 0 ? (cur - base === 0 ? 100 : 0) : floor0(((cur - base) / goalDelta) * 100)
-        weeklyPct = (r.prev == null || goalDelta === 0) ? pct : floor0(((cur - Number(r.prev)) / goalDelta) * 100)
+        weeklyPct = !hasWeekly || goalDelta === 0 ? 0 : floor0(((cur - Number(r.prev)) / goalDelta) * 100)
       }
       return {
         userId: r.user_id, name: r.name, initials: r.initials, color: r.color, photo: api.avatarUrl(r.photo_path),
         metricKey: r.metric_key, metricLabel: m?.label ?? r.metric_key, unit: m?.unit ?? '',
-        mode: r.mode, target: Number(r.target), baseline: r.baseline, current: r.current, pct, weeklyPct, needsBaseline, isMe: r.user_id === meId,
+        mode: r.mode, target: Number(r.target), baseline: r.baseline, current: r.current, pct, weeklyPct, needsBaseline, hasWeekly, isMe: r.user_id === meId,
       }
     })
     setChallengeDetail({
@@ -679,13 +682,11 @@ export function useBackend(): Backend {
     await api.leaveChallenge(challengeDetail.id)
     setChallengeDetail(null); await reloadChallenges()
   }, [challengeDetail, reloadChallenges])
-  const setChallengeGoal = useCallback(async (metricKey: string, mode: 'absolute' | 'relative', target: number) => {
+  const setChallengeGoal = useCallback(async (metricKey: string, mode: 'absolute' | 'relative', target: number, baseline: number) => {
     if (!challengeDetail) return
-    const sv = remoteMetrics?.[metricKey as MetricKey]?.series
-    const baseline = sv && sv.length ? sv[sv.length - 1] : null
     await api.setChallengeGoal(challengeDetail.id, metricKey, mode, target, baseline)
     const cv = (challenges ?? []).find((c) => c.id === challengeDetail.id); if (cv) await loadChallengeDetail(cv)
-  }, [challengeDetail, challenges, remoteMetrics, loadChallengeDetail])
+  }, [challengeDetail, challenges, loadChallengeDetail])
   const deleteChallengeGoal = useCallback(async (metricKey: string) => {
     if (!challengeDetail) return
     await api.deleteChallengeGoal(challengeDetail.id, metricKey)

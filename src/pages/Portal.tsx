@@ -67,6 +67,8 @@ export default function Portal() {
   const [cgMetric, setCgMetric] = useState('')
   const [cgMode, setCgMode] = useState<'absolute' | 'relative'>('relative')
   const [cgTarget, setCgTarget] = useState('')
+  const [cgBaseSel, setCgBaseSel] = useState('')      // '' none · '__manual__' · else a picked value
+  const [cgBaseManual, setCgBaseManual] = useState('')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [msgActions, setMsgActions] = useState<string | null>(null)
   const [replyTarget, setReplyTarget] = useState<{ id: string; author: string; text: string } | null>(null)
@@ -1623,8 +1625,8 @@ export default function Portal() {
                 <span style={{ width: 22, height: 22, borderRadius: '50%', background: MEDAL[i], color: '#1a1206', fontSize: 11, fontWeight: 800, fontFamily: "'IBM Plex Mono',monospace", display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 10px ${MEDAL[i]}66` }}>{i + 1}</span>
               </span>
             ) : <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: 'rgba(231,239,234,.4)', width: 22, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
-            const board = (getPct: (p: typeof cd.progress[number]) => number) => {
-              const rows = [...cd.progress].sort((a, b) => getPct(b) - getPct(a))
+            const board = (getPct: (p: typeof cd.progress[number]) => number, items: typeof cd.progress = cd.progress) => {
+              const rows = [...items].sort((a, b) => getPct(b) - getPct(a))
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
                   {rows.map((p, i) => { const pv = getPct(p); return (
@@ -1662,16 +1664,6 @@ export default function Portal() {
                   </div>
                 </div>
 
-                {cd.progress.some((p) => p.isMe && p.needsBaseline) && (
-                  <div style={{ marginTop: 16, padding: '13px 15px', borderRadius: 14, background: 'rgba(224,160,106,.12)', border: '1px solid rgba(224,160,106,.3)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E0A06A" strokeWidth="1.8"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#F2C28A' }}>시작일 측정이 필요해요</div>
-                    </div>
-                    <div style={{ fontSize: 12, color: 'rgba(231,239,234,.7)', lineHeight: 1.6, marginBottom: 10 }}>성취도는 챌린지 <b style={{ color: '#F2C28A' }}>시작일({cd.startDate.replace(/-/g, '.')})</b>의 측정값을 기준으로 계산돼요. 그 날짜의 인바디 결과지를 업로드해 주세요.</div>
-                    <OcrUpload onCommitted={() => { be.reload(); const cv = (be.challenges ?? []).find((c) => c.id === cd.id); if (cv) be.openChallenge(cv) }} />
-                  </div>
-                )}
                 {cd.progress.length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '14px 0 2px' }}>아직 목표를 설정한 참여자가 없어요. 아래에서 내 목표를 정해보세요.</div>}
                 {cd.progress.length > 0 && <>
                   {/* 전체 성취도 (상단) */}
@@ -1690,10 +1682,27 @@ export default function Portal() {
                     )}
                     {board((p) => p.pct)}
                   </div>
-                  {/* 이번 주 성취도 (하단) */}
+                  {/* 이번 주 성취도 (하단) — 직전 측정이 없는 사람은 집계 제외 */}
                   <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
                     <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 12 }}>이번 주 성취도 · 순위</div>
-                    {board((p) => p.weeklyPct)}
+                    {(() => {
+                      const ranked = cd.progress.filter((p) => p.hasWeekly)
+                      const noWeekly = cd.progress.filter((p) => !p.hasWeekly)
+                      return (<>
+                        {ranked.length > 0 ? board((p) => p.weeklyPct, ranked) : <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)' }}>이번 주 집계 대상이 없어요(직전 측정 필요).</div>}
+                        {noWeekly.length > 0 && (
+                          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed rgba(255,255,255,.1)', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                            {noWeekly.map((p) => (
+                              <div key={p.userId} style={{ display: 'flex', alignItems: 'center', gap: 9, opacity: 0.65 }}>
+                                <Avatar initials={p.initials} color={p.color} photo={p.photo} size={26} fontSize={9.5} />
+                                <span style={{ fontSize: 12, color: '#EAF3F1', flex: 1 }}>{p.name}{p.isMe ? ' (나)' : ''}</span>
+                                <span style={{ fontSize: 10.5, color: 'rgba(224,160,106,.85)', fontWeight: 600 }}>지난주 측정 없음 · 집계 제외</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>)
+                    })()}
                   </div>
                 </>}
 
@@ -1706,9 +1715,15 @@ export default function Portal() {
                       <button onClick={() => void be.deleteChallengeGoal(g.metricKey)} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, color: 'rgba(224,135,92,.8)' }}>삭제</button>
                     </div>
                   ))}
+                  {(() => {
+                    const mSeries = (metrics as Record<string, { series: number[]; unit?: string }>)[cgMetric]?.series
+                    const mUnit = (metrics as Record<string, { series: number[]; unit?: string }>)[cgMetric]?.unit ?? ''
+                    const baseVal = cgBaseSel === '__manual__' ? parseFloat(cgBaseManual) : parseFloat(cgBaseSel)
+                    const canSave = !!cgMetric && !isNaN(parseFloat(cgTarget)) && !isNaN(baseVal)
+                    return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                     <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                      <select value={cgMetric} onChange={(e) => setCgMetric(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '7px 9px', fontSize: 12, borderRadius: 9 }}>
+                      <select value={cgMetric} onChange={(e) => { setCgMetric(e.target.value); setCgBaseSel(''); setCgBaseManual('') }} style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '7px 9px', fontSize: 12, borderRadius: 9 }}>
                         <option value="">지표 선택</option>
                         {cd.metricKeys.map((k, i) => <option key={k} value={k}>{cd.metricLabels[i]}</option>)}
                       </select>
@@ -1718,12 +1733,19 @@ export default function Portal() {
                         ))}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 7 }}>
-                      <input value={cgTarget} onChange={(e) => setCgTarget(e.target.value)} type="number" step="0.1" placeholder={cgMode === 'relative' ? '예) -3' : '예) 35'} style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '8px 11px', fontSize: 12.5, borderRadius: 9 }} />
-                      <button onClick={() => { const t = parseFloat(cgTarget); if (cgMetric && !isNaN(t)) { void be.setChallengeGoal(cgMetric, cgMode, t); setCgMetric(''); setCgTarget('') } }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '8px 20px', borderRadius: 9 }}>저장</button>
-                    </div>
+                    <input value={cgTarget} onChange={(e) => setCgTarget(e.target.value)} type="number" step="0.1" placeholder={cgMode === 'relative' ? '목표 변화량 예) -3' : '목표 달성값 예) 35'} style={{ ...inputStyle, padding: '8px 11px', fontSize: 12.5, borderRadius: 9 }} />
+                    {/* 시작 기준값: 내 측정 기록 중 선택하거나 직접 입력 */}
+                    <select value={cgBaseSel} onChange={(e) => setCgBaseSel(e.target.value)} disabled={!cgMetric} style={{ ...inputStyle, padding: '8px 11px', fontSize: 12.5, borderRadius: 9, opacity: cgMetric ? 1 : 0.5 }}>
+                      <option value="">시작 기준값: 측정 기록 선택</option>
+                      {cgMetric && (D ?? []).map((d, i) => { const v = mSeries?.[i]; return v == null ? null : <option key={i} value={String(v)}>{d} · {v}{mUnit}</option> })}
+                      <option value="__manual__">직접 입력…</option>
+                    </select>
+                    {cgBaseSel === '__manual__' && <input value={cgBaseManual} onChange={(e) => setCgBaseManual(e.target.value)} type="number" step="0.1" placeholder={`시작 기준값 직접 입력${mUnit ? ` (${mUnit})` : ''}`} style={{ ...inputStyle, padding: '8px 11px', fontSize: 12.5, borderRadius: 9 }} />}
+                    <button disabled={!canSave} onClick={() => { if (canSave) { void be.setChallengeGoal(cgMetric, cgMode, parseFloat(cgTarget), baseVal); setCgMetric(''); setCgTarget(''); setCgBaseSel(''); setCgBaseManual('') } }} style={{ all: 'unset', cursor: canSave ? 'pointer' : 'not-allowed', textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: canSave ? CTA : 'rgba(103,215,223,.3)', padding: '9px 20px', borderRadius: 9 }}>목표 저장</button>
                   </div>
-                  <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginTop: 6, lineHeight: 1.5 }}>변화 = 현재 대비 증감(예: 체지방 -3), 달성 = 절대 목표값(예: 골격근 35). 시작 시점 수치를 기준으로 성취도를 계산해요.</div>
+                    )
+                  })()}
+                  <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginTop: 8, lineHeight: 1.55 }}>변화 = 시작 대비 증감(예: 체지방 -3), 달성 = 절대 목표값(예: 골격근 35). <b style={{ color: 'rgba(231,239,234,.6)' }}>시작 기준값</b>은 내 측정 기록 중에서 고르거나 직접 입력해요 — 이 값이 성취도 계산의 기준이 됩니다.</div>
                 </div>
 
                 {/* 참여 멤버 + 초대 */}

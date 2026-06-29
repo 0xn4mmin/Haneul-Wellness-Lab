@@ -130,6 +130,11 @@ export interface Backend {
   joinRoom: (code: string) => Promise<{ ok: boolean; reason?: string }>
   deleteRoom: (id: string) => Promise<void>
   renameRoom: (id: string, name: string) => Promise<void>
+  slots: api.ScheduleSlot[] | null
+  createSlot: (title: string, startsAt: string, durationMin: number, capacity: number, note: string | null) => Promise<void>
+  deleteSlot: (id: string) => Promise<void>
+  bookSlot: (id: string) => Promise<string>
+  cancelBooking: (id: string) => Promise<void>
   // challenges
   challenges: ChallengeView[] | null
   createChallenge: (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => Promise<void>
@@ -638,6 +643,20 @@ export function useBackend(): Backend {
     await reloadRooms()
   }, [reloadRooms])
 
+  // ── class schedule ──
+  const [slots, setSlots] = useState<api.ScheduleSlot[] | null>(null)
+  const reloadSlots = useCallback(async () => {
+    if (!supabase || !meId) { setSlots(null); return }
+    setSlots(await api.fetchSlots(meId))
+  }, [meId])
+  const createSlot = useCallback(async (title: string, startsAt: string, durationMin: number, capacity: number, note: string | null) => {
+    await api.createSlot(title, startsAt, durationMin, capacity, note); await reloadSlots()
+  }, [reloadSlots])
+  const deleteSlot = useCallback(async (id: string) => { await api.deleteSlot(id); await reloadSlots() }, [reloadSlots])
+  const bookSlot = useCallback(async (id: string) => { const { error } = await api.bookSlot(id); await reloadSlots(); return error ? error.message : '' }, [reloadSlots])
+  const cancelBooking = useCallback(async (id: string) => { await api.cancelBooking(id); await reloadSlots() }, [reloadSlots])
+  useEffect(() => { void reloadSlots() }, [reloadSlots, reloadKey])
+
   // ── challenges ──
   const createChallenge = useCallback(async (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => {
     await api.createChallengeRow(c)
@@ -860,6 +879,7 @@ export function useBackend(): Backend {
     posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, onlineIds, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
+    slots, createSlot, deleteSlot, bookSlot, cancelBooking,
     challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,
     members, activeMember, openMember, closeMember, addMemberCheer,

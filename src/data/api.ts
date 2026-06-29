@@ -367,6 +367,44 @@ export async function renameRoom(roomId: string, name: string) {
   return requireSupabase().from('chat_rooms').update({ name: name.trim() }).eq('id', roomId)
 }
 
+// ───────────────────── class schedule ────────────────────
+export interface ScheduleSlot {
+  id: string; title: string; startsAt: string; durationMin: number; capacity: number; note: string | null
+  trainerName: string; bookedCount: number; mine: boolean
+  attendees: { userId: string; name: string; initials: string; color: string; photo: string | null }[]
+}
+/** Upcoming class slots (today onward) with booking info. */
+export async function fetchSlots(meId: string): Promise<ScheduleSlot[]> {
+  const sinceISO = new Date(Date.now() - 12 * 3600 * 1000).toISOString() // keep today's earlier slots visible
+  const { data } = await requireSupabase().from('class_slots')
+    .select('id, title, starts_at, duration_min, capacity, note, trainer:profiles!class_slots_trainer_id_fkey(name), bookings:class_bookings(user_id, attendee:profiles!class_bookings_user_id_fkey(name, initials, avatar_color, photo_path))')
+    .gte('starts_at', sinceISO).order('starts_at', { ascending: true })
+  return ((data ?? []) as any[]).map((s) => {
+    const bookings = (s.bookings ?? []) as any[]
+    return {
+      id: s.id, title: s.title, startsAt: s.starts_at, durationMin: s.duration_min, capacity: s.capacity, note: s.note ?? null,
+      trainerName: (Array.isArray(s.trainer) ? s.trainer[0] : s.trainer)?.name ?? '트레이너',
+      bookedCount: bookings.length, mine: bookings.some((b) => b.user_id === meId),
+      attendees: bookings.map((b) => { const p = Array.isArray(b.attendee) ? b.attendee[0] : b.attendee; return { userId: b.user_id, name: p?.name ?? '', initials: p?.initials ?? '', color: p?.avatar_color ?? '#5E97A0', photo: avatarUrl(p?.photo_path) } }),
+    }
+  })
+}
+export async function createSlot(title: string, startsAt: string, durationMin: number, capacity: number, note: string | null) {
+  const me = await uid()
+  return requireSupabase().from('class_slots').insert({ trainer_id: me, title: title.trim() || 'PT 세션', starts_at: startsAt, duration_min: durationMin, capacity, note: note?.trim() || null })
+}
+export async function deleteSlot(slotId: string) {
+  return requireSupabase().from('class_slots').delete().eq('id', slotId)
+}
+export async function bookSlot(slotId: string) {
+  const me = await uid()
+  return requireSupabase().from('class_bookings').insert({ slot_id: slotId, user_id: me })
+}
+export async function cancelBooking(slotId: string) {
+  const me = await uid()
+  return requireSupabase().from('class_bookings').delete().eq('slot_id', slotId).eq('user_id', me)
+}
+
 /** Joins a (possibly private) room by its code. */
 export async function joinRoomByCode(code: string): Promise<{ ok: boolean; reason?: string; room_id?: string; name?: string }> {
   const { data, error } = await requireSupabase().rpc('join_room_by_code', { p_code: code })

@@ -4,7 +4,7 @@ const ICONS: Record<string, React.ReactNode> = {
   health: <><circle cx="12" cy="12" r="8.5" /><path d="M5 12h3l2-4 3 8 2-4h4" strokeLinecap="round" strokeLinejoin="round" /></>,
   community: <><rect x="3.5" y="4.5" width="17" height="6" rx="2.5" /><rect x="3.5" y="13.5" width="11" height="6" rx="2.5" /></>,
   chat: <path d="M4.5 5.5h15v10h-9l-4 4v-4h-2z" strokeLinejoin="round" />,
-  members: <><circle cx="8.5" cy="9" r="3.2" /><circle cx="16" cy="10.5" r="2.7" /><path d="M3.5 19c.6-3 2.6-4.6 5-4.6s4.4 1.6 5 4.6" strokeLinecap="round" /></>,
+  schedule: <><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 9h17M8 3.5v3M16 3.5v3" strokeLinecap="round" /></>,
   profile: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20c.7-3.6 3.2-5.5 7-5.5s6.3 1.9 7 5.5" strokeLinecap="round" /></>,
 }
 
@@ -12,7 +12,7 @@ const TABS: { key: View; label: string }[] = [
   { key: 'health', label: '나의 건강' },
   { key: 'community', label: '커뮤니티' },
   { key: 'chat', label: '채팅' },
-  { key: 'members', label: '멤버' },
+  { key: 'schedule', label: '스케줄' },
   { key: 'profile', label: '프로필' },
 ]
 

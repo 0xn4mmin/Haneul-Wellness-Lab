@@ -70,6 +70,9 @@ export default function Portal() {
   const [editChallengeId, setEditChallengeId] = useState<string | null>(null)
   const [roomMenu, setRoomMenu] = useState(false)
   const [memberList, setMemberList] = useState(false)
+  const [commTab, setCommTab] = useState<'feed' | 'challenge' | 'members'>('feed')
+  const [slotForm, setSlotForm] = useState({ date: '', time: '', title: 'PT 세션', cap: '1', note: '' })
+  const [slotErr, setSlotErr] = useState('')
   const [chProgInfo, setChProgInfo] = useState(false)
   const [notifPerm, setNotifPerm] = useState<string>(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
   const [editNoteId, setEditNoteId] = useState<string | null>(null)
@@ -556,6 +559,7 @@ export default function Portal() {
     community: ['커뮤니티', '하늘 랩 회원들의 기록과 응원'],
     chat: ['그룹 채팅', '회원과 코치가 함께하는 실시간 대화'],
     members: ['멤버', '다른 회원이 공개한 기록을 둘러보세요'],
+    schedule: ['수업 스케줄', '트레이너와 수업 일정을 예약하세요'],
     trainer: ['트레이너 스튜디오', '모든 회원을 한 곳에서 관리하세요'],
   }
   const score = M.score.series[M.score.series.length - 1]
@@ -636,18 +640,18 @@ export default function Portal() {
           </div>
         </a>
 
-        {(['health', 'community', 'chat', 'members'] as View[]).map((k) => {
+        {(['health', 'community', 'chat', 'schedule'] as View[]).map((k) => {
           const studioSlot = k === 'health' && be.isAdmin
           const active = studioSlot ? s.view === 'trainer' : s.view === k
           const ns = { bg: active ? 'linear-gradient(110deg,#2E9BA6,#247E88)' : 'transparent', fg: active ? '#060B17' : '#9DAFCB' }
-          const labels: Record<string, string> = { health: studioSlot ? '트레이너 스튜디오' : '나의 건강', community: '커뮤니티', chat: '그룹 채팅', members: '멤버' }
+          const labels: Record<string, string> = { health: studioSlot ? '트레이너 스튜디오' : '나의 건강', community: '커뮤니티', chat: '그룹 채팅', schedule: '스케줄' }
           const icons: Record<string, React.ReactNode> = {
             health: studioSlot
               ? <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M9 7h6M9 11h6M9 15h4" strokeLinecap="round" /></>
               : <><circle cx="12" cy="12" r="8.5" /><path d="M5 12h3l2-4 3 8 2-4h4" strokeLinecap="round" strokeLinejoin="round" /></>,
             community: <><rect x="3.5" y="4.5" width="17" height="6" rx="2.5" /><rect x="3.5" y="13.5" width="11" height="6" rx="2.5" /></>,
             chat: <path d="M4.5 5.5h15v10h-9l-4 4v-4h-2z" strokeLinejoin="round" />,
-            members: <><circle cx="8.5" cy="9" r="3.2" /><circle cx="16" cy="10.5" r="2.7" /><path d="M3.5 19c.6-3 2.6-4.6 5-4.6s4.4 1.6 5 4.6" strokeLinecap="round" /></>,
+            schedule: <><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 9h17M8 3.5v3M16 3.5v3" strokeLinecap="round" /></>,
           }
           return (
             <button key={k} onClick={() => go(k)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 13, fontSize: 14.5, fontWeight: 500, transition: 'background .2s', background: ns.bg, color: ns.fg }}>
@@ -1162,7 +1166,15 @@ export default function Portal() {
 
           {/* ============ 커뮤니티 ============ */}
           {s.view === 'community' && (
-            <div style={{ maxWidth: 720, margin: '0 auto', animation: 'hwl-rise .4s ease both' }}>
+            <div style={{ animation: 'hwl-rise .4s ease both' }}>
+              <div className="hwl-chiprow" style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
+                {([['feed', '피드'], ['challenge', '챌린지'], ['members', '멤버의 체성분']] as const).map(([k, l]) => (
+                  <button key={k} onClick={() => { setCommTab(k); closeMember() }} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '9px 16px', borderRadius: 22, transition: 'all .18s', background: commTab === k ? CTA : 'rgba(255,255,255,.05)', color: commTab === k ? '#060B17' : '#9DAFCB', border: `1px solid ${commTab === k ? 'transparent' : 'rgba(255,255,255,.12)'}` }}>{l}</button>
+                ))}
+              </div>
+              {commTab !== 'members' && (
+              <div style={{ maxWidth: 720, margin: '0 auto' }}>
+              {commTab === 'challenge' && (<>
               {!be.configured && (
               <section style={{ ...card, position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 22, marginBottom: 20 }}>
                 <div style={{ position: 'absolute', top: '-50%', right: '-5%', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle,rgba(46,155,166,.3),transparent 65%)', filter: 'blur(34px)', pointerEvents: 'none' }} />
@@ -1218,6 +1230,8 @@ export default function Portal() {
                   ))}
                 </div>
               )}
+              </>)}
+              {commTab === 'feed' && (<>
 
               <section style={{ ...card, borderRadius: 22, padding: 18, marginBottom: 20 }}>
                 <div style={{ display: 'flex', gap: 12 }}>
@@ -1324,6 +1338,9 @@ export default function Portal() {
                   )}
                 </article>
               ))}
+              </>)}
+              </div>
+              )}
             </div>
           )}
 
@@ -1950,9 +1967,9 @@ export default function Portal() {
             )
           })()}
 
-          {/* ============ 멤버 ============ */}
-          {s.view === 'members' && (
-            <div style={{ animation: 'hwl-rise .4s ease both' }}>
+          {/* ============ 커뮤니티 › 멤버의 체성분 ============ */}
+          {s.view === 'community' && commTab === 'members' && (
+            <div style={{ maxWidth: 980, margin: '0 auto' }}>
               {activeMember ? (
                 <div>
                   <button onClick={closeMember} style={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'rgba(231,239,234,.6)', marginBottom: 16 }}>‹ 멤버 목록으로</button>
@@ -2023,6 +2040,84 @@ export default function Portal() {
                   ))}
                 </div>
                 </>
+              )}
+            </div>
+          )}
+
+          {/* ============ 수업 스케줄 ============ */}
+          {s.view === 'schedule' && (
+            <div style={{ maxWidth: 720, margin: '0 auto', animation: 'hwl-rise .4s ease both' }}>
+              {!be.configured && (
+                <section style={{ ...card, borderRadius: 22, padding: '24px 22px', textAlign: 'center' }}>
+                  <div style={eyebrow}>Schedule</div>
+                  <div style={{ fontSize: 14, color: 'rgba(231,239,234,.6)', marginTop: 8, lineHeight: 1.6 }}>로그인하면 트레이너가 올린 수업 일정을 보고 예약할 수 있어요.</div>
+                </section>
+              )}
+              {be.configured && be.isAdmin && (() => {
+                const cap = parseInt(slotForm.cap, 10)
+                const canAdd = !!slotForm.date && !!slotForm.time && !isNaN(cap) && cap >= 1
+                const addSlot = () => {
+                  if (!canAdd) { setSlotErr('날짜·시간·정원을 확인하세요.'); return }
+                  const iso = new Date(`${slotForm.date}T${slotForm.time}`).toISOString()
+                  void be.createSlot(slotForm.title, iso, 50, cap, slotForm.note).then(() => { setSlotForm({ date: '', time: '', title: 'PT 세션', cap: '1', note: '' }); setSlotErr('') }).catch((e) => setSlotErr(e instanceof Error ? e.message : '추가 실패'))
+                }
+                return (
+                  <section style={{ ...card, borderRadius: 22, padding: 20, marginBottom: 18 }}>
+                    <div style={eyebrow}>New Class</div><div style={cardTitle}>수업 추가</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>날짜</label><input type="date" value={slotForm.date} onChange={(e) => setSlotForm((f) => ({ ...f, date: e.target.value }))} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 11px', fontSize: 13 }} /></div>
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>시간</label><input type="time" value={slotForm.time} onChange={(e) => setSlotForm((f) => ({ ...f, time: e.target.value }))} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 11px', fontSize: 13 }} /></div>
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>수업명</label><input value={slotForm.title} onChange={(e) => setSlotForm((f) => ({ ...f, title: e.target.value }))} placeholder="예) PT 세션" style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>정원</label><input type="number" min="1" value={slotForm.cap} onChange={(e) => setSlotForm((f) => ({ ...f, cap: e.target.value }))} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
+                    </div>
+                    <input value={slotForm.note} onChange={(e) => setSlotForm((f) => ({ ...f, note: e.target.value }))} placeholder="메모(선택) — 장소·준비물 등" style={{ ...inputStyle, padding: '9px 11px', fontSize: 13, marginTop: 10 }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                      <button disabled={!canAdd} onClick={addSlot} style={{ all: 'unset', cursor: canAdd ? 'pointer' : 'not-allowed', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: canAdd ? CTA : 'rgba(103,215,223,.3)', padding: '10px 22px', borderRadius: 22 }}>수업 추가</button>
+                      <span style={{ fontSize: 12, color: '#E0A06A' }}>{slotErr}</span>
+                    </div>
+                  </section>
+                )
+              })()}
+              {be.configured && (be.slots == null || be.slots.length === 0) && (
+                <section style={{ ...card, borderRadius: 22, padding: '26px 22px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 14, color: 'rgba(231,239,234,.6)', lineHeight: 1.6 }}>예정된 수업이 없어요.{be.isAdmin ? '' : '\n트레이너가 일정을 올리면 여기에서 예약할 수 있어요.'}</div>
+                </section>
+              )}
+              {be.configured && be.slots && be.slots.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {be.slots.map((sl) => {
+                    const d = new Date(sl.startsAt); const days = ['일', '월', '화', '수', '목', '금', '토']
+                    const when = `${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]}) ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+                    const full = sl.bookedCount >= sl.capacity
+                    return (
+                      <section key={sl.id} style={{ ...card, borderRadius: 18, padding: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 15, fontWeight: 700, color: '#EAF3F1' }}>{sl.title}</span>
+                              <span style={{ fontSize: 10.5, fontWeight: 600, color: full ? '#E0A06A' : '#67D7DF', background: full ? 'rgba(224,138,94,.16)' : 'rgba(46,155,166,.16)', borderRadius: 8, padding: '1px 8px' }}>{sl.bookedCount}/{sl.capacity}{full ? ' 마감' : ''}</span>
+                              {sl.mine && <span style={{ fontSize: 10.5, fontWeight: 700, color: '#060B17', background: '#7BD88F', borderRadius: 8, padding: '1px 8px' }}>예약됨</span>}
+                            </div>
+                            <div style={{ fontSize: 13, color: '#9FE2E8', marginTop: 4, fontFamily: "'IBM Plex Mono',monospace" }}>{when} · {sl.durationMin}분</div>
+                            <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>{sl.trainerName} 코치{sl.note ? ` · ${sl.note}` : ''}</div>
+                            {sl.attendees.length > 0 && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: -6, marginTop: 9 }}>
+                                {sl.attendees.slice(0, 6).map((a) => <span key={a.userId} style={{ marginRight: -6 }} title={a.name}><Avatar initials={a.initials} color={a.color} photo={a.photo} size={26} fontSize={9.5} /></span>)}
+                                {be.isAdmin && <span style={{ fontSize: 11, color: 'rgba(231,239,234,.5)', marginLeft: 12 }}>{sl.attendees.map((a) => a.name).join(', ')}</span>}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flexShrink: 0 }}>
+                            {sl.mine
+                              ? <button onClick={() => void be.cancelBooking(sl.id)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, textAlign: 'center', color: '#E0A06A', background: 'rgba(224,138,94,.12)', border: '1px solid rgba(224,138,94,.3)', padding: '8px 16px', borderRadius: 18 }}>예약 취소</button>
+                              : <button disabled={full} onClick={() => { void be.bookSlot(sl.id).then((err) => { if (err) alert('이미 마감되었거나 예약에 실패했어요.') }) }} style={{ all: 'unset', cursor: full ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, textAlign: 'center', color: '#060B17', background: full ? 'rgba(103,215,223,.3)' : CTA, padding: '8px 18px', borderRadius: 18 }}>{full ? '마감' : '예약하기'}</button>}
+                            {be.isAdmin && <button onClick={() => { if (confirm(`'${sl.title}' 수업을 삭제할까요?`)) void be.deleteSlot(sl.id) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, textAlign: 'center', color: 'rgba(224,160,106,.8)', padding: '4px 0' }}>삭제</button>}
+                          </div>
+                        </div>
+                      </section>
+                    )
+                  })}
+                </div>
               )}
             </div>
           )}

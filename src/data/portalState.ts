@@ -1,7 +1,7 @@
 import type { MetricKey } from './portalData'
 
 export type Role = 'trainer' | 'client' | 'me'
-export type View = 'health' | 'community' | 'chat' | 'members' | 'trainer' | 'profile'
+export type View = 'health' | 'community' | 'chat' | 'members' | 'schedule' | 'trainer' | 'profile'
 
 export interface MetricComment { author: string; initials: string; color: string; role: Role; text: string; time: string }
 export interface PostComment { author: string; initials: string; color: string; photo?: string | null; text: string; replies?: PostComment[]; isOwn?: boolean }

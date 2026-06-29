@@ -73,8 +73,10 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
   .hwl-hero{padding:20px 18px!important}
   .hwl-hero-stats{margin-left:0!important;width:100%}
   .hwl-roster-inner{min-width:560px}
-  /* fixed tall block so the message list scrolls inside it (not the page) */
-  .hwl-chat-panel{height:calc(100dvh - 180px)!important;min-height:400px}
+  /* fixed block so the message list scrolls inside it (not the page) and the
+     input bar stays visible. Subtract header + tab bar + BOTH safe-area insets
+     so it fits above the bottom tab bar on notched phones. */
+  .hwl-chat-panel{height:calc(100dvh - 132px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;min-height:0}
 
   /* prevent iOS zoom-on-focus: inputs must be >=16px */
   input,textarea,select{font-size:16px!important}

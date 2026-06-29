@@ -126,7 +126,7 @@ export default function Portal() {
   useEffect(() => {
     if (lastUserId.current === curUserId) return
     lastUserId.current = curUserId
-    set({ view: 'health', activeMember: null, scanOpen: false, showChallengeForm: false, profileSaved: '', chDone: '', newPost: '', newMsg: '', newComment: '' })
+    set({ view: 'health', role: 'client', activeMember: null, scanOpen: false, showChallengeForm: false, profileSaved: '', chDone: '', newPost: '', newMsg: '', newComment: '' })
     setNotifOpen(false); setCycleModal(false); setGoalModal(false); setChatModal('none'); setGaugeInfo(null); setMemberQuery(''); setPostImg(null); setChatImg(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curUserId])

@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { registerSW } from 'virtual:pwa-register'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import './index.css'
 import Intro from './pages/Intro'
 import Portal from './pages/Portal'
@@ -16,5 +17,6 @@ const router = createBrowserRouter([
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <RouterProvider router={router} />
+    <SpeedInsights />
   </React.StrictMode>,
 )

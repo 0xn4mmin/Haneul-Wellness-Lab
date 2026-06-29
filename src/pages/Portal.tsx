@@ -1662,6 +1662,16 @@ export default function Portal() {
                   </div>
                 </div>
 
+                {cd.progress.some((p) => p.isMe && p.needsBaseline) && (
+                  <div style={{ marginTop: 16, padding: '13px 15px', borderRadius: 14, background: 'rgba(224,160,106,.12)', border: '1px solid rgba(224,160,106,.3)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E0A06A" strokeWidth="1.8"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#F2C28A' }}>시작일 측정이 필요해요</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'rgba(231,239,234,.7)', lineHeight: 1.6, marginBottom: 10 }}>성취도는 챌린지 <b style={{ color: '#F2C28A' }}>시작일({cd.startDate.replace(/-/g, '.')})</b>의 측정값을 기준으로 계산돼요. 그 날짜의 인바디 결과지를 업로드해 주세요.</div>
+                    <OcrUpload onCommitted={() => { be.reload(); const cv = (be.challenges ?? []).find((c) => c.id === cd.id); if (cv) be.openChallenge(cv) }} />
+                  </div>
+                )}
                 {cd.progress.length === 0 && <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '14px 0 2px' }}>아직 목표를 설정한 참여자가 없어요. 아래에서 내 목표를 정해보세요.</div>}
                 {cd.progress.length > 0 && <>
                   {/* 전체 성취도 (상단) */}

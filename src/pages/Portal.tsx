@@ -1297,15 +1297,20 @@ export default function Portal() {
 
           {/* ============ 그룹 채팅 ============ */}
           {s.view === 'chat' && (
-            <div className="hwl-chat-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 224px', gap: 20, animation: 'hwl-rise .4s ease both' }}>
+            <div className="hwl-chat-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 20, animation: 'hwl-rise .4s ease both' }}>
               <section className="hwl-chat-panel" style={{ ...card, borderRadius: 22, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)', overflow: 'hidden' }}>
-                <div style={{ position: 'relative', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', zIndex: 6 }}>
+                <div style={{ position: 'relative', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'nowrap', zIndex: 6 }}>
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)', flexShrink: 0 }} />
                   <button onClick={() => be.configured && chatRooms != null && setRoomMenu((v) => !v)} style={{ all: 'unset', cursor: be.configured && chatRooms != null ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
                     <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roomTitle}</span>
                     {be.configured && chatRooms != null && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.8)" strokeWidth="2" style={{ flexShrink: 0, transform: roomMenu ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                   </button>
-                  {activeRoom?.isPrivate && <span style={{ fontSize: 10.5, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 10, padding: '2px 8px' }}>비공개</span>}
+                  {activeRoom?.isPrivate && <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 600, color: '#C9A24B', background: 'rgba(201,162,75,.14)', border: '1px solid rgba(201,162,75,.3)', borderRadius: 10, padding: '2px 8px' }}>비공개</span>}
+                  {activeRoom?.isPrivate && activeRoom.joinCode && (
+                    <button onClick={() => { navigator.clipboard?.writeText(activeRoom.joinCode!).then(() => { setChatErr(''); setRoomMenu(false) }).catch(() => {}) }} title="코드 복사" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, marginLeft: 'auto', fontFamily: "'IBM Plex Mono',monospace", fontSize: 12.5, fontWeight: 600, letterSpacing: '1.5px', color: '#67D7DF', background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.25)', borderRadius: 10, padding: '4px 10px', whiteSpace: 'nowrap' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" /></svg>{activeRoom.joinCode}
+                    </button>
+                  )}
                   {roomMenu && chatRooms != null && (
                     <>
                       <div onClick={() => setRoomMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
@@ -1419,23 +1424,6 @@ export default function Portal() {
                   <button onClick={sendMsg} style={{ all: 'unset', cursor: 'pointer', flex: 'none', width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg,#67D7DF,#2E9BA6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#060B17" strokeWidth="2"><path d="M4 12l16-7-7 16-2-7z" strokeLinejoin="round" /></svg></button>
                 </div>
               </section>
-              <aside style={{ ...card, borderRadius: 22, padding: 18, height: 'fit-content' }}>
-                {activeRoom?.isPrivate && activeRoom.joinCode && (
-                  <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid rgba(255,247,232,.1)' }}>
-                    <div style={{ fontSize: 10.5, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 7 }}>입장 코드</div>
-                    <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 20, letterSpacing: '3px', color: '#67D7DF', background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.25)', borderRadius: 12, padding: '9px 0', textAlign: 'center' }}>{activeRoom.joinCode}</div>
-                    <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginTop: 6 }}>이 코드를 공유해 초대하세요.</div>
-                  </div>
-                )}
-                <div style={{ fontSize: 10.5, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 13 }}>접속 중</div>
-                {onlineMembers.map((o, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 13 }}>
-                    <div style={{ position: 'relative', flex: 'none' }}><div style={{ position: 'relative', width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', background: o.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11 }}>{o.initials}{o.photo && <img src={o.photo} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}</div><span style={{ position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: '50%', background: o.statusColor, border: '2.5px solid #0E1834' }} /></div>
-                    <div style={{ lineHeight: 1.2 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#EAF3F1' }}>{o.name}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>{o.role}</div></div>
-                  </div>
-                ))}
-              </aside>
-
               {/* 방 만들기 / 코드로 입장 모달 */}
             </div>
           )}

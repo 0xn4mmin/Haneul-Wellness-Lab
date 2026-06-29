@@ -111,7 +111,7 @@ export async function setPrivacy(metricKey: string, visibility: 'public' | 'priv
 export async function fetchMembers(): Promise<ProfileRow[]> {
   const me = await uid()
   const { data, error } = await requireSupabase()
-    .from('profiles').select('*').neq('id', me).eq('role', 'client')
+    .from('profiles').select('*').neq('id', me)
   if (error) throw error
   return (data ?? []) as ProfileRow[]
 }
@@ -478,8 +478,10 @@ export interface MemberCard {
 export async function fetchMemberCards(): Promise<MemberCard[]> {
   const sb = requireSupabase()
   const me = await uid()
+  // include trainers/admins too — they have all member features and should be
+  // browsable + invitable like any member
   const { data: profs } = await sb.from('profiles')
-    .select('id, name, initials, avatar_color, bio, bio2, photo_path').neq('id', me).eq('role', 'client')
+    .select('id, name, initials, avatar_color, bio, bio2, photo_path').neq('id', me)
   const cards: MemberCard[] = []
   for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null }>) {
     const { data: pv } = await sb.from('metric_privacy').select('metric_key, visibility').eq('user_id', p.id)

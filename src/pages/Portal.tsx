@@ -84,6 +84,7 @@ export default function Portal() {
   const [editChallengeId, setEditChallengeId] = useState<string | null>(null)
   const [roomMenu, setRoomMenu] = useState(false)
   const [chatTab, setChatTab] = useState<'group' | 'dm'>('group')
+  const [chatModeMenu, setChatModeMenu] = useState(false)
   const [openSchedBlk, setOpenSchedBlk] = useState<Record<string, boolean>>({})
   const [memberList, setMemberList] = useState(false)
   const [commTab, setCommTab] = useState<'feed' | 'challenge' | 'members'>('feed')
@@ -817,9 +818,23 @@ export default function Portal() {
           <button className="hwl-hamburger" onClick={() => setMobileNav(true)} aria-label="메뉴" style={{ all: 'unset', cursor: 'pointer', width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center', flex: 'none', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9DAFCB" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" /></svg>
           </button>
-          <div style={{ lineHeight: 1.15 }}>
-            <div className="hwl-page-title" style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, letterSpacing: '.2px', color: '#F2F7F3' }}>{titles[s.view][0]}</div>
-            <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', marginTop: 3 }}>{titles[s.view][1]}</div>
+          <div style={{ lineHeight: 1.15, position: 'relative' }}>
+            {s.view === 'chat' && be.configured ? (<>
+              <button onClick={() => setChatModeMenu((v) => !v)} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span className="hwl-page-title" style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, letterSpacing: '.2px', color: '#F2F7F3' }}>{chatTab === 'group' ? '그룹 채팅' : '개인 채팅'}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9DAFCB" strokeWidth="2.4" style={{ transform: chatModeMenu ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+              <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', marginTop: 3 }}>{chatTab === 'group' ? '회원과 코치가 함께하는 실시간 대화' : '트레이너·회원과의 1:1 대화'}</div>
+              {chatModeMenu && (<>
+                <div onClick={() => setChatModeMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 119 }} />
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 6, zIndex: 120, background: '#0E1A38', border: '1px solid rgba(255,247,232,.14)', borderRadius: 12, overflow: 'hidden', minWidth: 150, boxShadow: '0 22px 44px -18px rgba(0,0,0,.85)' }}>
+                  {(['group', 'dm'] as const).map((t) => <button key={t} onClick={() => { setChatTab(t); setChatModeMenu(false); setRoomMenu(true) }} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 15px', fontSize: 13.5, fontWeight: 700, color: chatTab === t ? '#67D7DF' : '#EAF3F1', background: chatTab === t ? 'rgba(46,155,166,.16)' : 'transparent' }}>{t === 'group' ? '그룹 채팅' : '개인 채팅'}</button>)}
+                </div>
+              </>)}
+            </>) : (<>
+              <div className="hwl-page-title" style={{ fontFamily: "'Gowun Batang',serif", fontSize: 25, letterSpacing: '.2px', color: '#F2F7F3' }}>{titles[s.view][0]}</div>
+              <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', marginTop: 3 }}>{titles[s.view][1]}</div>
+            </>)}
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
             {s.view === 'health' && (() => {
@@ -1506,9 +1521,7 @@ export default function Portal() {
                     <>
                       <div onClick={() => setRoomMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
                       <div style={{ position: 'absolute', top: '100%', left: 20, right: 20, marginTop: 2, zIndex: 10, background: '#0E1A38', border: '1px solid rgba(255,247,232,.14)', borderRadius: 14, boxShadow: '0 24px 50px -20px rgba(0,0,0,.85)', overflow: 'hidden', maxHeight: 300, overflowY: 'auto' }}>
-                        <div style={{ display: 'flex', gap: 6, padding: 8, borderBottom: '1px solid rgba(255,255,255,.07)' }}>
-                          {(['group', 'dm'] as const).map((t) => <button key={t} onClick={() => setChatTab(t)} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12.5, fontWeight: 700, padding: '7px 0', borderRadius: 9, background: chatTab === t ? '#2E9BA6' : 'rgba(255,255,255,.04)', color: chatTab === t ? '#060B17' : '#9DAFCB' }}>{t === 'group' ? '그룹 채팅' : '개인 채팅'}</button>)}
-                        </div>
+                        <div style={{ padding: '8px 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.5px', color: '#C9A24B', borderBottom: '1px solid rgba(255,255,255,.07)' }}>{chatTab === 'group' ? '그룹 채팅방' : '개인 채팅'}</div>
                         {chatTab === 'group' && <>
                         {chatRooms.map((r) => { const sel = r.id === be.activeRoomId; const un = be.unreadByRoom[r.id] ?? 0; return (
                           <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 5, width: '100%', boxSizing: 'border-box', padding: '8px 12px', background: sel ? 'rgba(46,155,166,.16)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,.05)' }}>

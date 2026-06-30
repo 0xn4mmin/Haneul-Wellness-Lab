@@ -10,10 +10,13 @@ type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ out
  */
 export default function InstallPrompt() {
   const [deferred, setDeferred] = useState<BIPEvent | null>(null)
-  // X just hides for this visit (session); only "다시 보지 않기" / accepting persists.
+  // X just hides for this visit (session). ONLY "다시 보지 않기" persists — installing
+  // does NOT, so if someone installs then deletes the app the popup returns
+  // (Android: beforeinstallprompt fires again once it's uninstalled). New key so
+  // people previously hidden by accepting an install get the popup back.
   const [closed, setClosed] = useState(false)
   const [never, setNever] = useState(() => {
-    try { return localStorage.getItem('hwl-install-never') === '1' } catch { return false }
+    try { return localStorage.getItem('hwl-install-dontshow') === '1' } catch { return false }
   })
 
   const standalone = typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true)
@@ -35,8 +38,10 @@ export default function InstallPrompt() {
   if (!deferred && !manual) return null
 
   const close = () => setClosed(true)
-  const dontShow = () => { setNever(true); try { localStorage.setItem('hwl-install-never', '1') } catch { /* ignore */ } }
-  const install = async () => { if (deferred) { await deferred.prompt(); const r = await deferred.userChoice; if (r.outcome === 'accepted') dontShow(); setDeferred(null) } }
+  const dontShow = () => { setNever(true); try { localStorage.setItem('hwl-install-dontshow', '1') } catch { /* ignore */ } }
+  // do NOT persist on install — rely on the platform (installed → no
+  // beforeinstallprompt; uninstalled → it fires again → popup returns)
+  const install = async () => { if (deferred) { await deferred.prompt(); await deferred.userChoice; setDeferred(null) } }
 
   const shareIcon = <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" style={{ verticalAlign: '-3px' }}><path d="M12 3v12M8.5 6.5 12 3l3.5 3.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1" strokeLinecap="round" /></svg>
   const steps: { n: string; body: React.ReactNode }[] = isMacDesktop

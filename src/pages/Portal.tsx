@@ -617,6 +617,8 @@ export default function Portal() {
     : segData
   const segs = segSource.map((seg) => { const c = segColor(seg.pct); const selS = s.selectedSegment === seg.key; return { ...seg, color: c, border: selS ? c : 'rgba(255,255,255,.12)', chipBg: selS ? 'rgba(46,155,166,.18)' : 'rgba(255,255,255,.04)' } })
   const selSeg = (() => { const ss = segSource.find((x) => x.key === s.selectedSegment) || segSource[2]; const st = ss.pct >= 100 ? '표준 이상 · 우수' : (ss.pct >= 95 ? '표준 범위' : '표준 이하'); return { name: ss.name, pct: ss.pct, kg: ss.kg, color: segColor(ss.pct), status: st } })()
+  // segmental muscle values only when the InBody measurement actually has them
+  const hasSeg = !be.configured || segNames.some(([k]) => latestMeasure?.segmental?.[k]?.kg != null)
 
   const metricChips = (Object.keys(M) as MetricKey[]).map((k) => { const a = s.selectedMetric === k; return { key: k, label: M[k].short || M[k].label, bg: a ? CTA : 'rgba(255,255,255,.05)', fg: a ? '#060B17' : '#9DAFCB', border: a ? 'transparent' : 'rgba(255,255,255,.12)' } })
 
@@ -1011,18 +1013,26 @@ export default function Portal() {
                     <div style={cardTitle}>부위별 근육 모델</div>
                     <div style={{ fontSize: 12, color: 'rgba(231,239,234,.5)', marginTop: 5 }}>드래그하여 회전 · 부위를 탭하세요</div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B' }}>Segment</div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 5 }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: selSeg.color, boxShadow: `0 0 12px ${selSeg.color}` }} /><span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 20, color: '#EAF3F1' }}>{selSeg.name}</span></div>
-                    <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#67D7DF', marginTop: 4 }}>근육 {selSeg.kg}kg · 균형 {selSeg.pct}%</div>
-                    <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>{selSeg.status}</div>
-                  </div>
+                  {hasSeg && (
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '2px', textTransform: 'uppercase', color: '#C9A24B' }}>Segment</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 5 }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: selSeg.color, boxShadow: `0 0 12px ${selSeg.color}` }} /><span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 20, color: '#EAF3F1' }}>{selSeg.name}</span></div>
+                      <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#67D7DF', marginTop: 4 }}>근육 {selSeg.kg}kg · 균형 {selSeg.pct}%</div>
+                      <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>{selSeg.status}</div>
+                    </div>
+                  )}
                 </div>
+                {!hasSeg && (
+                  <div style={{ margin: '8px 20px 0', padding: '11px 14px', borderRadius: 12, background: 'rgba(224,160,106,.1)', border: '1px solid rgba(224,160,106,.28)', position: 'relative', zIndex: 2 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: '#F2C28A', marginBottom: 3 }}>부위별 근육 데이터가 없어요</div>
+                    <div style={{ fontSize: 11.5, lineHeight: 1.55, color: 'rgba(231,239,234,.6)' }}>현재 측정하신 INBODY 데이터에는 해당 값이 존재하지 않습니다. 부위별 근육 측정을 원하시면 INBODY 상위 모델을 사용해 측정해주세요.</div>
+                  </div>
+                )}
                 <div ref={mount3d} style={{ flex: 1, minHeight: 340, width: '100%', cursor: 'grab', position: 'relative', zIndex: 1 }} />
                 <div className="hwl-chiprow" style={{ display: 'flex', gap: 7, flexWrap: 'wrap', padding: '6px 20px 18px', position: 'relative', zIndex: 2 }}>
                   {segs.map((sg) => (
                     <button key={sg.key} onClick={() => set({ selectedSegment: sg.key })} onMouseEnter={() => set({ selectedSegment: sg.key })} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, padding: '7px 11px', borderRadius: 11, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${sg.border}`, background: sg.chipBg, color: '#EAF3F1', transition: 'all .18s' }}>
-                      <span style={{ width: 11, height: 11, borderRadius: 3, background: sg.color }} />{sg.name}<span style={{ fontFamily: "'IBM Plex Mono',monospace", color: 'rgba(231,239,234,.5)', fontWeight: 500 }}>{sg.pct}%</span>
+                      <span style={{ width: 11, height: 11, borderRadius: 3, background: hasSeg ? sg.color : 'rgba(157,175,203,.4)' }} />{sg.name}{hasSeg && <span style={{ fontFamily: "'IBM Plex Mono',monospace", color: 'rgba(231,239,234,.5)', fontWeight: 500 }}>{sg.pct}%</span>}
                     </button>
                   ))}
                 </div>

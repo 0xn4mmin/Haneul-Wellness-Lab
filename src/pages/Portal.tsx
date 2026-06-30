@@ -2281,8 +2281,6 @@ export default function Portal() {
                       {isCoach && <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                         <button onClick={() => setReqForm({ memberId: '', message: '이번 주 가능한 수업 시간을 알려주세요!' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', borderRadius: 18, padding: '7px 14px' }}>시간 요청</button>
                         <button onClick={() => setPkgManage(true)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', borderRadius: 18, padding: '7px 14px' }}>회차권 관리</button>
-                        <button onClick={() => setPkgForm({ memberId: '', total: '10', date: todayY, start: todayY, note: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9FE2E8', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '7px 14px' }}>회차권 등록</button>
-                        <button onClick={() => openNew()} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, borderRadius: 18, padding: '7px 16px' }}>+ 수업</button>
                       </div>}
                     </div>
 

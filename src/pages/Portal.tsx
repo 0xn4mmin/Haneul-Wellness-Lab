@@ -665,6 +665,58 @@ export default function Portal() {
   const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: 14, padding: '12px 15px', borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1' }
   const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 'rgba(231,239,234,.6)', marginBottom: 7, display: 'block' }
 
+  // back gesture closes the topmost open modal/detail before changing tabs.
+  // Each open overlay = one history entry (no hash change, so it doesn't move
+  // the tab); back pops it and we close that overlay. Ordered details-first so
+  // a modal opened on top of a detail closes first.
+  const overlayDefs: Array<[boolean, () => void]> = [
+    [memberOpen, closeMember],
+    [!!be.challengeDetail, () => be.closeChallenge()],
+    [s.showChallengeForm, () => set({ showChallengeForm: false })],
+    [s.scanOpen, () => set({ scanOpen: false })],
+    [notifOpen, () => setNotifOpen(false)],
+    [cycleModal, () => setCycleModal(false)],
+    [goalModal, () => setGoalModal(false)],
+    [chatModal !== 'none', () => setChatModal('none')],
+    [aliasModal, () => setAliasModal(false)],
+    [!!readModal, () => setReadModal(null)],
+    [manualOpen, () => setManualOpen(false)],
+    [!!measEdit, () => setMeasEdit(null)],
+    [!!goalEdit, () => setGoalEdit(null)],
+    [pkgManage, () => setPkgManage(false)],
+    [!!pkgForm, () => setPkgForm(null)],
+    [!!reqForm, () => setReqForm(null)],
+    [!!sessForm, () => setSessForm(null)],
+  ]
+  const overlayCount = overlayDefs.filter(([o]) => o).length
+  const overlayRef = useRef(overlayDefs)
+  overlayRef.current = overlayDefs
+  const prevOverlay = useRef(0)
+  const overlayPop = useRef(false)
+  const overlaySelf = useRef(false)
+  useEffect(() => {
+    if (overlayCount > prevOverlay.current) {
+      for (let i = prevOverlay.current; i < overlayCount; i++) window.history.pushState({ ...window.history.state, hwlOverlay: true }, '')
+    } else if (overlayCount < prevOverlay.current && !overlayPop.current) {
+      overlaySelf.current = true
+      window.history.go(-(prevOverlay.current - overlayCount))
+    }
+    overlayPop.current = false
+    prevOverlay.current = overlayCount
+  }, [overlayCount])
+  useEffect(() => {
+    const onPop = () => {
+      if (overlaySelf.current) { overlaySelf.current = false; return } // our own history.go
+      if (prevOverlay.current > 0) {
+        overlayPop.current = true
+        const defs = overlayRef.current
+        for (let i = defs.length - 1; i >= 0; i--) if (defs[i][0]) { defs[i][1](); break }
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh', display: 'flex', fontFamily: "'Pretendard',system-ui,sans-serif", color: '#E7EFEA', background: 'radial-gradient(120% 90% at 82% -8%,#0D1A33 0%,#0A1326 52%,#060B17 100%)' }}>
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.4, backgroundImage: 'radial-gradient(rgba(255,255,255,.025) 1px,transparent 1.4px)', backgroundSize: '32px 32px' }} />

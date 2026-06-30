@@ -420,6 +420,9 @@ export async function createPackage(memberId: string, totalSessions: number, reg
   const me = await uid()
   return requireSupabase().from('class_packages').insert({ member_id: memberId, trainer_id: me, total_sessions: totalSessions, registered_on: registeredOn, started_on: startedOn, note: note?.trim() || null })
 }
+export async function updatePackage(id: string, fields: Partial<{ total_sessions: number; registered_on: string; started_on: string | null; note: string | null }>) {
+  return requireSupabase().from('class_packages').update(fields).eq('id', id)
+}
 export async function deletePackage(id: string) {
   return requireSupabase().from('class_packages').delete().eq('id', id)
 }

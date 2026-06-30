@@ -89,7 +89,9 @@ export default function Portal() {
   const [schedAnchor, setSchedAnchor] = useState('')   // YYYY-MM-DD reference; '' = today
   const [schedDay, setSchedDay] = useState('')          // selected day in month view
   const [sessForm, setSessForm] = useState<null | { id?: string; memberId: string; packageId: string; title: string; color: string; location: string; date: string; time: string; dur: string; status: string }>(null)
-  const [pkgForm, setPkgForm] = useState<null | { memberId: string; total: string; date: string; start: string; note: string }>(null)
+  const [pkgForm, setPkgForm] = useState<null | { id?: string; memberId: string; total: string; date: string; start: string; note: string }>(null)
+  const [pkgManage, setPkgManage] = useState(false)
+  const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({})
   const [schedErr, setSchedErr] = useState('')
   const [reqForm, setReqForm] = useState<null | { memberId: string; message: string }>(null)
   const [reqReply, setReqReply] = useState<Record<string, string>>({})
@@ -1792,10 +1794,10 @@ export default function Portal() {
             return (
               <div onClick={() => setPkgForm(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 124, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
                 <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
-                  <div style={eyebrow}>Session Pass</div><div style={cardTitle}>회차권 등록</div>
+                  <div style={eyebrow}>Session Pass</div><div style={cardTitle}>{f.id ? '회차권 수정' : '회차권 등록'}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 11, marginTop: 14 }}>
                     <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>회원</label>
-                      <select value={f.memberId} onChange={(e) => setPkgForm({ ...f, memberId: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }}>
+                      <select value={f.memberId} disabled={!!f.id} onChange={(e) => setPkgForm({ ...f, memberId: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13, opacity: f.id ? 0.6 : 1 }}>
                         <option value="">회원 선택</option>
                         {(be.roster ?? []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                       </select>
@@ -1808,13 +1810,42 @@ export default function Portal() {
                     <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>메모(선택)</label><input value={f.note} onChange={(e) => setPkgForm({ ...f, note: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
                   </div>
                   <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                    {f.id && <button onClick={() => { if (confirm('이 회차권을 삭제할까요?')) void be.deletePackage(f.id!).then(() => setPkgForm(null)) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#E0875C', background: 'rgba(224,138,94,.12)', border: '1px solid rgba(224,138,94,.3)', padding: '12px 16px', borderRadius: 22 }}>삭제</button>}
                     <button onClick={() => setPkgForm(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '12px 18px', borderRadius: 22 }}>취소</button>
-                    <button disabled={!canSave} onClick={() => { void be.createPackage(f.memberId, total, f.date, f.start || null, f.note).then(() => setPkgForm(null)) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSave ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSave ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>등록</button>
+                    <button disabled={!canSave} onClick={() => { const done = () => setPkgForm(null); if (f.id) void be.updatePackage(f.id, { total_sessions: total, registered_on: f.date, started_on: f.start || null, note: f.note || null }).then(done); else void be.createPackage(f.memberId, total, f.date, f.start || null, f.note).then(done) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSave ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSave ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>{f.id ? '저장' : '등록'}</button>
                   </div>
                 </div>
               </div>
             )
           })()}
+
+          {/* 회차권 관리 모달 (코치) */}
+          {pkgManage && (
+            <div onClick={() => setPkgManage(false)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 124, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto', background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div><div style={eyebrow}>Session Passes</div><div style={cardTitle}>회차권 관리</div></div>
+                  <button onClick={() => { const t = ymd(new Date()); setPkgManage(false); setPkgForm({ memberId: '', total: '10', date: t, start: t, note: '' }) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '7px 14px', borderRadius: 16 }}>+ 새 회차권</button>
+                </div>
+                {(be.packages ?? []).length === 0 && <div style={{ fontSize: 13, color: 'rgba(231,239,234,.45)', padding: '18px 0' }}>등록된 회차권이 없어요.</div>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 14 }}>
+                  {(be.packages ?? []).map((p) => (
+                    <button key={p.id} onClick={() => { setPkgManage(false); setPkgForm({ id: p.id, memberId: p.memberId, total: String(p.totalSessions), date: p.registeredOn, start: p.startedOn ?? '', note: p.note ?? '' }) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                      <Avatar initials={p.memberInitials} color={p.memberColor} photo={p.memberPhoto} size={34} fontSize={12} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#EAF3F1' }}>{p.memberName} <span style={{ color: 'rgba(231,239,234,.5)', fontWeight: 500 }}>· {p.totalSessions}회권</span></div>
+                        <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>등록 {p.registeredOn.replace(/-/g, '.')}{p.startedOn ? ` · 시작 ${p.startedOn.replace(/-/g, '.')}` : ''}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 20, color: p.remaining <= 2 ? '#E0875C' : '#67D7DF' }}>{p.remaining}<span style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}> / {p.totalSessions}</span></div>
+                        <div style={{ fontSize: 10, color: 'rgba(231,239,234,.4)' }}>남은 시수</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 측정값 수정 모달 */}
           {measEdit && (
@@ -2249,6 +2280,7 @@ export default function Portal() {
                       </div>
                       {isCoach && <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                         <button onClick={() => setReqForm({ memberId: '', message: '이번 주 가능한 수업 시간을 알려주세요!' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', borderRadius: 18, padding: '7px 14px' }}>시간 요청</button>
+                        <button onClick={() => setPkgManage(true)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', borderRadius: 18, padding: '7px 14px' }}>회차권 관리</button>
                         <button onClick={() => setPkgForm({ memberId: '', total: '10', date: todayY, start: todayY, note: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9FE2E8', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '7px 14px' }}>회차권 등록</button>
                         <button onClick={() => openNew()} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, borderRadius: 18, padding: '7px 16px' }}>+ 수업</button>
                       </div>}
@@ -2293,13 +2325,16 @@ export default function Portal() {
 
                     {schedView === 'week' ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {week.map((d) => { const k = ymd(d); const list = dayList(k); const isToday = k === todayY; return (
-                          <section key={k} style={{ ...card, borderRadius: 14, padding: '12px 14px', borderColor: isToday ? 'rgba(103,215,223,.4)' : undefined }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: list.length ? 9 : 0 }}>
-                              <span style={{ fontSize: 13, fontWeight: 700, color: isToday ? '#67D7DF' : '#EAF3F1' }}>{d.getMonth() + 1}.{d.getDate()} <span style={{ color: d.getDay() === 0 ? '#E0875C' : d.getDay() === 6 ? '#67D7DF' : 'rgba(231,239,234,.5)' }}>({WD[d.getDay()]})</span>{isToday && <span style={{ fontSize: 10, color: '#67D7DF', marginLeft: 6 }}>오늘</span>}</span>
-                              {isCoach && <button onClick={() => openNew(k)} style={{ all: 'unset', cursor: 'pointer', fontSize: 16, color: 'rgba(157,175,203,.7)', lineHeight: 1 }}>+</button>}
+                        {week.map((d) => { const k = ymd(d); const list = dayList(k); const isToday = k === todayY; const collapsed = !!collapsedDays[k]; return (
+                          <section key={k} style={{ ...card, borderRadius: 14, padding: '10px 14px', borderColor: isToday ? 'rgba(103,215,223,.4)' : undefined }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (collapsed || list.length === 0) ? 0 : 9 }}>
+                              <button onClick={() => setCollapsedDays((c) => ({ ...c, [k]: !c[k] }))} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
+                                <span style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 6, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#9DAFCB', lineHeight: 1 }}>{collapsed ? '+' : '−'}</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: isToday ? '#67D7DF' : '#EAF3F1' }}>{d.getMonth() + 1}.{d.getDate()} <span style={{ color: d.getDay() === 0 ? '#E0875C' : d.getDay() === 6 ? '#67D7DF' : 'rgba(231,239,234,.5)' }}>({WD[d.getDay()]})</span>{isToday && <span style={{ fontSize: 10, color: '#67D7DF', marginLeft: 6 }}>오늘</span>}{list.length > 0 && <span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)', marginLeft: 7 }}>{list.length}건</span>}</span>
+                              </button>
+                              {isCoach && <button onClick={() => openNew(k)} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 11.5, fontWeight: 700, color: '#67D7DF', padding: '3px 9px', borderRadius: 12, background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.25)' }}>+ 수업</button>}
                             </div>
-                            {list.length === 0 ? <div style={{ fontSize: 12, color: 'rgba(231,239,234,.3)' }}>{isCoach ? '' : '수업 없음'}</div> : <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>{list.map(SessCard)}</div>}
+                            {!collapsed && (list.length === 0 ? <div style={{ fontSize: 12, color: 'rgba(231,239,234,.3)' }}>{isCoach ? '' : '수업 없음'}</div> : <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>{list.map(SessCard)}</div>)}
                           </section>
                         ) })}
                       </div>

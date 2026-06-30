@@ -26,6 +26,16 @@ export interface ProfileRow {
   phone: string | null
   photo_path: string | null
   measure_cycle_days: number | null
+  studio: string | null
+}
+
+// member-group clustering: BigDaS is isolated; everyone else (incl. unassigned)
+// shares one cluster. Two members can see each other iff same cluster.
+export type StudioName = 'BigDaS' | '래미안그레이튼' | '선릉 핏허브' | '청담 쉐어필라테스'
+export const STUDIOS: StudioName[] = ['BigDaS', '래미안그레이튼', '선릉 핏허브', '청담 쉐어필라테스']
+export function studioCluster(studio: string | null | undefined): 'bigdas' | 'main' { return studio === 'BigDaS' ? 'bigdas' : 'main' }
+export async function setMemberStudio(memberId: string, studio: string | null) {
+  return requireSupabase().rpc('set_member_studio', { p_member: memberId, p_studio: studio })
 }
 
 async function uid(): Promise<string> {
@@ -714,7 +724,7 @@ export function avatarUrl(path?: string | null): string | null {
 // ───────────────────────── members ──────────────────────
 export interface MemberCard {
   id: string; name: string; initials: string; color: string; photo: string | null; role: 'client' | 'trainer'
-  bio: string | null; bio2: string | null; pub: string[]; score: number | null
+  bio: string | null; bio2: string | null; pub: string[]; score: number | null; studio: string | null
 }
 /** Member roster with each member's public metric keys + score (if public). */
 export async function fetchMemberCards(): Promise<MemberCard[]> {
@@ -723,8 +733,14 @@ export async function fetchMemberCards(): Promise<MemberCard[]> {
   // include trainers/admins too — they have all member features and should be
   // browsable + invitable like any member
   const { data: profs } = await sb.from('profiles')
-    .select('id, name, initials, avatar_color, bio, bio2, photo_path, role').neq('id', me)
-  const list = (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null; role: 'client' | 'trainer' }>
+    .select('id, name, initials, avatar_color, bio, bio2, photo_path, role, studio').neq('id', me)
+  let list = (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null; role: 'client' | 'trainer'; studio: string | null }>
+  // member-group visibility: a non-trainer only sees members in their own cluster
+  const { data: meProf } = await sb.from('profiles').select('role, studio').eq('id', me).single()
+  if (meProf && (meProf as { role: string }).role !== 'trainer') {
+    const myCluster = studioCluster((meProf as { studio: string | null }).studio)
+    list = list.filter((p) => p.role === 'trainer' || studioCluster(p.studio) === myCluster)
+  }
   const ids = list.map((p) => p.id)
   if (!ids.length) return []
   // batched: one privacy query + one score query for all members (no N+1)
@@ -739,7 +755,7 @@ export async function fetchMemberCards(): Promise<MemberCard[]> {
   const scoreByUser = new Map<string, number>() // first row per user = latest (desc order)
   for (const r of (scores ?? []) as { user_id: string; value: number }[]) if (!scoreByUser.has(r.user_id)) scoreByUser.set(r.user_id, Number(r.value))
   return list.map((p) => { const pub = pubByUser.get(p.id) ?? []; return {
-    id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), role: p.role, bio: p.bio, bio2: p.bio2, pub,
+    id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), role: p.role, bio: p.bio, bio2: p.bio2, pub, studio: p.studio,
     score: pub.includes('score') ? (scoreByUser.get(p.id) ?? null) : null,
   } })
 }
@@ -761,11 +777,11 @@ export async function fetchMemberProfile(id: string) {
 }
 
 // ───────────────────── trainer studio ───────────────────
-export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number | null; pbf: number | null; smm: number | null }
+export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number | null; pbf: number | null; smm: number | null; studio: string | null }
 export async function fetchRoster(): Promise<RosterRow[]> {
   const sb = requireSupabase()
-  const { data: profs } = await sb.from('profiles').select('id, name, initials, avatar_color, role, photo_path').eq('role', 'client')
-  const list = (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; photo_path: string | null }>
+  const { data: profs } = await sb.from('profiles').select('id, name, initials, avatar_color, role, photo_path, studio').eq('role', 'client')
+  const list = (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; photo_path: string | null; studio: string | null }>
   const ids = list.map((p) => p.id)
   if (!ids.length) return []
   // batched: one readings query for score/pbf/smm across all members (no N+1)
@@ -773,7 +789,7 @@ export async function fetchRoster(): Promise<RosterRow[]> {
     .select('user_id, metric_key, value').in('user_id', ids).in('metric_key', ['score', 'pbf', 'smm']).order('date', { ascending: false })
   const latest = new Map<string, number>() // `${user}:${metric}` → first (latest) value
   for (const r of (readings ?? []) as { user_id: string; metric_key: string; value: number }[]) { const k = `${r.user_id}:${r.metric_key}`; if (!latest.has(k)) latest.set(k, Number(r.value)) }
-  return list.map((p) => ({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path),
+  return list.map((p) => ({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), studio: p.studio,
     score: latest.get(`${p.id}:score`) ?? null, pbf: latest.get(`${p.id}:pbf`) ?? null, smm: latest.get(`${p.id}:smm`) ?? null }))
 }
 export async function addCoachNote(memberId: string, metricKey: string, text: string) {

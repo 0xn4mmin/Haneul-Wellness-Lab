@@ -84,6 +84,7 @@ export default function Portal() {
   const [editChallengeId, setEditChallengeId] = useState<string | null>(null)
   const [roomMenu, setRoomMenu] = useState(false)
   const [chatTab, setChatTab] = useState<'group' | 'dm'>('group')
+  const [openSchedBlk, setOpenSchedBlk] = useState<Record<string, boolean>>({})
   const [memberList, setMemberList] = useState(false)
   const [commTab, setCommTab] = useState<'feed' | 'challenge' | 'members'>('feed')
   const [schedView, setSchedView] = useState<'week' | 'month'>('week')
@@ -586,6 +587,12 @@ export default function Portal() {
   const activeRoom = chatRooms?.find((r) => r.id === be.activeRoomId) ?? null
   const activeDm = be.configured ? (be.dmThreads ?? []).find((t) => t.roomId === be.activeRoomId) ?? null : null
   const roomTitle = activeDm ? activeDm.partnerName : activeRoom ? activeRoom.name : '그룹 채팅'
+  // DM timeline: interleave schedule-request "대화내역" blocks at their start time
+  const dmSchedReqs = activeDm ? (be.requests ?? []).filter((r) => (be.isAdmin ? r.memberId === activeDm.partnerId : r.trainerId === activeDm.partnerId)) : []
+  const msgItems = messages.map((m) => ({ kind: 'msg' as const, t: Date.parse((m as { createdAt?: string }).createdAt ?? '') || 0, m, r: null as (typeof dmSchedReqs)[number] | null }))
+  const chatTimeline = activeDm
+    ? [...msgItems, ...dmSchedReqs.map((r) => ({ kind: 'req' as const, t: Date.parse(r.createdAt) || 0, m: null as (typeof messages)[number] | null, r }))].sort((a, b) => a.t - b.t)
+    : msgItems
   const hasRooms = !be.configured || (chatRooms != null && chatRooms.length > 0)
   const mockOnline = [
     { name: '코치 하늘', initials: '하늘', color: '#234B47', photo: null as string | null, role: '트레이너', statusColor: '#2E9BA6' },
@@ -1600,7 +1607,33 @@ export default function Portal() {
                         <button onClick={() => { setChatErr(''); setChatModal('join') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', padding: '10px 18px', borderRadius: 22 }}>코드로 입장</button>
                       </div>
                     </div>
-                  ) : messages.map((m) => {
+                  ) : chatTimeline.map((item) => {
+                    if (item.kind === 'req' && item.r) {
+                      const r = item.r; const dt = new Date(r.createdAt)
+                      const open = !!openSchedBlk[r.id]
+                      return (
+                        <div key={'req-' + r.id} style={{ alignSelf: 'stretch' }}>
+                          <button onClick={() => setOpenSchedBlk((s) => ({ ...s, [r.id]: !s[r.id] }))} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 12, background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.22)' }}>
+                            <span style={{ fontSize: 14 }}>📅</span>
+                            <span style={{ flex: 1, fontSize: 12.5, fontWeight: 700, color: '#9FE2E8' }}>{dt.getMonth() + 1}월 {dt.getDate()}일 스케줄링 대화내역</span>
+                            {r.status === 'closed' && <span style={{ fontSize: 10, color: 'rgba(231,239,234,.4)' }}>종료됨</span>}
+                            <span style={{ fontSize: 14, color: '#9DAFCB', lineHeight: 1 }}>{open ? '−' : '+'}</span>
+                          </button>
+                          {open && (
+                            <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {r.messages.length === 0 ? <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.4)', padding: '2px 10px' }}>아직 대화가 없어요.</div>
+                                : r.messages.map((mm) => (
+                                  <div key={mm.id} style={{ fontSize: 12, lineHeight: 1.5, color: 'rgba(231,239,234,.82)', padding: '7px 11px', borderRadius: 9, background: 'rgba(255,255,255,.04)' }}>
+                                    <b style={{ color: mm.mine ? '#67D7DF' : '#C9D6CF' }}>{mm.mine ? '나' : activeDm?.partnerName}</b> <span style={{ color: 'rgba(231,239,234,.35)', fontSize: 10 }}>{hhmm(mm.createdAt)}</span><br />{mm.text}
+                                  </div>
+                                ))}
+                              <div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.38)', textAlign: 'center', paddingTop: 2 }}>※ 대화는 스케줄 탭의 ‘시간 요청’에서 이어가요.</div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+                    const m = item.m!
                     const mid = String(m.id)
                     const deleted = (m as { deleted?: boolean }).deleted
                     const reactions = (m as { reactions?: { emoji: string; count: number; mine: boolean; users: string[] }[] }).reactions ?? []
@@ -2436,7 +2469,6 @@ export default function Portal() {
                                 <span style={{ fontSize: 13, fontWeight: 700, color: '#EAF3F1', flex: 1 }}>{isCoach ? r.memberName : `${r.trainerName} 코치`}</span>
                                 {isCoach && <button onClick={() => { setSchedErr(''); setSessForm({ memberId: r.memberId, packageId: '', title: 'PT', color: SLOT_COLORS[0], location: SLOT_LOCATIONS[0], date: todayY, time: '10:00', dur: '50', status: 'scheduled' }) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '5px 11px', borderRadius: 11 }}>수업 만들기</button>}
                                 <button onClick={() => void be.closeRequest(r.id)} title="대화 종료" style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#9DAFCB', padding: '4px 6px' }}>종료</button>
-                                {isCoach && <button onClick={() => { if (confirm('대화를 삭제할까요?')) void be.deleteRequest(r.id) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, color: 'rgba(224,135,92,.7)', padding: '4px 4px' }}>삭제</button>}
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto', marginBottom: 9 }}>
                                 {r.messages.map((m) => (
@@ -2561,16 +2593,22 @@ export default function Portal() {
             <div style={{ animation: 'hwl-rise .4s ease both' }}>
               <section style={{ ...card, padding: 8, overflow: 'hidden' }}>
                 <div className="hwl-roster-wrap"><div className="hwl-roster-inner">
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.3fr', gap: 8, padding: '14px 18px', fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>
-                  <div>회원</div><div>인바디</div><div>체지방률</div><div>골격근</div><div>상태</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.7fr .8fr .8fr .8fr 1fr 1.3fr', gap: 8, padding: '14px 18px', fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>
+                  <div>회원</div><div>인바디</div><div>체지방률</div><div>골격근</div><div>상태</div><div>그룹</div>
                 </div>
                 {roster.map((r) => (
-                  <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.3fr', gap: 8, alignItems: 'center', padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                  <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1.7fr .8fr .8fr .8fr 1fr 1.3fr', gap: 8, alignItems: 'center', padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}><Avatar initials={r.initials} color={r.color} photo={r.photo} size={38} fontSize={12} /><div><div style={{ fontWeight: 600, fontSize: 14, color: '#EAF3F1' }}>{r.name}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>최근 측정 {r.last}</div></div></div>
                     <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#67D7DF' }}>{r.score}</div>
                     <div style={{ fontSize: 14, fontFamily: "'IBM Plex Mono',monospace", color: '#EAF3F1' }}>{r.pbf}<span style={{ color: 'rgba(231,239,234,.4)' }}>%</span></div>
                     <div style={{ fontSize: 14, fontFamily: "'IBM Plex Mono',monospace", color: '#EAF3F1' }}>{r.smm}<span style={{ color: 'rgba(231,239,234,.4)' }}>kg</span></div>
                     <div><span style={{ fontSize: 11.5, fontWeight: 600, color: r.statusFg, background: r.statusBg, padding: '4px 11px', borderRadius: 20 }}>{r.status}</span></div>
+                    <div>{be.configured ? (
+                      <select value={(be.roster ?? []).find((x) => x.id === r.id)?.studio ?? ''} onChange={(e) => { void be.setMemberStudio(r.id, e.target.value || null).catch((err) => alert(err instanceof Error ? err.message : '변경 실패')) }} style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: 11.5, padding: '6px 7px', borderRadius: 8, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.05)', color: '#EAF3F1', WebkitAppearance: 'none', appearance: 'none' }}>
+                        <option value="">미지정</option>
+                        {['BigDaS', '래미안그레이튼', '선릉 핏허브', '청담 쉐어필라테스'].map((g) => <option key={g} value={g}>{g}</option>)}
+                      </select>
+                    ) : <span style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>—</span>}</div>
                   </div>
                 ))}
                 </div></div>

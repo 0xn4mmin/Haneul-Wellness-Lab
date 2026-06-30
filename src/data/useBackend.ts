@@ -61,7 +61,7 @@ export interface ChallengeDetail {
 }
 const METRIC_LABEL: Record<string, string> = { weight: '체중', smm: '골격근량', pbf: '체지방률', bodyFatMass: '체지방량', bmi: 'BMI', bmr: '기초대사량', visceral: '내장지방', tbw: '체수분', score: '인바디 점수' }
 export interface NotificationView { id: string; type: string; text: string; read: boolean; time: string; ref: string | null; actorInitials: string; actorColor: string; actorPhoto?: string | null }
-export interface MemberView { id: string; name: string; initials: string; color: string; photo?: string | null; role: 'client' | 'trainer'; bio: string; bio2: string; score: number; pub: string[] }
+export interface MemberView { id: string; name: string; initials: string; color: string; photo?: string | null; role: 'client' | 'trainer'; bio: string; bio2: string; score: number; pub: string[]; studio: string | null }
 export interface ActiveMemberDetail {
   id: string; name: string; initials: string; color: string; photo: string | null; role: 'client' | 'trainer'; bio2: string; score: number
   measureCount: number; lastDate: string | null; publicCount: number; lockedCount: number
@@ -70,7 +70,7 @@ export interface ActiveMemberDetail {
 }
 export interface ChartCommentView { author: string; initials: string; color: string; role: Role; text: string; time: string }
 export interface FeedbackItem { author: string; initials: string; color: string; photo?: string | null; isCoach: boolean; text: string; time: string }
-export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number; pbf: number; smm: number }
+export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number; pbf: number; smm: number; studio: string | null }
 export interface CoachNoteItem { id: string; author: string; initials: string; color: string; photo: string | null; isCoach: boolean; isMine: boolean; text: string; time: string }
 
 export interface Backend {
@@ -187,6 +187,7 @@ export interface Backend {
   addCoachFeedback: (text: string) => void
   // trainer
   roster: RosterRow[] | null
+  setMemberStudio: (memberId: string, studio: string | null) => Promise<void>
   addCoachNote: (memberId: string, metricKey: string, text: string) => Promise<string>
   coachNotes: CoachNoteItem[] | null
   loadCoachNotes: (memberId: string) => Promise<void>
@@ -378,7 +379,7 @@ export function useBackend(): Backend {
 
   const reloadMembers = useCallback(async () => {
     const cards = await api.fetchMemberCards()
-    setMembers(cards.map((c) => ({ id: c.id, name: c.name, initials: c.initials, color: c.color, photo: c.photo, role: c.role, bio: c.bio ?? '', bio2: c.bio2 ?? '', score: c.score ?? 0, pub: c.pub })))
+    setMembers(cards.map((c) => ({ id: c.id, name: c.name, initials: c.initials, color: c.color, photo: c.photo, role: c.role, bio: c.bio ?? '', bio2: c.bio2 ?? '', score: c.score ?? 0, pub: c.pub, studio: c.studio })))
   }, [])
 
   // load everything for the signed-in user
@@ -447,11 +448,13 @@ export function useBackend(): Backend {
     if (!supabase || !meId) return
     return api.subscribeNotifications(meId, (row) => {
       void reloadNotifications()
-      // best-effort phone/desktop popup (works while the app is open/alive)
+      // best-effort phone/desktop popup with vibration (works while the app is open/alive)
       if (row?.text && typeof Notification !== 'undefined' && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+        const vib = [180, 80, 180]
         navigator.serviceWorker.ready
-          .then((reg) => reg.showNotification('하늘 웰니스 랩', { body: row.text, icon: '/assets/logo-mark.png', badge: '/assets/logo-mark.png' }))
+          .then((reg) => reg.showNotification('하늘 웰니스 랩', { body: row.text, icon: '/assets/logo-mark.png', badge: '/assets/logo-mark.png', vibrate: vib, tag: 'hwl-notif', renotify: true } as NotificationOptions))
           .catch(() => {})
+        try { navigator.vibrate?.(vib) } catch { /* ignore */ }
       }
     })
   }, [meId, reloadNotifications])
@@ -897,7 +900,7 @@ export function useBackend(): Backend {
   useEffect(() => { lazy.current = { community: false, chat: false, schedule: false, roster: false } }, [meId, reloadKey])
   const loadRoster = useCallback(async () => {
     if (lazy.current.roster) return; lazy.current.roster = true
-    try { const rows = await api.fetchRoster(); setRoster(rows.map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo, score: r.score ?? 0, pbf: r.pbf ?? 0, smm: r.smm ?? 0 }))) } catch (e) { console.warn('[backend] roster', e) }
+    try { const rows = await api.fetchRoster(); setRoster(rows.map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo, score: r.score ?? 0, pbf: r.pbf ?? 0, smm: r.smm ?? 0, studio: r.studio }))) } catch (e) { console.warn('[backend] roster', e) }
   }, [])
   const ensureCommunity = useCallback(async () => {
     if (lazy.current.community) return; lazy.current.community = true
@@ -906,17 +909,23 @@ export function useBackend(): Backend {
   const ensureChat = useCallback(async () => {
     if (lazy.current.chat) return; lazy.current.chat = true
     try {
-      const [myRooms] = await Promise.all([reloadRooms(), reloadDms(), reloadUnread(), loadRoster()])
+      const [myRooms] = await Promise.all([reloadRooms(), reloadDms(), reloadUnread(), loadRoster(), reloadRequests()])
       const first = myRooms[0]?.id ?? null
       roomId.current = first; setActiveRoomId(first)
       if (first) { await reloadMessages(first); setMyRoomAlias(await api.fetchMyRoomMembership(first)) } else { setMessages([]); setRoomMembers([]) }
     } catch (e) { console.warn('[backend] chat', e) }
-  }, [reloadRooms, reloadMessages, reloadDms, reloadUnread, loadRoster])
+  }, [reloadRooms, reloadMessages, reloadDms, reloadUnread, loadRoster, reloadRequests])
   const ensureSchedule = useCallback(async () => {
     if (lazy.current.schedule) return; lazy.current.schedule = true
     await Promise.all([reloadSchedule(), reloadRequests(), loadRoster()]).catch((e) => console.warn('[backend] schedule', e))
   }, [reloadSchedule, reloadRequests, loadRoster])
   const ensureTrainer = useCallback(async () => { await loadRoster() }, [loadRoster])
+  const setMemberStudio = useCallback(async (memberId: string, studio: string | null) => {
+    const { error } = await api.setMemberStudio(memberId, studio)
+    if (error) throw new Error(error.message)
+    lazy.current.roster = false
+    await Promise.all([loadRoster(), reloadMembers()])
+  }, [loadRoster, reloadMembers])
   const loadCoachNotes = useCallback(async (memberId: string) => {
     if (!memberId || !/^[0-9a-f-]{36}$/i.test(memberId)) { setCoachNotes(null); return }
     const rows = await api.fetchChartComments(memberId, 'overall').catch(() => [])
@@ -982,7 +991,7 @@ export function useBackend(): Backend {
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, onlineIds, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
     sessions, packages, createSession, updateSession, deleteSession, createPackage, updatePackage, sendReregNotice, deletePackage,
-    ensureCommunity, ensureChat, ensureSchedule, ensureTrainer,
+    ensureCommunity, ensureChat, ensureSchedule, ensureTrainer, setMemberStudio,
     requests, createRequest, postRequestMessage, closeRequest, deleteRequest,
     challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,

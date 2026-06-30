@@ -93,7 +93,7 @@ export default function Portal() {
   const [schedAnchor, setSchedAnchor] = useState('')   // YYYY-MM-DD reference; '' = today
   const [schedDay, setSchedDay] = useState('')          // selected day in month view
   const [sessForm, setSessForm] = useState<null | { id?: string; memberId: string; packageId: string; title: string; color: string; location: string; date: string; time: string; dur: string; status: string }>(null)
-  const [pkgForm, setPkgForm] = useState<null | { id?: string; memberId: string; total: string; date: string; start: string; note: string }>(null)
+  const [pkgForm, setPkgForm] = useState<null | { id?: string; memberId: string; total: string; date: string; start: string; note: string; amount: string }>(null)
   const [pkgManage, setPkgManage] = useState(false)
   const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({})
   const [schedErr, setSchedErr] = useState('')
@@ -1456,7 +1456,7 @@ export default function Portal() {
                           <div style={{ display: 'flex', gap: 10 }}>
                             <Avatar initials={cm.initials} color={cm.color} photo={cm.photo} size={30} fontSize={10.5} />
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px' }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{cm.author}</span> <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{renderMentions(cm.text)}</span></div>
+                              <div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px' }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{cm.author}</span>{(cm as { isCoach?: boolean }).isCoach && <span style={{ fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '0 5px', marginLeft: 5 }}>코치</span>} <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{renderMentions(cm.text)}</span></div>
                               <div style={{ display: 'flex', gap: 12, marginTop: 4, marginLeft: 4 }}>
                                 <button onClick={() => { onReply(p.id, (cm as { id?: string }).id, i, cm.author); document.getElementById(`cmt-${p.id}`)?.focus() }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(157,175,203,.8)' }}>답글</button>
                                 {(be.configured ? (cm as { isOwn?: boolean }).isOwn : cm.author === ME.name) && (
@@ -1469,7 +1469,7 @@ export default function Portal() {
                             <div key={j} style={{ display: 'flex', gap: 9, marginLeft: 34 }}>
                               <Avatar initials={rp.initials} color={rp.color} photo={rp.photo} size={26} fontSize={9.5} />
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: '3px 12px 12px 12px', padding: '8px 12px' }}><span style={{ fontWeight: 700, fontSize: 12, color: '#EAF3F1' }}>{rp.author}</span> <span style={{ fontSize: 12.5, color: 'rgba(231,239,234,.78)' }}>{renderMentions(rp.text)}</span></div>
+                                <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: '3px 12px 12px 12px', padding: '8px 12px' }}><span style={{ fontWeight: 700, fontSize: 12, color: '#EAF3F1' }}>{rp.author}</span>{(rp as { isCoach?: boolean }).isCoach && <span style={{ fontSize: 8.5, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 5, padding: '0 4px', marginLeft: 4 }}>코치</span>} <span style={{ fontSize: 12.5, color: 'rgba(231,239,234,.78)' }}>{renderMentions(rp.text)}</span></div>
                                 {(be.configured ? (rp as { isOwn?: boolean }).isOwn : rp.author === ME.name) && (
                                   <button onClick={() => { if (confirm('답글을 삭제할까요?')) onDeleteComment(p.id, (rp as { id?: string }).id, j) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 10.5, fontWeight: 600, color: 'rgba(224,160,106,.8)', marginTop: 3, marginLeft: 4 }}>삭제</button>
                                 )}
@@ -1526,6 +1526,7 @@ export default function Portal() {
                     <button onClick={() => be.configured && chatRooms != null && (setMemberList(false), setRoomMenu((v) => !v))} style={{ all: 'unset', cursor: be.configured && chatRooms != null ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, maxWidth: '100%' }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)', flexShrink: 0 }} />
                       <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roomTitle}</span>
+                      {activeDm && (be.trainers ?? []).some((t) => t.id === activeDm.partnerId) && <span style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '1px 6px' }}>코치</span>}
                       {be.configured && chatRooms != null && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.8)" strokeWidth="2" style={{ flexShrink: 0, transform: roomMenu ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                     </button>
                   </div>
@@ -1675,7 +1676,7 @@ export default function Portal() {
                       style={{ display: 'flex', gap: 11, flexDirection: m.dir, animation: 'hwl-rise .3s ease both' }}>
                       <Avatar initials={m.initials} color={m.color} photo={m.photo} size={34} fontSize={11} ring={m.ring} />
                       <div style={{ maxWidth: '76%', display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3, justifyContent: m.justify }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{m.author}</span><span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)' }}>{m.time}</span></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3, justifyContent: m.justify }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{m.author}</span>{m.role === 'trainer' && <span style={{ fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '0 5px' }}>코치</span>}<span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)' }}>{m.time}</span></div>
                         {deleted ? (
                           <div style={{ fontSize: 13, fontStyle: 'italic', color: 'rgba(231,239,234,.4)', padding: '6px 11px', borderRadius: m.radius, border: '1px dashed rgba(255,255,255,.14)' }}>메시지가 삭제되었습니다</div>
                         ) : (
@@ -1996,12 +1997,13 @@ export default function Portal() {
                       <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>등록일</label><input type="date" value={f.date} onChange={(e) => setPkgForm({ ...f, date: e.target.value })} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 8px', fontSize: 13 }} /></div>
                       <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>시작일</label><input type="date" value={f.start} onChange={(e) => setPkgForm({ ...f, start: e.target.value })} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 8px', fontSize: 13 }} /></div>
                     </div>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>금액 (원, 선택)</label><input type="number" min="0" inputMode="numeric" value={f.amount} onChange={(e) => setPkgForm({ ...f, amount: e.target.value })} placeholder="예: 600000" style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} />{f.amount && !isNaN(Number(f.amount)) && <div style={{ fontSize: 11, color: '#9FE2E8', marginTop: 3 }}>{Number(f.amount).toLocaleString('ko-KR')}원</div>}</div>
                     <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>메모(선택)</label><input value={f.note} onChange={(e) => setPkgForm({ ...f, note: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
                   </div>
                   <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
                     {f.id && <button onClick={() => { if (confirm('이 회차권을 삭제할까요?')) void be.deletePackage(f.id!).then(() => setPkgForm(null)) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#E0875C', background: 'rgba(224,138,94,.12)', border: '1px solid rgba(224,138,94,.3)', padding: '12px 16px', borderRadius: 22 }}>삭제</button>}
                     <button onClick={() => setPkgForm(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '12px 18px', borderRadius: 22 }}>취소</button>
-                    <button disabled={!canSave} onClick={() => { const done = () => setPkgForm(null); if (f.id) void be.updatePackage(f.id, { total_sessions: total, registered_on: f.date, started_on: f.start || null, note: f.note || null }).then(done); else void be.createPackage(f.memberId, total, f.date, f.start || null, f.note).then(done) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSave ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSave ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>{f.id ? '저장' : '등록'}</button>
+                    <button disabled={!canSave} onClick={() => { const done = () => setPkgForm(null); const amt = f.amount.trim() === '' ? null : Math.round(Number(f.amount)); if (f.id) void be.updatePackage(f.id, { total_sessions: total, registered_on: f.date, started_on: f.start || null, note: f.note || null, amount: amt }).then(done); else void be.createPackage(f.memberId, total, f.date, f.start || null, f.note, amt).then(done) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSave ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSave ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>{f.id ? '저장' : '등록'}</button>
                   </div>
                 </div>
               </div>
@@ -2014,7 +2016,7 @@ export default function Portal() {
               <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto', background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div><div style={eyebrow}>Session Passes</div><div style={cardTitle}>회차권 관리</div></div>
-                  <button onClick={() => { const t = ymd(new Date()); setPkgManage(false); setPkgForm({ memberId: '', total: '10', date: t, start: t, note: '' }) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '7px 14px', borderRadius: 16 }}>+ 새 회차권</button>
+                  <button onClick={() => { const t = ymd(new Date()); setPkgManage(false); setPkgForm({ memberId: '', total: '10', date: t, start: t, note: '', amount: '' }) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '7px 14px', borderRadius: 16 }}>+ 새 회차권</button>
                 </div>
                 {(be.packages ?? []).length === 0 && <div style={{ fontSize: 13, color: 'rgba(231,239,234,.45)', padding: '18px 0' }}>등록된 회차권이 없어요.</div>}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 14 }}>
@@ -2022,9 +2024,9 @@ export default function Portal() {
                     <div key={p.id} style={{ boxSizing: 'border-box', padding: '11px 13px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                         <Avatar initials={p.memberInitials} color={p.memberColor} photo={p.memberPhoto} size={34} fontSize={12} />
-                        <button onClick={() => { setPkgManage(false); setPkgForm({ id: p.id, memberId: p.memberId, total: String(p.totalSessions), date: p.registeredOn, start: p.startedOn ?? '', note: p.note ?? '' }) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0, borderRadius: 8 }}>
+                        <button onClick={() => { setPkgManage(false); setPkgForm({ id: p.id, memberId: p.memberId, total: String(p.totalSessions), date: p.registeredOn, start: p.startedOn ?? '', note: p.note ?? '', amount: p.amount != null ? String(p.amount) : '' }) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0, borderRadius: 8 }}>
                           <div style={{ fontSize: 13.5, fontWeight: 700, color: '#EAF3F1' }}>{p.memberName} <span style={{ color: 'rgba(231,239,234,.5)', fontWeight: 500 }}>· {p.totalSessions}회권</span></div>
-                          <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>등록 {p.registeredOn.replace(/-/g, '.')}{p.startedOn ? ` · 시작 ${p.startedOn.replace(/-/g, '.')}` : ''}</div>
+                          <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>등록 {p.registeredOn.replace(/-/g, '.')}{p.startedOn ? ` · 시작 ${p.startedOn.replace(/-/g, '.')}` : ''}{p.amount != null ? ` · ${p.amount.toLocaleString('ko-KR')}원` : ''}</div>
                         </button>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                           <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 20, color: p.remaining <= 2 ? '#E0875C' : '#67D7DF' }}>{p.remaining}<span style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}> / {p.totalSessions}</span></div>
@@ -2460,7 +2462,7 @@ export default function Portal() {
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontSize: 11, color: 'rgba(231,239,234,.5)', flexWrap: 'wrap' }}>
                         {ss.memberName && <span>{ss.memberName}</span>}
                         {ss.location && <span style={{ color: 'rgba(231,239,234,.45)' }}>· {ss.location}</span>}
-                        {ss.packageId && ss.pkgTotal > 0 && <span style={{ color: ss.pkgRemaining <= 2 ? '#E0875C' : '#67D7DF', fontFamily: "'IBM Plex Mono',monospace" }}>{ss.pkgTotal}회 중 {ss.seq}회차</span>}
+                        {ss.packageId && ss.pkgTotal > 0 && <span style={{ color: ss.pkgRemaining <= 2 ? '#E0875C' : '#67D7DF', fontFamily: "'IBM Plex Mono',monospace" }}>{ss.seq}회차 · 잔여 {ss.pkgRemaining}/{ss.pkgTotal}</span>}
                       </span>
                     </span>
                   </button>

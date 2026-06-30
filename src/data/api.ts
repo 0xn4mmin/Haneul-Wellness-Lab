@@ -218,7 +218,7 @@ export async function uploadPostMedia(file: File): Promise<string> {
 export async function fetchPosts(limit = 12, offset = 0) {
   const { data, error } = await requireSupabase()
     .from('posts')
-    .select('id, author_id, text, shared_metric, image_path, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role, photo_path), post_likes(user_id), post_comments(id, text, author_id, parent_id, created_at, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color, photo_path))')
+    .select('id, author_id, text, shared_metric, image_path, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role, photo_path), post_likes(user_id), post_comments(id, text, author_id, parent_id, created_at, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color, photo_path, role))')
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
   if (error) throw error
@@ -420,7 +420,13 @@ export interface ClassSession {
 }
 export interface ClassPackage {
   id: string; memberId: string; memberName: string; memberInitials: string; memberColor: string; memberPhoto: string | null
-  totalSessions: number; registeredOn: string; startedOn: string | null; note: string | null
+  totalSessions: number; registeredOn: string; startedOn: string | null; note: string | null; amount: number | null
+}
+/** Every session for one member (all-time), for the management hub's stats. */
+export async function fetchMemberSessions(memberId: string): Promise<{ startsAt: string; durationMin: number; status: SessionStatus; packageId: string | null }[]> {
+  const { data } = await requireSupabase().from('class_sessions')
+    .select('starts_at, duration_min, status, package_id').eq('member_id', memberId).order('starts_at', { ascending: true })
+  return ((data ?? []) as any[]).map((s) => ({ startsAt: s.starts_at, durationMin: s.duration_min, status: s.status as SessionStatus, packageId: s.package_id }))
 }
 const mp = (raw: any) => (Array.isArray(raw) ? raw[0] : raw)
 
@@ -443,10 +449,10 @@ export async function fetchPackageSessions(): Promise<{ id: string; packageId: s
 }
 export async function fetchPackages(): Promise<ClassPackage[]> {
   const { data } = await requireSupabase().from('class_packages')
-    .select('id, member_id, total_sessions, registered_on, started_on, note, member:profiles!class_packages_member_id_fkey(name, initials, avatar_color, photo_path)')
+    .select('id, member_id, total_sessions, registered_on, started_on, note, amount, member:profiles!class_packages_member_id_fkey(name, initials, avatar_color, photo_path)')
     .order('registered_on', { ascending: false })
   return ((data ?? []) as any[]).map((p) => { const m = mp(p.member); return {
-    id: p.id, memberId: p.member_id, totalSessions: p.total_sessions, registeredOn: p.registered_on, startedOn: p.started_on ?? null, note: p.note ?? null,
+    id: p.id, memberId: p.member_id, totalSessions: p.total_sessions, registeredOn: p.registered_on, startedOn: p.started_on ?? null, note: p.note ?? null, amount: p.amount ?? null,
     memberName: m?.name ?? '', memberInitials: m?.initials ?? '', memberColor: m?.avatar_color ?? '#5E97A0', memberPhoto: avatarUrl(m?.photo_path),
   } })
 }
@@ -460,11 +466,11 @@ export async function updateSession(id: string, fields: Partial<{ title: string;
 export async function deleteSession(id: string) {
   return requireSupabase().from('class_sessions').delete().eq('id', id)
 }
-export async function createPackage(memberId: string, totalSessions: number, registeredOn: string, startedOn: string | null, note: string | null) {
+export async function createPackage(memberId: string, totalSessions: number, registeredOn: string, startedOn: string | null, note: string | null, amount: number | null) {
   const me = await uid()
-  return requireSupabase().from('class_packages').insert({ member_id: memberId, trainer_id: me, total_sessions: totalSessions, registered_on: registeredOn, started_on: startedOn, note: note?.trim() || null })
+  return requireSupabase().from('class_packages').insert({ member_id: memberId, trainer_id: me, total_sessions: totalSessions, registered_on: registeredOn, started_on: startedOn, note: note?.trim() || null, amount })
 }
-export async function updatePackage(id: string, fields: Partial<{ total_sessions: number; registered_on: string; started_on: string | null; note: string | null }>) {
+export async function updatePackage(id: string, fields: Partial<{ total_sessions: number; registered_on: string; started_on: string | null; note: string | null; amount: number | null }>) {
   return requireSupabase().from('class_packages').update(fields).eq('id', id)
 }
 export async function sendReregNotice(memberId: string, text: string) {

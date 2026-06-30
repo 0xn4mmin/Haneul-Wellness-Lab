@@ -33,7 +33,7 @@ export interface BackendProfile {
   name: string; initials: string; color: string; role: 'client' | 'trainer'
   birth: string | null; gender: string | null; phone: string | null; photoUrl: string | null
 }
-export interface PostComment { id?: string; author: string; initials: string; color: string; photo?: string | null; text: string; isOwn?: boolean; replies?: PostComment[] }
+export interface PostComment { id?: string; author: string; initials: string; color: string; photo?: string | null; text: string; isOwn?: boolean; isCoach?: boolean; replies?: PostComment[] }
 export interface PostView {
   id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string
   likes: number; liked: boolean; open: boolean; draft: string; comments: PostComment[]; isOwn: boolean
@@ -144,7 +144,8 @@ export interface Backend {
   createSession: (s: { memberId: string | null; packageId: string | null; title: string; color: string; location: string | null; startsAt: string; durationMin: number }) => Promise<void>
   updateSession: (id: string, fields: Parameters<typeof api.updateSession>[1]) => Promise<void>
   deleteSession: (id: string) => Promise<void>
-  createPackage: (memberId: string, total: number, registeredOn: string, startedOn: string | null, note: string | null) => Promise<void>
+  createPackage: (memberId: string, total: number, registeredOn: string, startedOn: string | null, note: string | null, amount: number | null) => Promise<void>
+  fetchMemberSessions: (memberId: string) => Promise<{ startsAt: string; durationMin: number; status: api.SessionStatus; packageId: string | null }[]>
   updatePackage: (id: string, fields: Parameters<typeof api.updatePackage>[1]) => Promise<void>
   sendReregNotice: (memberId: string, text: string) => Promise<void>
   deletePackage: (id: string) => Promise<void>
@@ -266,7 +267,7 @@ export function useBackend(): Backend {
       const ui = postUi.current[r.id] ?? { open: false, draft: '', replyTo: null }
       const sm = r.shared_metric as { val?: string; label?: string; sub?: string } | null
       // build nested comments: top-level + their replies (one level)
-      const raw = (r.post_comments ?? []).map((c: any) => ({ id: c.id, author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, photo: api.avatarUrl(c.author?.photo_path), text: c.text, isOwn: c.author_id === meId, parentId: c.parent_id as string | null, ts: Date.parse(c.created_at) }))
+      const raw = (r.post_comments ?? []).map((c: any) => ({ id: c.id, author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, photo: api.avatarUrl(c.author?.photo_path), text: c.text, isOwn: c.author_id === meId, isCoach: c.author?.role === 'trainer', parentId: c.parent_id as string | null, ts: Date.parse(c.created_at) }))
       raw.sort((x: any, y: any) => x.ts - y.ts)
       const byParent: Record<string, PostComment[]> = {}
       raw.filter((c: any) => c.parentId).forEach((c: any) => { (byParent[c.parentId] ??= []).push(c) })
@@ -732,8 +733,9 @@ export function useBackend(): Backend {
   const createSession = useCallback(async (s: { memberId: string | null; packageId: string | null; title: string; color: string; location: string | null; startsAt: string; durationMin: number }) => { const { error } = await api.createSession(s); if (error) throw new Error(error.message); await reloadSchedule() }, [reloadSchedule])
   const updateSession = useCallback(async (id: string, fields: Parameters<typeof api.updateSession>[1]) => { const { error } = await api.updateSession(id, fields); if (error) throw new Error(error.message); await reloadSchedule() }, [reloadSchedule])
   const deleteSession = useCallback(async (id: string) => { await api.deleteSession(id); await reloadSchedule() }, [reloadSchedule])
-  const createPackage = useCallback(async (memberId: string, total: number, registeredOn: string, startedOn: string | null, note: string | null) => { await api.createPackage(memberId, total, registeredOn, startedOn, note); await reloadSchedule() }, [reloadSchedule])
+  const createPackage = useCallback(async (memberId: string, total: number, registeredOn: string, startedOn: string | null, note: string | null, amount: number | null) => { await api.createPackage(memberId, total, registeredOn, startedOn, note, amount); await reloadSchedule() }, [reloadSchedule])
   const updatePackage = useCallback(async (id: string, fields: Parameters<typeof api.updatePackage>[1]) => { await api.updatePackage(id, fields); await reloadSchedule() }, [reloadSchedule])
+  const fetchMemberSessions = useCallback((memberId: string) => api.fetchMemberSessions(memberId), [])
   const sendReregNotice = useCallback(async (memberId: string, text: string) => { const { error } = await api.sendReregNotice(memberId, text); if (error) throw new Error(error.message) }, [])
   const deletePackage = useCallback(async (id: string) => { await api.deletePackage(id); await reloadSchedule() }, [reloadSchedule])
   const [requests, setRequests] = useState<api.ScheduleRequest[] | null>(null)
@@ -992,7 +994,7 @@ export function useBackend(): Backend {
     posts, postsMore, loadMorePosts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, onlineIds, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
-    sessions, packages, createSession, updateSession, deleteSession, createPackage, updatePackage, sendReregNotice, deletePackage,
+    sessions, packages, createSession, updateSession, deleteSession, createPackage, updatePackage, sendReregNotice, deletePackage, fetchMemberSessions,
     ensureCommunity, ensureChat, ensureSchedule, ensureTrainer, setMemberStudio, refreshRoster,
     requests, createRequest, postRequestMessage, closeRequest, deleteRequest,
     challenges, createChallenge, deleteChallenge, updateChallenge,

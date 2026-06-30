@@ -106,6 +106,9 @@ export default function Portal() {
   const [measEdit, setMeasEdit] = useState<{ id: string; date: string; iso: string; values: Record<string, string> } | null>(null)
   const [manualOpen, setManualOpen] = useState(false)
   const [manualTargetId, setManualTargetId] = useState<string | null>(null) // trainer recording on a member's behalf
+  const [studioMemberId, setStudioMemberId] = useState<string | null>(null) // trainer studio: opened member's hub
+  const [studioQuery, setStudioQuery] = useState('')
+  const [studioStats, setStudioStats] = useState<{ startsAt: string; durationMin: number; status: string; packageId: string | null }[] | null>(null)
   const [manualDate, setManualDate] = useState('')
   const [manualVals, setManualVals] = useState<Record<string, string>>({})
   const [postImg, setPostImg] = useState<File | null>(null)
@@ -186,6 +189,16 @@ export default function Portal() {
     if (be.configured && be.isAdmin && s.view === 'trainer' && s.coachTargetId) { setEditNoteId(null); void be.loadCoachNotes(s.coachTargetId) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [be.configured, be.isAdmin, s.view, s.coachTargetId])
+
+  // trainer studio hub: load the opened member's all-time sessions for stats
+  useEffect(() => {
+    if (!be.configured || !studioMemberId) { setStudioStats(null); return }
+    let cancelled = false
+    setStudioStats(null)
+    void be.fetchMemberSessions(studioMemberId).then((rows) => { if (!cancelled) setStudioStats(rows) }).catch(() => { if (!cancelled) setStudioStats([]) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [be.configured, studioMemberId, be.sessions])
 
   // lazy-load each tab's data the first time it's opened
   useEffect(() => {
@@ -2625,36 +2638,113 @@ export default function Portal() {
           {/* ============ 트레이너 ============ */}
           {s.view === 'trainer' && (
             <div style={{ animation: 'hwl-rise .4s ease both' }}>
+              {!studioMemberId && (
               <section style={{ ...card, padding: 8, overflow: 'hidden' }}>
-                <div className="hwl-roster-wrap"><div className="hwl-roster-inner">
-                <div style={{ display: 'grid', gridTemplateColumns: '1.9fr .7fr .7fr .7fr .85fr 1.05fr', gap: 8, padding: '14px 18px', fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>
-                  <div>회원</div><div>인바디</div><div>체지방률</div><div>골격근</div><div>상태</div><div>그룹</div>
+                <div style={{ position: 'relative', padding: '12px 12px 6px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.6)" strokeWidth="1.8" style={{ position: 'absolute', left: 24, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" strokeLinecap="round" /></svg>
+                  <input value={studioQuery} onChange={(e) => setStudioQuery(e.target.value)} placeholder="회원 이름으로 검색…" style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: 14, padding: '11px 14px 11px 40px', borderRadius: 12, border: '1px solid rgba(255,247,232,.12)', background: 'rgba(255,249,238,.05)', outline: 'none', color: '#EAF3F1' }} />
                 </div>
-                {roster.map((r) => (
-                  <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1.9fr .7fr .7fr .7fr .85fr 1.05fr', gap: 8, alignItems: 'center', padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                <div className="hwl-roster-wrap"><div className="hwl-roster-inner">
+                <div style={{ display: 'grid', gridTemplateColumns: '1.9fr .7fr .7fr .7fr .85fr .9fr 24px', gap: 8, padding: '10px 18px', fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>
+                  <div>회원</div><div>인바디</div><div>체지방률</div><div>골격근</div><div>상태</div><div>그룹</div><div />
+                </div>
+                {roster.filter((r) => r.name.includes(studioQuery.trim())).map((r) => { const grp = (be.roster ?? []).find((x) => x.id === r.id)?.studio; return (
+                  <button key={r.id} onClick={() => { setStudioMemberId(r.id); set({ coachTargetId: r.id === 'jiwoo' ? 'minseo' : r.id, coachConfirm: '' }) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '1.9fr .7fr .7fr .7fr .85fr .9fr 24px', gap: 8, alignItems: 'center', width: '100%', padding: '13px 18px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}><Avatar initials={r.initials} color={r.color} photo={r.photo} size={38} fontSize={12} /><div><div style={{ fontWeight: 600, fontSize: 14, color: '#EAF3F1' }}>{r.name}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>최근 측정 {r.last}</div></div></div>
                     <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#67D7DF' }}>{r.score}</div>
                     <div style={{ fontSize: 14, fontFamily: "'IBM Plex Mono',monospace", color: '#EAF3F1' }}>{r.pbf}<span style={{ color: 'rgba(231,239,234,.4)' }}>%</span></div>
                     <div style={{ fontSize: 14, fontFamily: "'IBM Plex Mono',monospace", color: '#EAF3F1' }}>{r.smm}<span style={{ color: 'rgba(231,239,234,.4)' }}>kg</span></div>
                     <div><span style={{ fontSize: 11.5, fontWeight: 600, color: r.statusFg, background: r.statusBg, padding: '4px 11px', borderRadius: 20 }}>{r.status}</span></div>
-                    <div>{be.configured ? (
-                      <select value={(be.roster ?? []).find((x) => x.id === r.id)?.studio ?? ''} onChange={(e) => { void be.setMemberStudio(r.id, e.target.value || null).catch((err) => alert(err instanceof Error ? err.message : '변경 실패')) }} style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: 10, padding: '4px 5px', borderRadius: 6, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', color: '#C9D6CF', WebkitAppearance: 'none', appearance: 'none' }}>
-                        <option value="">미지정</option>
-                        {['BigDaS', '래미안그레이튼', '선릉 핏허브', '청담 쉐어필라테스'].map((g) => <option key={g} value={g}>{g}</option>)}
-                      </select>
-                    ) : <span style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>—</span>}</div>
-                  </div>
-                ))}
+                    <div style={{ fontSize: 10.5, color: grp ? '#9FE2E8' : 'rgba(231,239,234,.35)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{grp || '미지정'}</div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.7)" strokeWidth="2"><path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
+                ) })}
+                {roster.filter((r) => r.name.includes(studioQuery.trim())).length === 0 && <div style={{ fontSize: 13, color: 'rgba(231,239,234,.45)', padding: '24px 18px', textAlign: 'center' }}>회원이 없어요.</div>}
                 </div></div>
               </section>
-              <section style={{ background: 'linear-gradient(165deg,#16264E,#101D3E)', border: '1px solid rgba(184,148,85,.18)', color: '#EAF3F1', borderRadius: 24, padding: 24, marginTop: 20, boxShadow: '0 26px 52px -40px rgba(0,0,0,.8)' }}>
+              )}
+              {studioMemberId && (() => {
+                const sm = roster.find((r) => r.id === studioMemberId)
+                const smStudio = (be.roster ?? []).find((x) => x.id === studioMemberId)?.studio ?? ''
+                const pkgs = (be.packages ?? []).filter((p) => p.memberId === studioMemberId)
+                const amountSum = pkgs.reduce((a, p) => a + (p.amount ?? 0), 0)
+                const remainSum = pkgs.reduce((a, p) => a + p.remaining, 0)
+                const totalSum = pkgs.reduce((a, p) => a + p.totalSessions, 0)
+                const st = studioStats ?? []
+                const attended = st.filter((x) => x.status === 'attended').length
+                const statusDefs = [['attended', '출석', '#67D7DF'], ['scheduled', '예정', '#9DAFCB'], ['sameday_cancel', '당일취소', '#E0A06A'], ['cancelled', '취소', '#E0875C']] as const
+                const statusCounts = statusDefs.map(([k, label, color]) => ({ k, label, color, n: st.filter((x) => x.status === k).length }))
+                const slotCounts = new Map<string, number>()
+                for (const x of st) { if (x.status === 'cancelled') continue; const d = new Date(x.startsAt); const slot = `${WD[d.getDay()]} ${String(d.getHours()).padStart(2, '0')}시`; slotCounts.set(slot, (slotCounts.get(slot) ?? 0) + 1) }
+                const slotTotal = [...slotCounts.values()].reduce((a, b) => a + b, 0)
+                const topSlots = [...slotCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([slot, n]) => ({ slot, n, pct: slotTotal ? Math.round((n / slotTotal) * 100) : 0 }))
+                const statCard = (label: string, value: React.ReactNode, sub?: string) => (
+                  <div style={{ flex: 1, minWidth: 130, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: '14px 15px' }}>
+                    <div style={{ fontSize: 10.5, letterSpacing: '1px', textTransform: 'uppercase', color: '#C9A24B' }}>{label}</div>
+                    <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#F2F7F3', marginTop: 4 }}>{value}</div>
+                    {sub && <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>{sub}</div>}
+                  </div>
+                )
+                return (
+                  <>
+                    <button onClick={() => setStudioMemberId(null)} style={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'rgba(231,239,234,.65)', marginBottom: 14 }}>‹ 회원 목록</button>
+                    <section style={{ ...card, padding: 22 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                        <Avatar initials={sm?.initials ?? ''} color={sm?.color ?? '#5E97A0'} photo={sm?.photo ?? null} size={54} fontSize={16} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#F2F7F3' }}>{sm?.name}</div>
+                          <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>최근 측정 {sm?.last}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 10, letterSpacing: '1px', color: '#C9A24B' }}>인바디</div>
+                          <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: '#EAF3F1', marginTop: 3 }}>{sm?.score}점 · {sm?.pbf}% · {sm?.smm}kg</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 14, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12, color: 'rgba(231,239,234,.6)' }}>그룹</span>
+                        <select value={smStudio} onChange={(e) => { void be.setMemberStudio(studioMemberId, e.target.value || null).catch((err) => alert(err instanceof Error ? err.message : '변경 실패')) }} style={{ fontFamily: 'inherit', fontSize: 12.5, padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.05)', color: '#EAF3F1', WebkitAppearance: 'none', appearance: 'none' }}>
+                          <option value="">미지정</option>
+                          {['BigDaS', '래미안그레이튼', '선릉 핏허브', '청담 쉐어필라테스'].map((g) => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </div>
+                    </section>
+                    <section style={{ ...card, padding: 22, marginTop: 16 }}>
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+                        {statCard('누적 수업', `${attended}회`, `예약 ${st.length}건 중 출석`)}
+                        {statCard('누적 구매 금액', `${amountSum.toLocaleString('ko-KR')}원`, `회차권 ${pkgs.length}건`)}
+                        {statCard('잔여 시수', `${remainSum}회`, `총 ${totalSum}회 중`)}
+                      </div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#C9A24B', marginBottom: 10 }}>수업 상태별</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                        {statusCounts.map((sc) => { const pct = st.length ? Math.round((sc.n / st.length) * 100) : 0; return (
+                          <div key={sc.k} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ width: 58, fontSize: 12, color: 'rgba(231,239,234,.7)' }}>{sc.label}</span>
+                            <div style={{ flex: 1, height: 9, borderRadius: 6, background: 'rgba(255,255,255,.06)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: sc.color }} /></div>
+                            <span style={{ width: 64, textAlign: 'right', fontSize: 11.5, color: 'rgba(231,239,234,.6)', fontFamily: "'IBM Plex Mono',monospace" }}>{sc.n}회 · {pct}%</span>
+                          </div>
+                        ) })}
+                      </div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#C9A24B', marginBottom: 10 }}>자주 잡은 요일·시간 (Top 3)</div>
+                      {topSlots.length === 0 ? <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)' }}>아직 잡은 수업이 없어요.</div> : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {topSlots.map((sl, i) => (
+                            <div key={sl.slot} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ width: 18, height: 18, flexShrink: 0, borderRadius: '50%', background: i === 0 ? '#C9A24B' : 'rgba(255,255,255,.1)', color: i === 0 ? '#060B17' : '#9DAFCB', fontSize: 10.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+                              <span style={{ width: 96, fontSize: 13, fontWeight: 600, color: '#EAF3F1' }}>{sl.slot}</span>
+                              <div style={{ flex: 1, height: 9, borderRadius: 6, background: 'rgba(255,255,255,.06)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${sl.pct}%`, background: 'linear-gradient(90deg,#2E9BA6,#67D7DF)' }} /></div>
+                              <span style={{ width: 64, textAlign: 'right', fontSize: 11.5, color: '#67D7DF', fontFamily: "'IBM Plex Mono',monospace" }}>{sl.n}회 · {sl.pct}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  </>
+                )
+              })()}
+              {studioMemberId && (
+              <section style={{ background: 'linear-gradient(165deg,#16264E,#101D3E)', border: '1px solid rgba(184,148,85,.18)', color: '#EAF3F1', borderRadius: 24, padding: 24, marginTop: 16, boxShadow: '0 26px 52px -40px rgba(0,0,0,.8)' }}>
                 <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 21, marginBottom: 4, color: '#F2F7F3' }}>코칭 노트 보내기</div>
-                <div style={{ fontSize: 13, color: '#9DAFCB', marginBottom: 16 }}>선택한 회원에게 전체 피드백으로 등록돼요. 회원의 측정 화면 “하늘 코치의 피드백”에 표시되고, 회원이 댓글로 답할 수 있어요.</div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-                  {roster.map((r) => (
-                    <button key={r.id} onClick={() => set({ coachTargetId: r.id === 'jiwoo' ? 'minseo' : r.id, coachConfirm: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: '7px 14px', borderRadius: 20, border: `1px solid ${r.selBorder}`, background: r.selBg, color: r.selFg }}>{r.name}</button>
-                  ))}
-                </div>
+                <div style={{ fontSize: 13, color: '#9DAFCB', marginBottom: 16 }}>{coachTargetMember ? coachTargetMember.name : '회원'}님에게 전체 피드백으로 등록돼요. 회원의 측정 화면 “하늘 코치의 피드백”에 표시되고, 회원이 댓글로 답할 수 있어요.</div>
                 <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
                   <input value={s.coachNote} onChange={(e) => set({ coachNote: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendCoachNote() } }} placeholder={`${coachTargetMember ? coachTargetMember.name : '회원'}님에게 피드백을 작성하세요…`} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14, padding: '13px 17px', borderRadius: 24, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.07)', outline: 'none', color: '#fff' }} />
                   <button onClick={sendCoachNote} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '12px 22px', borderRadius: 24 }}>노트 보내기</button>
@@ -2695,8 +2785,9 @@ export default function Portal() {
                   </div>
                 )}
               </section>
-              {be.configured && (
-                <section style={{ background: 'linear-gradient(165deg,#16264E,#101D3E)', border: '1px solid rgba(184,148,85,.18)', color: '#EAF3F1', borderRadius: 24, padding: 24, marginTop: 20, boxShadow: '0 26px 52px -40px rgba(0,0,0,.8)' }}>
+              )}
+              {studioMemberId && be.configured && (
+                <section style={{ background: 'linear-gradient(165deg,#16264E,#101D3E)', border: '1px solid rgba(184,148,85,.18)', color: '#EAF3F1', borderRadius: 24, padding: 24, marginTop: 16, boxShadow: '0 26px 52px -40px rgba(0,0,0,.8)' }}>
                   <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 21, marginBottom: 4, color: '#F2F7F3' }}>회원 측정값 기록</div>
                   <div style={{ fontSize: 13, color: '#9DAFCB', marginBottom: 16 }}>선택한 회원을 대신해 인바디 값을 직접 입력하거나, 결과지를 업로드해 자동 인식으로 저장합니다.</div>
                   <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.6)', marginBottom: 14 }}>대상 회원 · <b style={{ color: '#EAF3F1' }}>{coachTargetMember ? coachTargetMember.name : '위에서 회원을 선택하세요'}</b></div>

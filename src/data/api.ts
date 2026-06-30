@@ -93,20 +93,21 @@ export async function fetchMetricSeries(
   return { dates, series }
 }
 /** Manual measurement: stores readings only for the metrics actually filled. */
-export async function commitManualMeasurement(date: string, values: Partial<Record<MetricKey, number>>): Promise<void> {
+export async function commitManualMeasurement(date: string, values: Partial<Record<MetricKey, number>>, targetUserId?: string): Promise<void> {
   const sb = requireSupabase()
   const me = await uid()
+  const owner = targetUserId ?? me
   const { data: m, error: mErr } = await sb.from('measurements').upsert({
-    user_id: me, date, source: 'manual', segmental: {}, detail: {}, ranges: null, result_sheet_path: null,
+    user_id: owner, date, source: 'manual', segmental: {}, detail: {}, ranges: null, result_sheet_path: null,
   }, { onConflict: 'user_id,date' }).select('id').single()
   if (mErr) throw mErr
   const measurementId = (m as { id: string }).id
-  await sb.from('metric_readings').delete().eq('user_id', me).eq('date', date)
+  await sb.from('metric_readings').delete().eq('user_id', owner).eq('date', date)
   const rows = (Object.keys(values) as MetricKey[])
     .filter((k) => values[k] != null && !isNaN(values[k] as number))
-    .map((k) => ({ user_id: me, measurement_id: measurementId, metric_key: k, date, value: values[k] }))
+    .map((k) => ({ user_id: owner, measurement_id: measurementId, metric_key: k, date, value: values[k] }))
   if (rows.length) { const { error: rErr } = await sb.from('metric_readings').insert(rows); if (rErr) throw rErr }
-  await sb.rpc('request_briefing', { p_source: 'measurement' }).then(() => {}, () => {})
+  if (owner === me) await sb.rpc('request_briefing', { p_source: 'measurement' }).then(() => {}, () => {})
 }
 
 export interface MeasurementRow {
@@ -835,10 +836,11 @@ export interface OcrJob {
 }
 
 /** Uploads a result-sheet image and enqueues an OCR job. Returns the job id. */
-export async function uploadResultSheet(file: File): Promise<string> {
+export async function uploadResultSheet(file: File, targetUserId?: string): Promise<string> {
   const sb = requireSupabase()
   const me = await uid()
-  const path = `${me}/${Date.now()}-${file.name}`
+  const owner = targetUserId ?? me // member's folder (so they can view it); job stays owned by the uploader
+  const path = `${owner}/${Date.now()}-${file.name}`
   const { error: upErr } = await sb.storage.from('inbody-results').upload(path, file, { upsert: true })
   if (upErr) throw upErr
   const { data, error } = await sb.from('ocr_jobs').insert({ user_id: me, image_path: path }).select('id').single()
@@ -872,14 +874,15 @@ export async function fetchOcrJob(jobId: string): Promise<OcrJob | null> {
  * Commits a reviewed OCR result as a measurement + its metric_readings,
  * then marks the job 'committed'. `r` is the (possibly user-edited) result.
  */
-export async function commitOcrMeasurement(jobId: string, r: OcrResult): Promise<void> {
+export async function commitOcrMeasurement(jobId: string, r: OcrResult, targetUserId?: string): Promise<void> {
   const sb = requireSupabase()
   const me = await uid()
+  const owner = targetUserId ?? me
   // carry the uploaded result-sheet image onto the measurement so it's viewable
   const { data: jobRow } = await sb.from('ocr_jobs').select('image_path').eq('id', jobId).single()
   const sheetPath = (jobRow as { image_path?: string } | null)?.image_path ?? null
   const { data: m, error: mErr } = await sb.from('measurements').upsert({
-    user_id: me, date: r.date, source: 'ocr',
+    user_id: owner, date: r.date, source: 'ocr',
     segmental: r.segmental,
     detail: r.detail,
     ranges: r.ranges ?? null,
@@ -893,15 +896,15 @@ export async function commitOcrMeasurement(jobId: string, r: OcrResult): Promise
     bmi: r.bmi, bmr: r.bmr, visceral: r.visceral, tbw: r.tbw,
   }
   // replace any existing readings for this date, then insert the new set
-  await sb.from('metric_readings').delete().eq('user_id', me).eq('date', r.date)
+  await sb.from('metric_readings').delete().eq('user_id', owner).eq('date', r.date)
   const rows = (Object.keys(metricVals) as MetricKey[]).map((k) => ({
-    user_id: me, measurement_id: measurementId, metric_key: k, date: r.date, value: metricVals[k],
+    user_id: owner, measurement_id: measurementId, metric_key: k, date: r.date, value: metricVals[k],
   }))
   const { error: rErr } = await sb.from('metric_readings').insert(rows)
   if (rErr) throw rErr
   await sb.from('ocr_jobs').update({ status: 'committed' }).eq('id', jobId)
-  // new measurement → enqueue a fresh AI briefing (measurement source, no rate limit)
-  await sb.rpc('request_briefing', { p_source: 'measurement' }).then(() => {}, () => {})
+  // new measurement → enqueue a fresh AI briefing (only for one's own data)
+  if (owner === me) await sb.rpc('request_briefing', { p_source: 'measurement' }).then(() => {}, () => {})
 }
 
 // ───────────────────── AI coach briefing ────────────────

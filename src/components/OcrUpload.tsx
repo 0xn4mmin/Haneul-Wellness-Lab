@@ -27,7 +27,7 @@ const inputStyle: React.CSSProperties = {
 }
 
 /** Result-sheet upload → live OCR progress → editable review → commit. */
-export default function OcrUpload({ onCommitted }: { onCommitted: () => void }) {
+export default function OcrUpload({ onCommitted, targetUserId }: { onCommitted: () => void; targetUserId?: string }) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [msg, setMsg] = useState('')
   const [draft, setDraft] = useState<OcrResult | null>(null)
@@ -51,7 +51,7 @@ export default function OcrUpload({ onCommitted }: { onCommitted: () => void }) 
     const f = e.target.files && e.target.files[0]; if (!f) return
     setPhase('uploading'); setMsg('업로드 중…'); setDraft(null)
     try {
-      const jobId = await uploadResultSheet(f)
+      const jobId = await uploadResultSheet(f, targetUserId)
       jobIdRef.current = jobId
       setPhase('working'); setMsg('결과지를 분석하고 있어요…')
       unsubRef.current = subscribeOcrJob(jobId, handleJob)
@@ -71,7 +71,7 @@ export default function OcrUpload({ onCommitted }: { onCommitted: () => void }) 
     if (!draft || !jobIdRef.current) return
     setPhase('saving')
     try {
-      await commitOcrMeasurement(jobIdRef.current, draft)
+      await commitOcrMeasurement(jobIdRef.current, draft, targetUserId)
       setPhase('done'); setMsg('✓ 측정 기록에 저장했어요.')
       unsubRef.current?.(); unsubRef.current = null
       onCommitted()

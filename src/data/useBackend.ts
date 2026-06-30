@@ -94,7 +94,7 @@ export interface Backend {
   setGoal: (metricKey: string, target: number | null) => void
   viewResultSheet: (path: string) => void
   deleteMeasurement: (id: string, resultPath?: string | null) => Promise<void>
-  addManualMeasurement: (date: string, values: Partial<Record<MetricKey, number>>) => Promise<void>
+  addManualMeasurement: (date: string, values: Partial<Record<MetricKey, number>>, targetUserId?: string) => Promise<void>
   updateMeasurement: (id: string, date: string | null, values: Record<string, number>) => Promise<void>
   fetchMeasurementValues: (id: string) => Promise<Record<string, number>>
   unreadChat: number
@@ -188,6 +188,7 @@ export interface Backend {
   // trainer
   roster: RosterRow[] | null
   setMemberStudio: (memberId: string, studio: string | null) => Promise<void>
+  refreshRoster: () => Promise<void>
   addCoachNote: (memberId: string, metricKey: string, text: string) => Promise<string>
   coachNotes: CoachNoteItem[] | null
   loadCoachNotes: (memberId: string) => Promise<void>
@@ -551,9 +552,9 @@ export function useBackend(): Backend {
     await api.deleteMeasurement(id, resultPath)
     setReloadKey((k) => k + 1)
   }, [])
-  const addManualMeasurement = useCallback(async (date: string, values: Partial<Record<MetricKey, number>>) => {
-    await api.commitManualMeasurement(date, values)
-    setReloadKey((k) => k + 1)
+  const addManualMeasurement = useCallback(async (date: string, values: Partial<Record<MetricKey, number>>, targetUserId?: string) => {
+    await api.commitManualMeasurement(date, values, targetUserId)
+    if (!targetUserId) setReloadKey((k) => k + 1) // own data; the member's own session picks up theirs
   }, [])
   const updateMeasurement = useCallback(async (id: string, date: string | null, values: Record<string, number>) => {
     if (date) await api.updateMeasurementDate(id, date)
@@ -920,6 +921,7 @@ export function useBackend(): Backend {
     await Promise.all([reloadSchedule(), reloadRequests(), loadRoster()]).catch((e) => console.warn('[backend] schedule', e))
   }, [reloadSchedule, reloadRequests, loadRoster])
   const ensureTrainer = useCallback(async () => { await loadRoster() }, [loadRoster])
+  const refreshRoster = useCallback(async () => { lazy.current.roster = false; await loadRoster() }, [loadRoster])
   const setMemberStudio = useCallback(async (memberId: string, studio: string | null) => {
     const { error } = await api.setMemberStudio(memberId, studio)
     if (error) throw new Error(error.message)
@@ -991,7 +993,7 @@ export function useBackend(): Backend {
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, onlineIds, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
     sessions, packages, createSession, updateSession, deleteSession, createPackage, updatePackage, sendReregNotice, deletePackage,
-    ensureCommunity, ensureChat, ensureSchedule, ensureTrainer, setMemberStudio,
+    ensureCommunity, ensureChat, ensureSchedule, ensureTrainer, setMemberStudio, refreshRoster,
     requests, createRequest, postRequestMessage, closeRequest, deleteRequest,
     challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,

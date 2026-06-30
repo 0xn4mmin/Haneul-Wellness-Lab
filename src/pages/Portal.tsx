@@ -105,6 +105,7 @@ export default function Portal() {
   const [editNoteText, setEditNoteText] = useState('')
   const [measEdit, setMeasEdit] = useState<{ id: string; date: string; iso: string; values: Record<string, string> } | null>(null)
   const [manualOpen, setManualOpen] = useState(false)
+  const [manualTargetId, setManualTargetId] = useState<string | null>(null) // trainer recording on a member's behalf
   const [manualDate, setManualDate] = useState('')
   const [manualVals, setManualVals] = useState<Record<string, string>>({})
   const [postImg, setPostImg] = useState<File | null>(null)
@@ -1246,7 +1247,7 @@ export default function Portal() {
                 </div>
                 {be.configured && be.session && <OcrUpload onCommitted={be.reload} />}
                 {be.configured && be.session && (
-                  <button onClick={() => { setManualVals({}); setManualDate(todayISO); setManualOpen(true) }} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%', textAlign: 'center', marginTop: 10, padding: '11px 0', borderRadius: 12, border: '1px dashed rgba(103,215,223,.4)', color: '#9FE2E8', fontSize: 13, fontWeight: 600 }}>✎ 직접 입력으로 측정 추가</button>
+                  <button onClick={() => { setManualVals({}); setManualDate(todayISO); setManualTargetId(null); setManualOpen(true) }} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%', textAlign: 'center', marginTop: 10, padding: '11px 0', borderRadius: 12, border: '1px dashed rgba(103,215,223,.4)', color: '#9FE2E8', fontSize: 13, fontWeight: 600 }}>✎ 직접 입력으로 측정 추가</button>
                 )}
               </section>
             </div>
@@ -1859,8 +1860,8 @@ export default function Portal() {
           {manualOpen && (
             <div onClick={() => setManualOpen(false)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 122, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
               <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, maxHeight: 'calc(100dvh - 150px)', overflowY: 'auto', background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
-                <div style={eyebrow}>Manual Entry</div><div style={cardTitle}>직접 입력으로 측정 추가</div>
-                <div style={{ fontSize: 12, color: 'rgba(231,239,234,.5)', marginTop: 4, marginBottom: 16 }}>채운 항목만 저장돼요. 비운 항목은 ‘기록 없음’으로 표시되고 모든 계산에서 제외됩니다.</div>
+                <div style={eyebrow}>Manual Entry</div><div style={cardTitle}>{manualTargetId ? `${coachTargetMember?.name ?? '회원'}님 측정 입력` : '직접 입력으로 측정 추가'}</div>
+                <div style={{ fontSize: 12, color: 'rgba(231,239,234,.5)', marginTop: 4, marginBottom: 16 }}>{manualTargetId ? '트레이너가 회원을 대신해 인바디 값을 입력합니다. ' : ''}채운 항목만 저장돼요. 비운 항목은 ‘기록 없음’으로 표시되고 모든 계산에서 제외됩니다.</div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>측정 날짜</label>
                   <input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 11px', fontSize: 13 }} />
@@ -1875,7 +1876,7 @@ export default function Portal() {
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
                   <button onClick={() => setManualOpen(false)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '13px 20px', borderRadius: 22 }}>취소</button>
-                  <button onClick={() => { if (!manualDate) { alert('측정 날짜를 입력하세요.'); return } const vals: Record<string, number> = {}; for (const f of MEAS_FIELDS) { const n = parseFloat(manualVals[f.key]); if (!isNaN(n)) vals[f.key] = n } if (Object.keys(vals).length === 0) { alert('값을 하나 이상 입력하세요.'); return } void be.addManualMeasurement(manualDate, vals).then(() => setManualOpen(false)).catch((e) => alert(e instanceof Error ? e.message : '저장에 실패했어요.')) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>저장</button>
+                  <button onClick={() => { if (!manualDate) { alert('측정 날짜를 입력하세요.'); return } const vals: Record<string, number> = {}; for (const f of MEAS_FIELDS) { const n = parseFloat(manualVals[f.key]); if (!isNaN(n)) vals[f.key] = n } if (Object.keys(vals).length === 0) { alert('값을 하나 이상 입력하세요.'); return } void be.addManualMeasurement(manualDate, vals, manualTargetId ?? undefined).then(() => { setManualOpen(false); if (manualTargetId) void be.refreshRoster() }).catch((e) => alert(e instanceof Error ? e.message : '저장에 실패했어요.')) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 22 }}>저장</button>
                 </div>
               </div>
             </div>
@@ -2692,6 +2693,19 @@ export default function Portal() {
                   </div>
                 )}
               </section>
+              {be.configured && (
+                <section style={{ background: 'linear-gradient(165deg,#16264E,#101D3E)', border: '1px solid rgba(184,148,85,.18)', color: '#EAF3F1', borderRadius: 24, padding: 24, marginTop: 20, boxShadow: '0 26px 52px -40px rgba(0,0,0,.8)' }}>
+                  <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 21, marginBottom: 4, color: '#F2F7F3' }}>회원 측정값 기록</div>
+                  <div style={{ fontSize: 13, color: '#9DAFCB', marginBottom: 16 }}>선택한 회원을 대신해 인바디 값을 직접 입력하거나, 결과지를 업로드해 자동 인식으로 저장합니다.</div>
+                  <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.6)', marginBottom: 14 }}>대상 회원 · <b style={{ color: '#EAF3F1' }}>{coachTargetMember ? coachTargetMember.name : '위에서 회원을 선택하세요'}</b></div>
+                  {coachTargetMember ? (
+                    <>
+                      <button onClick={() => { setManualVals({}); setManualDate(todayISO); setManualTargetId(coachTargetMember.id); setManualOpen(true) }} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%', textAlign: 'center', padding: '11px 0', borderRadius: 12, border: '1px dashed rgba(103,215,223,.4)', color: '#9FE2E8', fontSize: 13, fontWeight: 600 }}>✎ 수기로 측정값 입력</button>
+                      <OcrUpload targetUserId={coachTargetMember.id} onCommitted={() => void be.refreshRoster()} />
+                    </>
+                  ) : <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)' }}>회원을 선택하면 입력·업로드 버튼이 나타납니다.</div>}
+                </section>
+              )}
             </div>
           )}
         </div>

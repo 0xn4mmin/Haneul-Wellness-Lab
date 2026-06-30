@@ -70,7 +70,7 @@ export interface ActiveMemberDetail {
 }
 export interface ChartCommentView { author: string; initials: string; color: string; role: Role; text: string; time: string }
 export interface FeedbackItem { author: string; initials: string; color: string; photo?: string | null; isCoach: boolean; text: string; time: string }
-export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number; pbf: number; smm: number; studio: string | null }
+export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number; pbf: number; smm: number; studio: string | null; lastDate: string | null }
 export interface CoachNoteItem { id: string; author: string; initials: string; color: string; photo: string | null; isCoach: boolean; isMine: boolean; text: string; time: string }
 
 export interface Backend {
@@ -900,7 +900,7 @@ export function useBackend(): Backend {
   useEffect(() => { lazy.current = { community: false, chat: false, schedule: false, roster: false } }, [meId, reloadKey])
   const loadRoster = useCallback(async () => {
     if (lazy.current.roster) return; lazy.current.roster = true
-    try { const rows = await api.fetchRoster(); setRoster(rows.map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo, score: r.score ?? 0, pbf: r.pbf ?? 0, smm: r.smm ?? 0, studio: r.studio }))) } catch (e) { console.warn('[backend] roster', e) }
+    try { const rows = await api.fetchRoster(); setRoster(rows.map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo, score: r.score ?? 0, pbf: r.pbf ?? 0, smm: r.smm ?? 0, studio: r.studio, lastDate: r.lastDate }))) } catch (e) { console.warn('[backend] roster', e) }
   }, [])
   const ensureCommunity = useCallback(async () => {
     if (lazy.current.community) return; lazy.current.community = true

@@ -574,7 +574,7 @@ export default function Portal() {
 
   const statusOf = (score: number) => score >= 85 ? { t: '순조', fg: '#67D7DF', bg: 'rgba(46,155,166,.18)' } : score >= 78 ? { t: '유지', fg: '#D9B45A', bg: 'rgba(214,178,90,.2)' } : { t: '점검 필요', fg: '#E0A06A', bg: 'rgba(224,138,94,.2)' }
   const rosterSrc = be.configured
-    ? (be.roster ?? []).map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo as string | null, score: r.score, pbf: r.pbf, smm: r.smm, last: D[D.length - 1] }))
+    ? (be.roster ?? []).map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo as string | null, score: r.score, pbf: r.pbf, smm: r.smm, last: r.lastDate ? `${+r.lastDate.slice(5, 7)}월 ${+r.lastDate.slice(8, 10)}일` : '기록 없음' }))
     : [
       { id: 'jiwoo', name: '박지우', initials: '지우', color: '#6E9B8E', photo: null as string | null, score: 78, pbf: 20.0, smm: 31.9, last: '6월 14일' },
       ...s.members.map((m, i) => ({ id: m.id, name: m.name, initials: m.initials, color: m.color, photo: (m.photo ?? null) as string | null, score: m.score, pbf: (metrics.pbf.series[5] ?? 0) + (m.score - 80) * -0.3, smm: (metrics.smm.series[5] ?? 0) + (m.score - 80) * 0.1, last: ['6월 12일', '6월 13일', '6월 11일'][i] || '6월 10일' })),
@@ -2606,18 +2606,18 @@ export default function Portal() {
             <div style={{ animation: 'hwl-rise .4s ease both' }}>
               <section style={{ ...card, padding: 8, overflow: 'hidden' }}>
                 <div className="hwl-roster-wrap"><div className="hwl-roster-inner">
-                <div style={{ display: 'grid', gridTemplateColumns: '1.7fr .8fr .8fr .8fr 1fr 1.3fr', gap: 8, padding: '14px 18px', fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.9fr .7fr .7fr .7fr .85fr 1.05fr', gap: 8, padding: '14px 18px', fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>
                   <div>회원</div><div>인바디</div><div>체지방률</div><div>골격근</div><div>상태</div><div>그룹</div>
                 </div>
                 {roster.map((r) => (
-                  <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1.7fr .8fr .8fr .8fr 1fr 1.3fr', gap: 8, alignItems: 'center', padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                  <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1.9fr .7fr .7fr .7fr .85fr 1.05fr', gap: 8, alignItems: 'center', padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}><Avatar initials={r.initials} color={r.color} photo={r.photo} size={38} fontSize={12} /><div><div style={{ fontWeight: 600, fontSize: 14, color: '#EAF3F1' }}>{r.name}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>최근 측정 {r.last}</div></div></div>
                     <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#67D7DF' }}>{r.score}</div>
                     <div style={{ fontSize: 14, fontFamily: "'IBM Plex Mono',monospace", color: '#EAF3F1' }}>{r.pbf}<span style={{ color: 'rgba(231,239,234,.4)' }}>%</span></div>
                     <div style={{ fontSize: 14, fontFamily: "'IBM Plex Mono',monospace", color: '#EAF3F1' }}>{r.smm}<span style={{ color: 'rgba(231,239,234,.4)' }}>kg</span></div>
                     <div><span style={{ fontSize: 11.5, fontWeight: 600, color: r.statusFg, background: r.statusBg, padding: '4px 11px', borderRadius: 20 }}>{r.status}</span></div>
                     <div>{be.configured ? (
-                      <select value={(be.roster ?? []).find((x) => x.id === r.id)?.studio ?? ''} onChange={(e) => { void be.setMemberStudio(r.id, e.target.value || null).catch((err) => alert(err instanceof Error ? err.message : '변경 실패')) }} style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: 11.5, padding: '6px 7px', borderRadius: 8, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.05)', color: '#EAF3F1', WebkitAppearance: 'none', appearance: 'none' }}>
+                      <select value={(be.roster ?? []).find((x) => x.id === r.id)?.studio ?? ''} onChange={(e) => { void be.setMemberStudio(r.id, e.target.value || null).catch((err) => alert(err instanceof Error ? err.message : '변경 실패')) }} style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: 10, padding: '4px 5px', borderRadius: 6, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', color: '#C9D6CF', WebkitAppearance: 'none', appearance: 'none' }}>
                         <option value="">미지정</option>
                         {['BigDaS', '래미안그레이튼', '선릉 핏허브', '청담 쉐어필라테스'].map((g) => <option key={g} value={g}>{g}</option>)}
                       </select>

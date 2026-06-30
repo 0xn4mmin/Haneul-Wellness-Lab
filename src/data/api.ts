@@ -777,7 +777,7 @@ export async function fetchMemberProfile(id: string) {
 }
 
 // ───────────────────── trainer studio ───────────────────
-export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number | null; pbf: number | null; smm: number | null; studio: string | null }
+export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number | null; pbf: number | null; smm: number | null; studio: string | null; lastDate: string | null }
 export async function fetchRoster(): Promise<RosterRow[]> {
   const sb = requireSupabase()
   const { data: profs } = await sb.from('profiles').select('id, name, initials, avatar_color, role, photo_path, studio').eq('role', 'client')
@@ -786,11 +786,15 @@ export async function fetchRoster(): Promise<RosterRow[]> {
   if (!ids.length) return []
   // batched: one readings query for score/pbf/smm across all members (no N+1)
   const { data: readings } = await sb.from('metric_readings')
-    .select('user_id, metric_key, value').in('user_id', ids).in('metric_key', ['score', 'pbf', 'smm']).order('date', { ascending: false })
+    .select('user_id, metric_key, value, date').in('user_id', ids).in('metric_key', ['score', 'pbf', 'smm']).order('date', { ascending: false })
   const latest = new Map<string, number>() // `${user}:${metric}` → first (latest) value
-  for (const r of (readings ?? []) as { user_id: string; metric_key: string; value: number }[]) { const k = `${r.user_id}:${r.metric_key}`; if (!latest.has(k)) latest.set(k, Number(r.value)) }
+  const lastDate = new Map<string, string>() // `${user}` → most recent measurement date
+  for (const r of (readings ?? []) as { user_id: string; metric_key: string; value: number; date: string }[]) {
+    const k = `${r.user_id}:${r.metric_key}`; if (!latest.has(k)) latest.set(k, Number(r.value))
+    if (!lastDate.has(r.user_id)) lastDate.set(r.user_id, r.date)
+  }
   return list.map((p) => ({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), studio: p.studio,
-    score: latest.get(`${p.id}:score`) ?? null, pbf: latest.get(`${p.id}:pbf`) ?? null, smm: latest.get(`${p.id}:smm`) ?? null }))
+    score: latest.get(`${p.id}:score`) ?? null, pbf: latest.get(`${p.id}:pbf`) ?? null, smm: latest.get(`${p.id}:smm`) ?? null, lastDate: lastDate.get(p.id) ?? null }))
 }
 export async function addCoachNote(memberId: string, metricKey: string, text: string) {
   const me = await uid()

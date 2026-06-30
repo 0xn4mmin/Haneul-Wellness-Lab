@@ -73,6 +73,7 @@ export default function Portal() {
 
   const [mobileNav, setMobileNav] = useState(false)
   const [memberQuery, setMemberQuery] = useState('')
+  const [memberStudioFilter, setMemberStudioFilter] = useState('')
   const [notifOpen, setNotifOpen] = useState(false)
   const [cycleModal, setCycleModal] = useState(false)
   const [sleepInput, setSleepInput] = useState('')
@@ -1610,14 +1611,14 @@ export default function Portal() {
                   </div>
                 </div>
                 <div ref={chatRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {be.configured && !hasRooms ? (
-                    <div style={{ margin: 'auto', textAlign: 'center', maxWidth: 280, padding: 20 }}>
+                  {be.configured && !be.activeRoomId ? (
+                    <div style={{ margin: 'auto', textAlign: 'center', maxWidth: 290, padding: 20 }}>
                       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.5)" strokeWidth="1.6" style={{ margin: '0 auto 12px' }}><path d="M4 5h16v10H9l-4 4v-4H4z" strokeLinejoin="round" /></svg>
-                      <div style={{ fontSize: 14.5, fontWeight: 600, color: '#EAF3F1', marginBottom: 6 }}>아직 채팅방이 없어요</div>
-                      <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', lineHeight: 1.6, marginBottom: 16 }}>새 방을 만들어 코드를 공유하거나, 받은 코드로 입장해 대화를 시작하세요.</div>
+                      <div style={{ fontSize: 14.5, fontWeight: 600, color: '#EAF3F1', marginBottom: 6 }}>대화를 시작해보세요</div>
+                      <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)', lineHeight: 1.6, marginBottom: 16 }}>좌측 상단 <b style={{ color: '#9FE2E8' }}>‘개인 채팅’</b>에서 {be.isAdmin ? '회원' : '코치'}과 1:1로 바로 대화하거나, 그룹 방을 만들어 시작하세요.</div>
                       <div style={{ display: 'flex', gap: 9, justifyContent: 'center' }}>
-                        <button onClick={() => { setChatErr(''); setChatModal('create') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 18px', borderRadius: 22 }}>+ 방 만들기</button>
-                        <button onClick={() => { setChatErr(''); setChatModal('join') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', padding: '10px 18px', borderRadius: 22 }}>코드로 입장</button>
+                        <button onClick={() => { setChatTab('dm'); setRoomMenu(true) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 18px', borderRadius: 22 }}>개인 채팅</button>
+                        <button onClick={() => { setChatErr(''); setChatModal('create') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', padding: '10px 18px', borderRadius: 22 }}>그룹 방 만들기</button>
                       </div>
                     </div>
                   ) : chatTimeline.map((item) => {
@@ -1711,9 +1712,9 @@ export default function Portal() {
                 <div style={{ padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 9, alignItems: 'center' }}>
                   <label style={{ cursor: be.configured && !activeRoom ? 'default' : 'pointer', flex: 'none', width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9FE2E8', opacity: be.configured && !activeRoom ? 0.5 : 1 }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    <input type="file" accept="image/*" disabled={be.configured && !activeRoom} onChange={(e) => { const f = e.target.files?.[0]; if (f) setChatImg(f); e.target.value = '' }} style={{ display: 'none' }} />
+                    <input type="file" accept="image/*" disabled={be.configured && !be.activeRoomId} onChange={(e) => { const f = e.target.files?.[0]; if (f) setChatImg(f); e.target.value = '' }} style={{ display: 'none' }} />
                   </label>
-                  <input value={s.newMsg} disabled={be.configured && !activeRoom} onChange={(e) => set({ newMsg: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder={be.configured && !activeRoom ? '먼저 채팅방을 만들거나 입장하세요' : '메시지를 입력하세요…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1', opacity: be.configured && !activeRoom ? 0.5 : 1 }} />
+                  <input value={s.newMsg} disabled={be.configured && !be.activeRoomId} onChange={(e) => set({ newMsg: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder={be.configured && !be.activeRoomId ? '대화를 선택하세요' : '메시지를 입력하세요…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1', opacity: be.configured && !be.activeRoomId ? 0.5 : 1 }} />
                   <button onClick={sendMsg} style={{ all: 'unset', cursor: 'pointer', flex: 'none', width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg,#67D7DF,#2E9BA6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#060B17" strokeWidth="2"><path d="M4 12l16-7-7 16-2-7z" strokeLinejoin="round" /></svg></button>
                 </div>
               </section>
@@ -2379,11 +2380,18 @@ export default function Portal() {
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.6)" strokeWidth="1.8" style={{ position: 'absolute', left: 15, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" strokeLinecap="round" /></svg>
                     <input value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} placeholder="이름으로 회원 검색…" style={{ width: '100%', fontFamily: 'inherit', fontSize: 14, padding: '12px 16px 12px 42px', borderRadius: 14, border: '1px solid rgba(255,247,232,.12)', background: 'rgba(255,249,238,.05)', outline: 'none', color: '#EAF3F1' }} />
                   </div>
-                  {membersDisp.filter((m) => m.name.includes(memberQuery.trim())).length === 0 && (
-                    <div style={{ textAlign: 'center', fontSize: 13, color: 'rgba(231,239,234,.45)', padding: '32px 0' }}>“{memberQuery.trim()}”에 해당하는 회원이 없어요.</div>
+                  {be.configured && be.isAdmin && (
+                    <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 16 }}>
+                      {['', 'BigDaS', '래미안그레이튼', '선릉 핏허브', '청담 쉐어필라테스'].map((g) => (
+                        <button key={g || 'all'} onClick={() => setMemberStudioFilter(g)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '6px 13px', borderRadius: 16, background: memberStudioFilter === g ? '#2E9BA6' : 'rgba(255,255,255,.05)', color: memberStudioFilter === g ? '#060B17' : '#9DAFCB', border: '1px solid rgba(255,247,232,.1)' }}>{g || '전체'}</button>
+                      ))}
+                    </div>
+                  )}
+                  {membersDisp.filter((m) => m.name.includes(memberQuery.trim()) && (!memberStudioFilter || (m as { studio?: string | null }).studio === memberStudioFilter)).length === 0 && (
+                    <div style={{ textAlign: 'center', fontSize: 13, color: 'rgba(231,239,234,.45)', padding: '32px 0' }}>{memberStudioFilter ? `‘${memberStudioFilter}’ 그룹에 회원이 없어요.` : `“${memberQuery.trim()}”에 해당하는 회원이 없어요.`}</div>
                   )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(248px,1fr))', gap: 18 }}>
-                  {membersDisp.filter((m) => m.name.includes(memberQuery.trim())).map((m) => (
+                  {membersDisp.filter((m) => m.name.includes(memberQuery.trim()) && (!memberStudioFilter || (m as { studio?: string | null }).studio === memberStudioFilter)).map((m) => (
                     <button key={m.id} onClick={() => openMember(m.id)} className="hwl-card-hover" style={{ all: 'unset', cursor: 'pointer', ...card, borderRadius: 22, padding: 20, display: 'flex', flexDirection: 'column', gap: 13 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <Avatar initials={m.initials} color={m.color} photo={m.photo} size={48} fontSize={15} ring={m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : undefined} />

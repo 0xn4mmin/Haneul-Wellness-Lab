@@ -395,28 +395,33 @@ export function useBackend(): Backend {
           setProfile({ name: prof.name, initials: prof.initials, color: prof.avatar_color, role: prof.role, birth: prof.birth, gender: prof.gender, phone: prof.phone, photoUrl })
           setCycleDays(prof.measure_cycle_days ?? 28)
         }
-        setSleepLogs(await api.fetchSleepLogs(meId))
-        setMeasurements(await api.fetchMeasurements(meId))
-        setGoals(await api.fetchGoals(meId))
-        const [latestBrief, used] = await Promise.all([
+        // first-screen (나의 건강) essentials — fetched in parallel
+        const [sleep, meas, goals, latestBrief, used] = await Promise.all([
+          api.fetchSleepLogs(meId), api.fetchMeasurements(meId), api.fetchGoals(meId),
           api.fetchLatestBriefing(meId), api.manualBriefingsThisWeek(meId),
         ])
         if (cancelled) return
+        setSleepLogs(sleep); setMeasurements(meas); setGoals(goals)
         setBriefing(latestBrief ? { focus: latestBrief.focus, summary: latestBrief.summary, actions: latestBrief.actions } : null)
         setBriefingUsed(used)
-        await reloadCoachFeedback()
-        await reloadChallenges()
-        await reloadNotifications()
-        await Promise.all([reloadPosts(), reloadMembers()])
-        const myRooms = await reloadRooms()   // no auto-created lounge — empty until the user makes/joins one
-        const first = myRooms[0]?.id ?? null
-        roomId.current = first
-        setActiveRoomId(first)
-        if (first) { await reloadMessages(first); setMyRoomAlias(await api.fetchMyRoomMembership(first)) }
-        else { setMessages([]); setRoomMembers([]) }
+        // the home screen is ready → reveal the app now; load the rest in the
+        // background so other tabs populate progressively (no blocking wait)
+        setLoaded(true)
+        void Promise.all([
+          reloadCoachFeedback(), reloadChallenges(), reloadNotifications(),
+          reloadPosts(), reloadMembers(),
+          (async () => {
+            const myRooms = await reloadRooms()   // empty until the user makes/joins a room
+            if (cancelled) return
+            const first = myRooms[0]?.id ?? null
+            roomId.current = first
+            setActiveRoomId(first)
+            if (first) { await reloadMessages(first); setMyRoomAlias(await api.fetchMyRoomMembership(first)) }
+            else { setMessages([]); setRoomMembers([]) }
+          })(),
+        ]).catch((e) => console.warn('[backend] background load', e))
       } catch (e) {
         console.warn('[backend] load failed', e)
-      } finally {
         if (!cancelled) setLoaded(true)
       }
     })()

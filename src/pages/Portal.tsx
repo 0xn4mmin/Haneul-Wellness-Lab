@@ -204,6 +204,33 @@ export default function Portal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [be.configured, be.loaded, be.isAdmin])
 
+  // back-gesture / browser back should return to the previous tab, not exit to
+  // the intro page. Mirror the active tab into the URL hash so each switch is
+  // its own history entry; popping the hash restores the previous tab.
+  const popViewRef = useRef(false)
+  const viewRef = useRef(s.view)
+  viewRef.current = s.view
+  useEffect(() => {
+    const onHash = () => {
+      const v = decodeURIComponent(window.location.hash.replace('#', ''))
+      // only react to a *different* view (ignore the echo from our own hash write)
+      if (v !== viewRef.current && (['health', 'community', 'chat', 'schedule', 'profile', 'trainer'] as View[]).includes(v as View)) {
+        popViewRef.current = true; set({ view: v as View })
+      }
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (popViewRef.current) { popViewRef.current = false; return }
+    const h = decodeURIComponent(window.location.hash.replace('#', ''))
+    if (h === s.view) return
+    if (!h) window.history.replaceState(window.history.state, '', `#${s.view}`) // first: no extra entry
+    else window.location.hash = s.view                                          // push a history entry
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.view])
+
   // fit the chat panel into one screen: measure its real top + the tab bar so
   // it ends just above the tab bar regardless of header/safe-area height.
   // (mobile only; desktop keeps the CSS height.)

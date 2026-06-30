@@ -139,6 +139,7 @@ export interface Backend {
   deleteSession: (id: string) => Promise<void>
   createPackage: (memberId: string, total: number, registeredOn: string, startedOn: string | null, note: string | null) => Promise<void>
   updatePackage: (id: string, fields: Parameters<typeof api.updatePackage>[1]) => Promise<void>
+  sendReregNotice: (memberId: string, text: string) => Promise<void>
   deletePackage: (id: string) => Promise<void>
   requests: api.ScheduleRequest[] | null
   createRequest: (memberId: string, text: string) => Promise<void>
@@ -688,6 +689,7 @@ export function useBackend(): Backend {
   const deleteSession = useCallback(async (id: string) => { await api.deleteSession(id); await reloadSchedule() }, [reloadSchedule])
   const createPackage = useCallback(async (memberId: string, total: number, registeredOn: string, startedOn: string | null, note: string | null) => { await api.createPackage(memberId, total, registeredOn, startedOn, note); await reloadSchedule() }, [reloadSchedule])
   const updatePackage = useCallback(async (id: string, fields: Parameters<typeof api.updatePackage>[1]) => { await api.updatePackage(id, fields); await reloadSchedule() }, [reloadSchedule])
+  const sendReregNotice = useCallback(async (memberId: string, text: string) => { const { error } = await api.sendReregNotice(memberId, text); if (error) throw new Error(error.message) }, [])
   const deletePackage = useCallback(async (id: string) => { await api.deletePackage(id); await reloadSchedule() }, [reloadSchedule])
   useEffect(() => { void reloadSchedule() }, [reloadSchedule, reloadKey])
   const [requests, setRequests] = useState<api.ScheduleRequest[] | null>(null)
@@ -924,7 +926,7 @@ export function useBackend(): Backend {
     posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, onlineIds, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
-    sessions, packages, createSession, updateSession, deleteSession, createPackage, updatePackage, deletePackage,
+    sessions, packages, createSession, updateSession, deleteSession, createPackage, updatePackage, sendReregNotice, deletePackage,
     requests, createRequest, postRequestMessage, closeRequest, deleteRequest,
     challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,

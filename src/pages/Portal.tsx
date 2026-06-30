@@ -1830,17 +1830,20 @@ export default function Portal() {
                 {(be.packages ?? []).length === 0 && <div style={{ fontSize: 13, color: 'rgba(231,239,234,.45)', padding: '18px 0' }}>등록된 회차권이 없어요.</div>}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 14 }}>
                   {(be.packages ?? []).map((p) => (
-                    <button key={p.id} onClick={() => { setPkgManage(false); setPkgForm({ id: p.id, memberId: p.memberId, total: String(p.totalSessions), date: p.registeredOn, start: p.startedOn ?? '', note: p.note ?? '' }) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
-                      <Avatar initials={p.memberInitials} color={p.memberColor} photo={p.memberPhoto} size={34} fontSize={12} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#EAF3F1' }}>{p.memberName} <span style={{ color: 'rgba(231,239,234,.5)', fontWeight: 500 }}>· {p.totalSessions}회권</span></div>
-                        <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>등록 {p.registeredOn.replace(/-/g, '.')}{p.startedOn ? ` · 시작 ${p.startedOn.replace(/-/g, '.')}` : ''}</div>
+                    <div key={p.id} style={{ boxSizing: 'border-box', padding: '11px 13px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                        <Avatar initials={p.memberInitials} color={p.memberColor} photo={p.memberPhoto} size={34} fontSize={12} />
+                        <button onClick={() => { setPkgManage(false); setPkgForm({ id: p.id, memberId: p.memberId, total: String(p.totalSessions), date: p.registeredOn, start: p.startedOn ?? '', note: p.note ?? '' }) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0, borderRadius: 8 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#EAF3F1' }}>{p.memberName} <span style={{ color: 'rgba(231,239,234,.5)', fontWeight: 500 }}>· {p.totalSessions}회권</span></div>
+                          <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', marginTop: 2 }}>등록 {p.registeredOn.replace(/-/g, '.')}{p.startedOn ? ` · 시작 ${p.startedOn.replace(/-/g, '.')}` : ''}</div>
+                        </button>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 20, color: p.remaining <= 2 ? '#E0875C' : '#67D7DF' }}>{p.remaining}<span style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}> / {p.totalSessions}</span></div>
+                          <div style={{ fontSize: 10, color: 'rgba(231,239,234,.4)' }}>남은 시수</div>
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 20, color: p.remaining <= 2 ? '#E0875C' : '#67D7DF' }}>{p.remaining}<span style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}> / {p.totalSessions}</span></div>
-                        <div style={{ fontSize: 10, color: 'rgba(231,239,234,.4)' }}>남은 시수</div>
-                      </div>
-                    </button>
+                      <button onClick={() => { const txt = `회차권이 ${p.remaining}회 남았어요 — 재등록을 부탁드려요! 🙌`; if (confirm(`${p.memberName}님에게 재등록 알림을 보낼까요?\n\n"${txt}"`)) void be.sendReregNotice(p.memberId, txt).then(() => alert('재등록 알림을 보냈어요.')).catch((e) => alert(e instanceof Error ? e.message : '전송 실패')) }} style={{ all: 'unset', cursor: 'pointer', display: 'block', textAlign: 'center', marginTop: 9, fontSize: 12, fontWeight: 600, color: '#F2C28A', background: 'rgba(224,160,106,.12)', border: '1px solid rgba(224,160,106,.3)', borderRadius: 9, padding: '7px 0' }}>📨 재등록 알림 보내기</button>
+                    </div>
                   ))}
                 </div>
               </div>

@@ -423,6 +423,9 @@ export async function createPackage(memberId: string, totalSessions: number, reg
 export async function updatePackage(id: string, fields: Partial<{ total_sessions: number; registered_on: string; started_on: string | null; note: string | null }>) {
   return requireSupabase().from('class_packages').update(fields).eq('id', id)
 }
+export async function sendReregNotice(memberId: string, text: string) {
+  return requireSupabase().rpc('send_rereg_notice', { p_member: memberId, p_text: text })
+}
 export async function deletePackage(id: string) {
   return requireSupabase().from('class_packages').delete().eq('id', id)
 }

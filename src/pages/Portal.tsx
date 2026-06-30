@@ -192,6 +192,18 @@ export default function Portal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [be.configured, s.view])
 
+  // once the home screen is up, quietly prefetch the other tabs after a beat
+  // so switching is instant (no blank flash). ensure* are idempotent.
+  useEffect(() => {
+    if (!be.configured || !be.loaded) return
+    const id = setTimeout(() => {
+      void be.ensureCommunity(); void be.ensureChat(); void be.ensureSchedule()
+      if (be.isAdmin) void be.ensureTrainer()
+    }, 1500)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [be.configured, be.loaded, be.isAdmin])
+
   // fit the chat panel into one screen: measure its real top + the tab bar so
   // it ends just above the tab bar regardless of header/safe-area height.
   // (mobile only; desktop keeps the CSS height.)

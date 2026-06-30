@@ -108,6 +108,8 @@ export interface Backend {
   uploadAvatar: (file: File) => Promise<void>
   // social
   posts: PostView[] | null
+  postsMore: boolean
+  loadMorePosts: () => Promise<void>
   createPost: (text: string, file?: File | null) => Promise<void>
   deletePost: (id: string) => Promise<void>
   deletePostComment: (id: string) => Promise<void>
@@ -141,6 +143,10 @@ export interface Backend {
   updatePackage: (id: string, fields: Parameters<typeof api.updatePackage>[1]) => Promise<void>
   sendReregNotice: (memberId: string, text: string) => Promise<void>
   deletePackage: (id: string) => Promise<void>
+  ensureCommunity: () => Promise<void>
+  ensureChat: () => Promise<void>
+  ensureSchedule: () => Promise<void>
+  ensureTrainer: () => Promise<void>
   requests: api.ScheduleRequest[] | null
   createRequest: (memberId: string, text: string) => Promise<void>
   postRequestMessage: (id: string, text: string) => Promise<void>
@@ -207,6 +213,8 @@ export function useBackend(): Backend {
   const [privacy, setPrivacyState] = useState<Record<string, 'public' | 'private'> | null>(null)
   const [profile, setProfile] = useState<BackendProfile | null>(null)
   const [posts, setPosts] = useState<PostView[] | null>(null)
+  const [postsMore, setPostsMore] = useState(false)
+  const postsRef = useRef<PostView[]>([])
   const [messages, setMessages] = useState<MessageView[] | null>(null)
   const [myRoomAlias, setMyRoomAlias] = useState<{ anonymous: boolean; aliasName: string | null } | null>(null)
   const [rooms, setRooms] = useState<RoomView[] | null>(null)
@@ -242,9 +250,8 @@ export function useBackend(): Backend {
   }, [])
 
   // ── loaders ──
-  const reloadPosts = useCallback(async () => {
-    const rows = await api.fetchPosts()
-    const shaped: PostView[] = (rows as any[]).map((r) => {
+  const POSTS_PAGE = 12
+  const shapePosts = useCallback((rows: any[]): PostView[] => (rows as any[]).map((r) => {
       const a = (r.author ?? {}) as Author
       const ui = postUi.current[r.id] ?? { open: false, draft: '', replyTo: null }
       const sm = r.shared_metric as { val?: string; label?: string; sub?: string } | null
@@ -265,9 +272,19 @@ export function useBackend(): Backend {
         comments,
         hasMetric: !!sm, metricVal: sm?.val, metricLabel: sm?.label, metricSub: sm?.sub,
       }
-    })
-    setPosts(shaped)
-  }, [meId])
+    }), [meId])
+  const reloadPosts = useCallback(async () => {
+    const rows = await api.fetchPosts(POSTS_PAGE, 0)
+    setPosts(shapePosts(rows as any[]))
+    setPostsMore(rows.length === POSTS_PAGE)
+  }, [shapePosts])
+  const loadMorePosts = useCallback(async () => {
+    const cur = postsRef.current.length
+    const rows = await api.fetchPosts(POSTS_PAGE, cur)
+    setPosts((prev) => [...(prev ?? []), ...shapePosts(rows as any[])])
+    setPostsMore(rows.length === POSTS_PAGE)
+  }, [shapePosts])
+  useEffect(() => { postsRef.current = posts ?? [] }, [posts])
 
   const reloadMessages = useCallback(async (room?: string | null) => {
     const rid = room ?? roomId.current
@@ -404,29 +421,18 @@ export function useBackend(): Backend {
         setSleepLogs(sleep); setMeasurements(meas); setGoals(goals)
         setBriefing(latestBrief ? { focus: latestBrief.focus, summary: latestBrief.summary, actions: latestBrief.actions } : null)
         setBriefingUsed(used)
-        // the home screen is ready → reveal the app now; load the rest in the
-        // background so other tabs populate progressively (no blocking wait)
+        // the home screen is ready → reveal the app now. Coach feedback (shown
+        // on 나의 건강) and notifications (the bell) load in the background;
+        // community / chat / schedule are loaded lazily on first tab open.
         setLoaded(true)
-        void Promise.all([
-          reloadCoachFeedback(), reloadChallenges(), reloadNotifications(),
-          reloadPosts(), reloadMembers(),
-          (async () => {
-            const myRooms = await reloadRooms()   // empty until the user makes/joins a room
-            if (cancelled) return
-            const first = myRooms[0]?.id ?? null
-            roomId.current = first
-            setActiveRoomId(first)
-            if (first) { await reloadMessages(first); setMyRoomAlias(await api.fetchMyRoomMembership(first)) }
-            else { setMessages([]); setRoomMembers([]) }
-          })(),
-        ]).catch((e) => console.warn('[backend] background load', e))
+        void Promise.all([reloadCoachFeedback(), reloadNotifications()]).catch((e) => console.warn('[backend] background load', e))
       } catch (e) {
         console.warn('[backend] load failed', e)
         if (!cancelled) setLoaded(true)
       }
     })()
     return () => { cancelled = true }
-  }, [meId, reloadKey, reloadPosts, reloadMembers, reloadMessages, reloadRooms, reloadCoachFeedback, reloadChallenges, reloadNotifications])
+  }, [meId, reloadKey, reloadCoachFeedback, reloadNotifications])
 
   // realtime: new notification → reload
   useEffect(() => {
@@ -696,13 +702,11 @@ export function useBackend(): Backend {
   const updatePackage = useCallback(async (id: string, fields: Parameters<typeof api.updatePackage>[1]) => { await api.updatePackage(id, fields); await reloadSchedule() }, [reloadSchedule])
   const sendReregNotice = useCallback(async (memberId: string, text: string) => { const { error } = await api.sendReregNotice(memberId, text); if (error) throw new Error(error.message) }, [])
   const deletePackage = useCallback(async (id: string) => { await api.deletePackage(id); await reloadSchedule() }, [reloadSchedule])
-  useEffect(() => { void reloadSchedule() }, [reloadSchedule, reloadKey])
   const [requests, setRequests] = useState<api.ScheduleRequest[] | null>(null)
   const reloadRequests = useCallback(async () => {
     if (!supabase || !meId) { setRequests(null); return }
     setRequests(await api.fetchRequests(meId))
   }, [meId])
-  useEffect(() => { void reloadRequests() }, [reloadRequests, reloadKey])
   useEffect(() => { if (!supabase || !meId) return; return api.subscribeRequestMessages(() => { void reloadRequests() }) }, [meId, reloadRequests])
   const createRequest = useCallback(async (memberId: string, text: string) => { await api.createRequest(memberId, text); await reloadRequests() }, [reloadRequests])
   const postRequestMessage = useCallback(async (id: string, text: string) => { await api.postRequestMessage(id, text); await reloadRequests() }, [reloadRequests])
@@ -858,16 +862,31 @@ export function useBackend(): Backend {
     reloadCoachFeedback()
   }, [meId, reloadCoachFeedback])
 
-  // ── trainer ──
-  useEffect(() => {
-    if (!supabase || !meId) { setRoster(null); return }
-    void (async () => {
-      try {
-        const rows = await api.fetchRoster()
-        setRoster(rows.map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo, score: r.score ?? 0, pbf: r.pbf ?? 0, smm: r.smm ?? 0 })))
-      } catch (e) { console.warn('[backend] roster', e) }
-    })()
-  }, [meId])
+  // ── lazy per-tab loading: only fetch a section's data when its tab opens ──
+  const lazy = useRef({ community: false, chat: false, schedule: false, roster: false })
+  useEffect(() => { lazy.current = { community: false, chat: false, schedule: false, roster: false } }, [meId, reloadKey])
+  const loadRoster = useCallback(async () => {
+    if (lazy.current.roster) return; lazy.current.roster = true
+    try { const rows = await api.fetchRoster(); setRoster(rows.map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo, score: r.score ?? 0, pbf: r.pbf ?? 0, smm: r.smm ?? 0 }))) } catch (e) { console.warn('[backend] roster', e) }
+  }, [])
+  const ensureCommunity = useCallback(async () => {
+    if (lazy.current.community) return; lazy.current.community = true
+    await Promise.all([reloadPosts(), reloadMembers(), reloadChallenges()]).catch((e) => console.warn('[backend] community', e))
+  }, [reloadPosts, reloadMembers, reloadChallenges])
+  const ensureChat = useCallback(async () => {
+    if (lazy.current.chat) return; lazy.current.chat = true
+    try {
+      const myRooms = await reloadRooms()
+      const first = myRooms[0]?.id ?? null
+      roomId.current = first; setActiveRoomId(first)
+      if (first) { await reloadMessages(first); setMyRoomAlias(await api.fetchMyRoomMembership(first)) } else { setMessages([]); setRoomMembers([]) }
+    } catch (e) { console.warn('[backend] chat', e) }
+  }, [reloadRooms, reloadMessages])
+  const ensureSchedule = useCallback(async () => {
+    if (lazy.current.schedule) return; lazy.current.schedule = true
+    await Promise.all([reloadSchedule(), reloadRequests(), loadRoster()]).catch((e) => console.warn('[backend] schedule', e))
+  }, [reloadSchedule, reloadRequests, loadRoster])
+  const ensureTrainer = useCallback(async () => { await loadRoster() }, [loadRoster])
   const loadCoachNotes = useCallback(async (memberId: string) => {
     if (!memberId || !/^[0-9a-f-]{36}$/i.test(memberId)) { setCoachNotes(null); return }
     const rows = await api.fetchChartComments(memberId, 'overall').catch(() => [])
@@ -928,10 +947,11 @@ export function useBackend(): Backend {
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, isAdmin: profile?.role === 'trainer', updateProfile, uploadAvatar,
-    posts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
+    posts, postsMore, loadMorePosts, createPost, deletePost, deletePostComment, toggleLike, toggleComments, setPostDraft, setReplyTo, submitPostComment,
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, onlineIds, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
     sessions, packages, createSession, updateSession, deleteSession, createPackage, updatePackage, sendReregNotice, deletePackage,
+    ensureCommunity, ensureChat, ensureSchedule, ensureTrainer,
     requests, createRequest, postRequestMessage, closeRequest, deleteRequest,
     challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,

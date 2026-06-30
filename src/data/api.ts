@@ -204,11 +204,12 @@ export async function uploadPostMedia(file: File): Promise<string> {
 }
 
 // ───────────────────────── feed ─────────────────────────
-export async function fetchPosts() {
+export async function fetchPosts(limit = 12, offset = 0) {
   const { data, error } = await requireSupabase()
     .from('posts')
     .select('id, author_id, text, shared_metric, image_path, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role, photo_path), post_likes(user_id), post_comments(id, text, author_id, parent_id, created_at, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color, photo_path))')
     .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
   if (error) throw error
   return data ?? []
 }
@@ -691,18 +692,24 @@ export async function fetchMemberCards(): Promise<MemberCard[]> {
   // browsable + invitable like any member
   const { data: profs } = await sb.from('profiles')
     .select('id, name, initials, avatar_color, bio, bio2, photo_path, role').neq('id', me)
-  const cards: MemberCard[] = []
-  for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null; role: 'client' | 'trainer' }>) {
-    const { data: pv } = await sb.from('metric_privacy').select('metric_key, visibility').eq('user_id', p.id)
-    const pub = ((pv ?? []) as { metric_key: string; visibility: string }[]).filter((r) => r.visibility === 'public').map((r) => r.metric_key)
-    let score: number | null = null
-    if (pub.includes('score')) {
-      const { data: sc } = await sb.from('metric_readings').select('value').eq('user_id', p.id).eq('metric_key', 'score').order('date', { ascending: false }).limit(1)
-      score = (sc?.[0] as { value: number } | undefined)?.value ?? null
-    }
-    cards.push({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), role: p.role, bio: p.bio, bio2: p.bio2, pub, score })
+  const list = (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; bio: string | null; bio2: string | null; photo_path: string | null; role: 'client' | 'trainer' }>
+  const ids = list.map((p) => p.id)
+  if (!ids.length) return []
+  // batched: one privacy query + one score query for all members (no N+1)
+  const [{ data: privs }, { data: scores }] = await Promise.all([
+    sb.from('metric_privacy').select('user_id, metric_key, visibility').in('user_id', ids),
+    sb.from('metric_readings').select('user_id, value').eq('metric_key', 'score').in('user_id', ids).order('date', { ascending: false }),
+  ])
+  const pubByUser = new Map<string, string[]>()
+  for (const r of (privs ?? []) as { user_id: string; metric_key: string; visibility: string }[]) {
+    if (r.visibility === 'public') { const a = pubByUser.get(r.user_id) ?? []; a.push(r.metric_key); pubByUser.set(r.user_id, a) }
   }
-  return cards
+  const scoreByUser = new Map<string, number>() // first row per user = latest (desc order)
+  for (const r of (scores ?? []) as { user_id: string; value: number }[]) if (!scoreByUser.has(r.user_id)) scoreByUser.set(r.user_id, Number(r.value))
+  return list.map((p) => { const pub = pubByUser.get(p.id) ?? []; return {
+    id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), role: p.role, bio: p.bio, bio2: p.bio2, pub,
+    score: pub.includes('score') ? (scoreByUser.get(p.id) ?? null) : null,
+  } })
 }
 
 export async function fetchMemberCheers(id: string) {
@@ -726,15 +733,16 @@ export interface RosterRow { id: string; name: string; initials: string; color: 
 export async function fetchRoster(): Promise<RosterRow[]> {
   const sb = requireSupabase()
   const { data: profs } = await sb.from('profiles').select('id, name, initials, avatar_color, role, photo_path').eq('role', 'client')
-  const rows: RosterRow[] = []
-  for (const p of (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; photo_path: string | null }>) {
-    const latest = async (k: string) => {
-      const { data } = await sb.from('metric_readings').select('value').eq('user_id', p.id).eq('metric_key', k).order('date', { ascending: false }).limit(1)
-      return (data?.[0] as { value: number } | undefined)?.value ?? null
-    }
-    rows.push({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path), score: await latest('score'), pbf: await latest('pbf'), smm: await latest('smm') })
-  }
-  return rows
+  const list = (profs ?? []) as Array<{ id: string; name: string; initials: string; avatar_color: string; photo_path: string | null }>
+  const ids = list.map((p) => p.id)
+  if (!ids.length) return []
+  // batched: one readings query for score/pbf/smm across all members (no N+1)
+  const { data: readings } = await sb.from('metric_readings')
+    .select('user_id, metric_key, value').in('user_id', ids).in('metric_key', ['score', 'pbf', 'smm']).order('date', { ascending: false })
+  const latest = new Map<string, number>() // `${user}:${metric}` → first (latest) value
+  for (const r of (readings ?? []) as { user_id: string; metric_key: string; value: number }[]) { const k = `${r.user_id}:${r.metric_key}`; if (!latest.has(k)) latest.set(k, Number(r.value)) }
+  return list.map((p) => ({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path),
+    score: latest.get(`${p.id}:score`) ?? null, pbf: latest.get(`${p.id}:pbf`) ?? null, smm: latest.get(`${p.id}:smm`) ?? null }))
 }
 export async function addCoachNote(memberId: string, metricKey: string, text: string) {
   const me = await uid()

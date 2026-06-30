@@ -182,6 +182,16 @@ export default function Portal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [be.configured, be.isAdmin, s.view, s.coachTargetId])
 
+  // lazy-load each tab's data the first time it's opened
+  useEffect(() => {
+    if (!be.configured) return
+    if (s.view === 'community') void be.ensureCommunity()
+    else if (s.view === 'chat') void be.ensureChat()
+    else if (s.view === 'schedule') void be.ensureSchedule()
+    else if (s.view === 'trainer') void be.ensureTrainer()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [be.configured, s.view])
+
   // fit the chat panel into one screen: measure its real top + the tab bar so
   // it ends just above the tab bar regardless of header/safe-area height.
   // (mobile only; desktop keeps the CSS height.)
@@ -1361,6 +1371,9 @@ export default function Portal() {
                   )}
                 </article>
               ))}
+              {be.configured && be.postsMore && (
+                <button onClick={() => void be.loadMorePosts()} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'block', width: '100%', textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: '12px 0', marginTop: 4 }}>더 보기</button>
+              )}
               </>)}
               </div>
               )}

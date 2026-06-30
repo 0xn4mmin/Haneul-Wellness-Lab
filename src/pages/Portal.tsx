@@ -1842,7 +1842,7 @@ export default function Portal() {
                           <div style={{ fontSize: 10, color: 'rgba(231,239,234,.4)' }}>남은 시수</div>
                         </div>
                       </div>
-                      <button onClick={() => { const txt = `회차권이 ${p.remaining}회 남았어요 — 재등록을 부탁드려요! 🙌`; if (confirm(`${p.memberName}님에게 재등록 알림을 보낼까요?\n\n"${txt}"`)) void be.sendReregNotice(p.memberId, txt).then(() => alert('재등록 알림을 보냈어요.')).catch((e) => alert(e instanceof Error ? e.message : '전송 실패')) }} style={{ all: 'unset', cursor: 'pointer', display: 'block', textAlign: 'center', marginTop: 9, fontSize: 12, fontWeight: 600, color: '#F2C28A', background: 'rgba(224,160,106,.12)', border: '1px solid rgba(224,160,106,.3)', borderRadius: 9, padding: '7px 0' }}>📨 재등록 알림 보내기</button>
+                      <button onClick={() => { const txt = `회차권이 ${p.remaining}회 남았어요 — 재등록을 부탁드려요! 🙌`; if (confirm(`${p.memberName}님에게 재등록 알림을 보낼까요?\n\n"${txt}"`)) void be.sendReregNotice(p.memberId, txt).then(() => alert('재등록 알림을 보냈어요.')).catch((e) => alert(e instanceof Error ? e.message : '전송 실패')) }} style={{ all: 'unset', cursor: 'pointer', display: 'block', boxSizing: 'border-box', width: '100%', textAlign: 'center', whiteSpace: 'nowrap', marginTop: 9, fontSize: 12, fontWeight: 600, color: '#F2C28A', background: 'rgba(224,160,106,.12)', border: '1px solid rgba(224,160,106,.3)', borderRadius: 9, padding: '7px 8px' }}>📨 재등록 알림 보내기</button>
                     </div>
                   ))}
                 </div>

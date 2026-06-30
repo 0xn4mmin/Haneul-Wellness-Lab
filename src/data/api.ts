@@ -371,23 +371,23 @@ export async function renameRoom(roomId: string, name: string) {
 export type SessionStatus = 'scheduled' | 'attended' | 'sameday_cancel' | 'cancelled'
 export interface ClassSession {
   id: string; trainerId: string; memberId: string | null; packageId: string | null
-  title: string; color: string; startsAt: string; durationMin: number; status: SessionStatus
+  title: string; color: string; location: string | null; startsAt: string; durationMin: number; status: SessionStatus
   memberName: string; memberInitials: string; memberColor: string; memberPhoto: string | null
 }
 export interface ClassPackage {
   id: string; memberId: string; memberName: string; memberInitials: string; memberColor: string; memberPhoto: string | null
-  totalSessions: number; registeredOn: string; note: string | null
+  totalSessions: number; registeredOn: string; startedOn: string | null; note: string | null
 }
 const mp = (raw: any) => (Array.isArray(raw) ? raw[0] : raw)
 
 /** All sessions in [fromISO, toISO) the caller can see, with member info. */
 export async function fetchSessions(fromISO: string, toISO: string): Promise<ClassSession[]> {
   const { data } = await requireSupabase().from('class_sessions')
-    .select('id, trainer_id, member_id, package_id, title, color, starts_at, duration_min, status, member:profiles!class_sessions_member_id_fkey(name, initials, avatar_color, photo_path)')
+    .select('id, trainer_id, member_id, package_id, title, color, location, starts_at, duration_min, status, member:profiles!class_sessions_member_id_fkey(name, initials, avatar_color, photo_path)')
     .gte('starts_at', fromISO).lt('starts_at', toISO).order('starts_at', { ascending: true })
   return ((data ?? []) as any[]).map((s) => { const m = mp(s.member); return {
     id: s.id, trainerId: s.trainer_id, memberId: s.member_id, packageId: s.package_id,
-    title: s.title, color: s.color, startsAt: s.starts_at, durationMin: s.duration_min, status: s.status as SessionStatus,
+    title: s.title, color: s.color, location: s.location ?? null, startsAt: s.starts_at, durationMin: s.duration_min, status: s.status as SessionStatus,
     memberName: m?.name ?? '', memberInitials: m?.initials ?? '', memberColor: m?.avatar_color ?? '#5E97A0', memberPhoto: avatarUrl(m?.photo_path),
   } })
 }
@@ -399,53 +399,65 @@ export async function fetchPackageSessions(): Promise<{ id: string; packageId: s
 }
 export async function fetchPackages(): Promise<ClassPackage[]> {
   const { data } = await requireSupabase().from('class_packages')
-    .select('id, member_id, total_sessions, registered_on, note, member:profiles!class_packages_member_id_fkey(name, initials, avatar_color, photo_path)')
+    .select('id, member_id, total_sessions, registered_on, started_on, note, member:profiles!class_packages_member_id_fkey(name, initials, avatar_color, photo_path)')
     .order('registered_on', { ascending: false })
   return ((data ?? []) as any[]).map((p) => { const m = mp(p.member); return {
-    id: p.id, memberId: p.member_id, totalSessions: p.total_sessions, registeredOn: p.registered_on, note: p.note ?? null,
+    id: p.id, memberId: p.member_id, totalSessions: p.total_sessions, registeredOn: p.registered_on, startedOn: p.started_on ?? null, note: p.note ?? null,
     memberName: m?.name ?? '', memberInitials: m?.initials ?? '', memberColor: m?.avatar_color ?? '#5E97A0', memberPhoto: avatarUrl(m?.photo_path),
   } })
 }
-export async function createSession(s: { memberId: string | null; packageId: string | null; title: string; color: string; startsAt: string; durationMin: number }) {
+export async function createSession(s: { memberId: string | null; packageId: string | null; title: string; color: string; location: string | null; startsAt: string; durationMin: number }) {
   const me = await uid()
-  return requireSupabase().from('class_sessions').insert({ trainer_id: me, member_id: s.memberId, package_id: s.packageId, title: s.title.trim() || 'PT', color: s.color, starts_at: s.startsAt, duration_min: s.durationMin })
+  return requireSupabase().from('class_sessions').insert({ trainer_id: me, member_id: s.memberId, package_id: s.packageId, title: s.title.trim() || 'PT', color: s.color, location: s.location, starts_at: s.startsAt, duration_min: s.durationMin })
 }
-export async function updateSession(id: string, fields: Partial<{ title: string; color: string; starts_at: string; duration_min: number; member_id: string | null; package_id: string | null; status: SessionStatus }>) {
+export async function updateSession(id: string, fields: Partial<{ title: string; color: string; location: string | null; starts_at: string; duration_min: number; member_id: string | null; package_id: string | null; status: SessionStatus }>) {
   return requireSupabase().from('class_sessions').update(fields).eq('id', id)
 }
 export async function deleteSession(id: string) {
   return requireSupabase().from('class_sessions').delete().eq('id', id)
 }
-export async function createPackage(memberId: string, totalSessions: number, registeredOn: string, note: string | null) {
+export async function createPackage(memberId: string, totalSessions: number, registeredOn: string, startedOn: string | null, note: string | null) {
   const me = await uid()
-  return requireSupabase().from('class_packages').insert({ member_id: memberId, trainer_id: me, total_sessions: totalSessions, registered_on: registeredOn, note: note?.trim() || null })
+  return requireSupabase().from('class_packages').insert({ member_id: memberId, trainer_id: me, total_sessions: totalSessions, registered_on: registeredOn, started_on: startedOn, note: note?.trim() || null })
 }
 export async function deletePackage(id: string) {
   return requireSupabase().from('class_packages').delete().eq('id', id)
 }
 
+export interface ReqMessage { id: string; senderId: string; text: string; createdAt: string; mine: boolean }
 export interface ScheduleRequest {
-  id: string; trainerId: string; memberId: string; message: string | null; options: string[]
-  status: 'pending' | 'replied' | 'closed'; reply: string | null; createdAt: string
+  id: string; trainerId: string; memberId: string; status: 'open' | 'closed'; createdAt: string; lastAt: string
   trainerName: string; memberName: string; memberInitials: string; memberColor: string; memberPhoto: string | null
+  messages: ReqMessage[]
 }
-export async function fetchRequests(): Promise<ScheduleRequest[]> {
+export async function fetchRequests(meId: string): Promise<ScheduleRequest[]> {
   const { data } = await requireSupabase().from('schedule_requests')
-    .select('id, trainer_id, member_id, message, options, status, reply, created_at, trainer:profiles!schedule_requests_trainer_id_fkey(name), member:profiles!schedule_requests_member_id_fkey(name, initials, avatar_color, photo_path)')
+    .select('id, trainer_id, member_id, status, created_at, trainer:profiles!schedule_requests_trainer_id_fkey(name), member:profiles!schedule_requests_member_id_fkey(name, initials, avatar_color, photo_path), messages:schedule_request_messages(id, sender_id, text, created_at)')
     .order('created_at', { ascending: false })
-  return ((data ?? []) as any[]).map((r) => { const m = mp(r.member); return {
-    id: r.id, trainerId: r.trainer_id, memberId: r.member_id, message: r.message, options: (r.options ?? []) as string[],
-    status: r.status, reply: r.reply, createdAt: r.created_at,
+  return ((data ?? []) as any[]).map((r) => { const m = mp(r.member); const msgs = ((r.messages ?? []) as any[]).map((x) => ({ id: x.id, senderId: x.sender_id, text: x.text, createdAt: x.created_at, mine: x.sender_id === meId })).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); return {
+    id: r.id, trainerId: r.trainer_id, memberId: r.member_id, status: r.status === 'closed' ? 'closed' : 'open', createdAt: r.created_at,
+    lastAt: msgs.length ? msgs[msgs.length - 1].createdAt : r.created_at,
     trainerName: mp(r.trainer)?.name ?? '코치',
     memberName: m?.name ?? '', memberInitials: m?.initials ?? '', memberColor: m?.avatar_color ?? '#5E97A0', memberPhoto: avatarUrl(m?.photo_path),
-  } })
+    messages: msgs,
+  } as ScheduleRequest }).sort((a, b) => b.lastAt.localeCompare(a.lastAt))
 }
-export async function createRequest(memberId: string, message: string, options: string[]) {
+/** Start a thread with a member and post the first message. */
+export async function createRequest(memberId: string, text: string) {
   const me = await uid()
-  return requireSupabase().from('schedule_requests').insert({ trainer_id: me, member_id: memberId, message: message.trim() || null, options })
+  const { data, error } = await requireSupabase().from('schedule_requests').insert({ trainer_id: me, member_id: memberId, status: 'open' }).select('id').single()
+  if (error) throw error
+  const rid = (data as { id: string }).id
+  return requireSupabase().from('schedule_request_messages').insert({ request_id: rid, sender_id: me, text: text.trim() })
 }
-export async function replyRequest(id: string, reply: string) {
-  return requireSupabase().from('schedule_requests').update({ reply: reply.trim(), status: 'replied', replied_at: new Date().toISOString() }).eq('id', id)
+export async function postRequestMessage(requestId: string, text: string) {
+  const me = await uid()
+  return requireSupabase().from('schedule_request_messages').insert({ request_id: requestId, sender_id: me, text: text.trim() })
+}
+export function subscribeRequestMessages(onChange: () => void) {
+  const sb = requireSupabase()
+  const ch = sb.channel('reqmsg').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'schedule_request_messages' }, () => onChange()).subscribe()
+  return () => { sb.removeChannel(ch) }
 }
 export async function closeRequest(id: string) {
   return requireSupabase().from('schedule_requests').update({ status: 'closed' }).eq('id', id)

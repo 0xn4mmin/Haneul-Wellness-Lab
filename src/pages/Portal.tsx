@@ -25,7 +25,10 @@ function fmtActive(iso: string | null): string | null {
 
 // ── scheduler date helpers (browser-local) ──
 const WD = ['일', '월', '화', '수', '목', '금', '토']
+const WD_MON = ['월', '화', '수', '목', '금', '토', '일']  // month grid columns (Mon-first)
 const SLOT_COLORS = ['#2E9BA6', '#67D7DF', '#8FD89E', '#E0B86A', '#E0875C', '#B98BD9', '#E082A8', '#7C8AAE']
+const SLOT_LOCATIONS = ['래미안그레이튼', '선릉 핏허브', '청담 쉐어필라테스']
+const endHHMM = (iso: string, dur: number) => { const d = new Date(new Date(iso).getTime() + dur * 60000); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const parseYMD = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1) }
 const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
@@ -85,8 +88,8 @@ export default function Portal() {
   const [schedView, setSchedView] = useState<'week' | 'month'>('week')
   const [schedAnchor, setSchedAnchor] = useState('')   // YYYY-MM-DD reference; '' = today
   const [schedDay, setSchedDay] = useState('')          // selected day in month view
-  const [sessForm, setSessForm] = useState<null | { id?: string; memberId: string; packageId: string; title: string; color: string; date: string; time: string; dur: string; status: string }>(null)
-  const [pkgForm, setPkgForm] = useState<null | { memberId: string; total: string; date: string; note: string }>(null)
+  const [sessForm, setSessForm] = useState<null | { id?: string; memberId: string; packageId: string; title: string; color: string; location: string; date: string; time: string; dur: string; status: string }>(null)
+  const [pkgForm, setPkgForm] = useState<null | { memberId: string; total: string; date: string; start: string; note: string }>(null)
   const [schedErr, setSchedErr] = useState('')
   const [reqForm, setReqForm] = useState<null | { memberId: string; message: string }>(null)
   const [reqReply, setReqReply] = useState<Record<string, string>>({})
@@ -1698,8 +1701,8 @@ export default function Portal() {
               const startsAt = new Date(`${f.date}T${f.time}`).toISOString()
               const dur = parseInt(f.dur, 10) || 50
               const done = () => setSessForm(null)
-              if (f.id) void be.updateSession(f.id, { title: f.title, color: f.color, starts_at: startsAt, duration_min: dur, member_id: f.memberId || null, package_id: f.packageId || null, status: f.status as never }).then(done).catch((e) => setSchedErr(e instanceof Error ? e.message : '저장 실패'))
-              else void be.createSession({ memberId: f.memberId || null, packageId: f.packageId || null, title: f.title, color: f.color, startsAt, durationMin: dur }).then(done).catch((e) => setSchedErr(e instanceof Error ? e.message : '저장 실패'))
+              if (f.id) void be.updateSession(f.id, { title: f.title, color: f.color, location: f.location || null, starts_at: startsAt, duration_min: dur, member_id: f.memberId || null, package_id: f.packageId || null, status: f.status as never }).then(done).catch((e) => setSchedErr(e instanceof Error ? e.message : '저장 실패'))
+              else void be.createSession({ memberId: f.memberId || null, packageId: f.packageId || null, title: f.title, color: f.color, location: f.location || null, startsAt, durationMin: dur }).then(done).catch((e) => setSchedErr(e instanceof Error ? e.message : '저장 실패'))
             }
             return (
               <div onClick={() => setSessForm(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 124, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
@@ -1726,8 +1729,14 @@ export default function Portal() {
                       <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>분</label><input type="number" value={f.dur} onChange={(e) => setSessForm({ ...f, dur: e.target.value })} style={{ ...inputStyle, padding: '9px 8px', fontSize: 13 }} /></div>
                     </div>
                     <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>수업명</label><input value={f.title} onChange={(e) => setSessForm({ ...f, title: e.target.value })} placeholder="예) PT, 그룹 클래스" style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>장소</label>
+                      <select value={f.location} onChange={(e) => setSessForm({ ...f, location: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }}>
+                        <option value="">선택 안 함</option>
+                        {SLOT_LOCATIONS.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+                      </select>
+                    </div>
                     <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>색상</label>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{SLOT_COLORS.map((c) => <button key={c} onClick={() => setSessForm({ ...f, color: c })} style={{ all: 'unset', cursor: 'pointer', width: 26, height: 26, borderRadius: '50%', background: c, boxShadow: f.color === c ? '0 0 0 2px #0E1834, 0 0 0 4px #fff' : 'none' }} />)}</div>
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{SLOT_COLORS.map((c) => { const sel = f.color === c; return <button key={c} onClick={() => setSessForm({ ...f, color: c })} style={{ all: 'unset', cursor: 'pointer', width: sel ? 30 : 26, height: sel ? 30 : 26, borderRadius: '50%', background: c, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: sel ? `0 0 0 3px #0E1834, 0 0 0 5px ${c}` : 'none', transition: 'all .12s' }}>{sel && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2"><path d="M5 12l5 5L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button> })}</div>
                     </div>
                     {f.id && (
                       <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>상태</label>
@@ -1768,7 +1777,7 @@ export default function Portal() {
                   </div>
                   <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
                     <button onClick={() => setReqForm(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '12px 18px', borderRadius: 22 }}>취소</button>
-                    <button disabled={!canSend} onClick={() => { void be.createRequest(f.memberId, f.message, []).then(() => setReqForm(null)) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSend ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSend ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>요청 보내기</button>
+                    <button disabled={!canSend} onClick={() => { void be.createRequest(f.memberId, f.message).then(() => setReqForm(null)) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSend ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSend ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>요청 보내기</button>
                   </div>
                 </div>
               </div>
@@ -1791,15 +1800,16 @@ export default function Portal() {
                         {(be.roster ?? []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                       </select>
                     </div>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>총 횟수</label><input type="number" min="1" value={f.total} onChange={(e) => setPkgForm({ ...f, total: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
-                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>총 횟수</label><input type="number" min="1" value={f.total} onChange={(e) => setPkgForm({ ...f, total: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
                       <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>등록일</label><input type="date" value={f.date} onChange={(e) => setPkgForm({ ...f, date: e.target.value })} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 8px', fontSize: 13 }} /></div>
+                      <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>시작일</label><input type="date" value={f.start} onChange={(e) => setPkgForm({ ...f, start: e.target.value })} style={{ ...inputStyle, WebkitAppearance: 'none', appearance: 'none', minWidth: 0, padding: '9px 8px', fontSize: 13 }} /></div>
                     </div>
                     <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>메모(선택)</label><input value={f.note} onChange={(e) => setPkgForm({ ...f, note: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }} /></div>
                   </div>
                   <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
                     <button onClick={() => setPkgForm(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '12px 18px', borderRadius: 22 }}>취소</button>
-                    <button disabled={!canSave} onClick={() => { void be.createPackage(f.memberId, total, f.date, f.note).then(() => setPkgForm(null)) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSave ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSave ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>등록</button>
+                    <button disabled={!canSave} onClick={() => { void be.createPackage(f.memberId, total, f.date, f.start || null, f.note).then(() => setPkgForm(null)) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSave ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSave ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>등록</button>
                   </div>
                 </div>
               </div>
@@ -2206,19 +2216,20 @@ export default function Portal() {
                   ? `${ws.getMonth() + 1}.${ws.getDate()} – ${addDays(ws, 6).getMonth() + 1}.${addDays(ws, 6).getDate()}`
                   : `${anchor.getFullYear()}.${String(anchor.getMonth() + 1).padStart(2, '0')}`
                 const shift = (dir: number) => setSchedAnchor(ymd(schedView === 'week' ? addDays(anchor, dir * 7) : new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1)))
-                const editSess = (ss: typeof sessions[number]) => { setSchedErr(''); setSessForm({ id: ss.id, memberId: ss.memberId || '', packageId: ss.packageId || '', title: ss.title, color: ss.color, date: ymd(new Date(ss.startsAt)), time: hhmm(ss.startsAt), dur: String(ss.durationMin), status: ss.status }) }
-                const openNew = (dateStr?: string) => { setSchedErr(''); setSessForm({ memberId: '', packageId: '', title: 'PT', color: SLOT_COLORS[0], date: dateStr || todayY, time: '10:00', dur: '50', status: 'scheduled' }) }
+                const editSess = (ss: typeof sessions[number]) => { setSchedErr(''); setSessForm({ id: ss.id, memberId: ss.memberId || '', packageId: ss.packageId || '', title: ss.title, color: ss.color, location: ss.location || '', date: ymd(new Date(ss.startsAt)), time: hhmm(ss.startsAt), dur: String(ss.durationMin), status: ss.status }) }
+                const openNew = (dateStr?: string) => { setSchedErr(''); setSessForm({ memberId: '', packageId: '', title: 'PT', color: SLOT_COLORS[0], location: SLOT_LOCATIONS[0], date: dateStr || todayY, time: '10:00', dur: '50', status: 'scheduled' }) }
                 const SessCard = (ss: typeof sessions[number]) => (
                   <button key={ss.id} onClick={() => isCoach && editSess(ss)} style={{ all: 'unset', cursor: isCoach ? 'pointer' : 'default', display: 'flex', gap: 9, alignItems: 'stretch', width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 11, padding: '8px 11px', opacity: ss.status === 'cancelled' ? 0.5 : 1 }}>
                     <span style={{ width: 4, borderRadius: 4, background: ss.color, flexShrink: 0 }} />
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#9FE2E8' }}>{hhmm(ss.startsAt)}</span>
+                        <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#9FE2E8' }}>{hhmm(ss.startsAt)} - {endHHMM(ss.startsAt, ss.durationMin)}</span>
                         <span style={{ fontSize: 13, fontWeight: 700, color: '#EAF3F1', textDecoration: ss.status === 'cancelled' ? 'line-through' : 'none' }}>{ss.title}</span>
                         <span style={{ fontSize: 9.5, fontWeight: 700, color: STATUS_COLOR[ss.status], background: 'rgba(255,255,255,.06)', borderRadius: 6, padding: '0 5px' }}>{STATUS_LABEL[ss.status]}</span>
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontSize: 11, color: 'rgba(231,239,234,.5)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontSize: 11, color: 'rgba(231,239,234,.5)', flexWrap: 'wrap' }}>
                         {ss.memberName && <span>{ss.memberName}</span>}
+                        {ss.location && <span style={{ color: 'rgba(231,239,234,.45)' }}>· {ss.location}</span>}
                         {ss.packageId && ss.pkgTotal > 0 && <span style={{ color: ss.pkgRemaining <= 2 ? '#E0875C' : '#67D7DF', fontFamily: "'IBM Plex Mono',monospace" }}>{ss.pkgTotal}회 중 {ss.seq}회차</span>}
                       </span>
                     </span>
@@ -2238,7 +2249,7 @@ export default function Portal() {
                       </div>
                       {isCoach && <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                         <button onClick={() => setReqForm({ memberId: '', message: '이번 주 가능한 수업 시간을 알려주세요!' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', borderRadius: 18, padding: '7px 14px' }}>시간 요청</button>
-                        <button onClick={() => setPkgForm({ memberId: '', total: '10', date: todayY, note: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9FE2E8', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '7px 14px' }}>회차권 등록</button>
+                        <button onClick={() => setPkgForm({ memberId: '', total: '10', date: todayY, start: todayY, note: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9FE2E8', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '7px 14px' }}>회차권 등록</button>
                         <button onClick={() => openNew()} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, borderRadius: 18, padding: '7px 16px' }}>+ 수업</button>
                       </div>}
                     </div>
@@ -2249,35 +2260,30 @@ export default function Portal() {
                       </div>
                     )}
 
-                    {/* 회원: 받은 시간 요청 */}
-                    {!isCoach && (be.requests ?? []).filter((r) => r.status === 'pending').map((r) => (
-                      <div key={r.id} style={{ marginBottom: 12, padding: '13px 15px', borderRadius: 14, background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.3)' }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#9FE2E8', marginBottom: 4 }}>📩 {r.trainerName} 코치의 시간 요청</div>
-                        <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.75)', marginBottom: 10, whiteSpace: 'pre-wrap' }}>{r.message}</div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <input value={reqReply[r.id] ?? ''} onChange={(e) => setReqReply((m) => ({ ...m, [r.id]: e.target.value }))} placeholder="가능한 시간을 적어주세요 (예: 화/목 저녁 7시)" style={{ ...inputStyle, padding: '9px 12px', fontSize: 13 }} />
-                          <button onClick={() => { const t = (reqReply[r.id] ?? '').trim(); if (t) void be.replyRequest(r.id, t) }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '9px 16px', borderRadius: 12 }}>보내기</button>
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* 코치: 보낸 요청 + 회신 */}
-                    {isCoach && (be.requests ?? []).filter((r) => r.status !== 'closed').length > 0 && (
+                    {/* 시간 조율 대화 (코치·회원 공통, 계속 주고받기) */}
+                    {(be.requests ?? []).filter((r) => r.status !== 'closed').length > 0 && (
                       <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 9 }}>시간 요청</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 9 }}>시간 조율</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                           {(be.requests ?? []).filter((r) => r.status !== 'closed').map((r) => (
-                            <div key={r.id} style={{ ...card, borderRadius: 12, padding: '11px 13px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Avatar initials={r.memberInitials} color={r.memberColor} photo={r.memberPhoto} size={28} fontSize={10} />
-                                <span style={{ fontSize: 13, fontWeight: 700, color: '#EAF3F1', flex: 1 }}>{r.memberName}</span>
-                                <span style={{ fontSize: 10, fontWeight: 700, color: r.status === 'replied' ? '#060B17' : '#9DAFCB', background: r.status === 'replied' ? '#7BD88F' : 'rgba(255,255,255,.06)', borderRadius: 7, padding: '1px 7px' }}>{r.status === 'replied' ? '회신옴' : '대기'}</span>
+                            <div key={r.id} style={{ ...card, borderRadius: 14, padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
+                                <Avatar initials={isCoach ? r.memberInitials : '코'} color={r.memberColor} photo={isCoach ? r.memberPhoto : null} size={28} fontSize={10} />
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#EAF3F1', flex: 1 }}>{isCoach ? r.memberName : `${r.trainerName} 코치`}</span>
+                                {isCoach && <button onClick={() => { setSchedErr(''); setSessForm({ memberId: r.memberId, packageId: '', title: 'PT', color: SLOT_COLORS[0], location: SLOT_LOCATIONS[0], date: todayY, time: '10:00', dur: '50', status: 'scheduled' }) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '5px 11px', borderRadius: 11 }}>수업 만들기</button>}
+                                <button onClick={() => void be.closeRequest(r.id)} title="대화 종료" style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: '#9DAFCB', padding: '4px 6px' }}>종료</button>
+                                {isCoach && <button onClick={() => { if (confirm('대화를 삭제할까요?')) void be.deleteRequest(r.id) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11.5, color: 'rgba(224,135,92,.7)', padding: '4px 4px' }}>삭제</button>}
                               </div>
-                              {r.reply && <div style={{ fontSize: 12.5, color: '#9FE2E8', marginTop: 7, padding: '7px 11px', background: 'rgba(46,155,166,.1)', borderRadius: 9 }}>“{r.reply}”</div>}
-                              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                                {r.status === 'replied' && <button onClick={() => { setSchedErr(''); setSessForm({ memberId: r.memberId, packageId: '', title: 'PT', color: SLOT_COLORS[0], date: todayY, time: '10:00', dur: '50', status: 'scheduled' }) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#060B17', background: CTA, padding: '6px 13px', borderRadius: 12 }}>수업 만들기</button>}
-                                <button onClick={() => void be.closeRequest(r.id)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#9DAFCB', padding: '6px 8px' }}>닫기</button>
-                                <button onClick={() => { if (confirm('요청을 삭제할까요?')) void be.deleteRequest(r.id) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, color: 'rgba(224,135,92,.7)', padding: '6px 4px' }}>삭제</button>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto', marginBottom: 9 }}>
+                                {r.messages.map((m) => (
+                                  <div key={m.id} style={{ alignSelf: m.mine ? 'flex-end' : 'flex-start', maxWidth: '82%' }}>
+                                    <div style={{ fontSize: 12.5, lineHeight: 1.45, color: m.mine ? '#06222A' : '#EAF3F1', background: m.mine ? 'linear-gradient(135deg,#7FE0E8,#3FB2BD)' : 'rgba(196,212,240,.12)', borderRadius: m.mine ? '13px 13px 4px 13px' : '13px 13px 13px 4px', padding: '7px 12px', whiteSpace: 'pre-wrap' }}>{m.text}</div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <input value={reqReply[r.id] ?? ''} onChange={(e) => setReqReply((mm) => ({ ...mm, [r.id]: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { const t = (reqReply[r.id] ?? '').trim(); if (t) { void be.postRequestMessage(r.id, t); setReqReply((mm) => ({ ...mm, [r.id]: '' })) } } }} placeholder={isCoach ? '메시지…' : '가능한 시간을 적어주세요…'} style={{ ...inputStyle, padding: '9px 12px', fontSize: 13 }} />
+                                <button onClick={() => { const t = (reqReply[r.id] ?? '').trim(); if (t) { void be.postRequestMessage(r.id, t); setReqReply((mm) => ({ ...mm, [r.id]: '' })) } }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '9px 16px', borderRadius: 12 }}>보내기</button>
                               </div>
                             </div>
                           ))}
@@ -2301,7 +2307,7 @@ export default function Portal() {
                       <>
                         <div style={{ ...card, borderRadius: 16, padding: 12 }}>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 6 }}>
-                            {WD.map((w, i) => <div key={w} style={{ textAlign: 'center', fontSize: 10.5, fontWeight: 600, color: i === 0 ? '#E0875C' : i === 6 ? '#67D7DF' : 'rgba(231,239,234,.45)' }}>{w}</div>)}
+                            {WD_MON.map((w, i) => <div key={w} style={{ textAlign: 'center', fontSize: 10.5, fontWeight: 600, color: i === 6 ? '#E0875C' : i === 5 ? '#67D7DF' : 'rgba(231,239,234,.45)' }}>{w}</div>)}
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
                             {grid.map((d) => { const k = ymd(d); const list = dayList(k); const inMonth = d.getMonth() === anchor.getMonth(); const isToday = k === todayY; const selected = k === schedDay; return (
@@ -2329,7 +2335,7 @@ export default function Portal() {
                         <div style={eyebrow}>My Pass</div>
                         {(be.packages ?? []).map((p) => (
                           <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-                            <div><div style={{ fontSize: 13.5, fontWeight: 700, color: '#EAF3F1' }}>{p.totalSessions}회권</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)' }}>등록 {p.registeredOn.replace(/-/g, '.')}</div></div>
+                            <div><div style={{ fontSize: 13.5, fontWeight: 700, color: '#EAF3F1' }}>{p.totalSessions}회권</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)' }}>등록 {p.registeredOn.replace(/-/g, '.')}{p.startedOn ? ` · 시작 ${p.startedOn.replace(/-/g, '.')}` : ''}</div></div>
                             <div style={{ textAlign: 'right' }}><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 22, color: p.remaining <= 2 ? '#E0875C' : '#67D7DF' }}>{p.remaining}<span style={{ fontSize: 12, color: 'rgba(231,239,234,.4)' }}> / {p.totalSessions}</span></div><div style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)' }}>남은 시수</div></div>
                           </div>
                         ))}

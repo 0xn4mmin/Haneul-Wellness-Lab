@@ -88,6 +88,8 @@ export default function Portal() {
   const [sessForm, setSessForm] = useState<null | { id?: string; memberId: string; packageId: string; title: string; color: string; date: string; time: string; dur: string; status: string }>(null)
   const [pkgForm, setPkgForm] = useState<null | { memberId: string; total: string; date: string; note: string }>(null)
   const [schedErr, setSchedErr] = useState('')
+  const [reqForm, setReqForm] = useState<null | { memberId: string; message: string }>(null)
+  const [reqReply, setReqReply] = useState<Record<string, string>>({})
   const [chProgInfo, setChProgInfo] = useState(false)
   const [notifPerm, setNotifPerm] = useState<string>(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
   const [editNoteId, setEditNoteId] = useState<string | null>(null)
@@ -236,6 +238,7 @@ export default function Portal() {
     if (n.type === 'chat' && n.ref) { go('chat'); be.selectRoom(n.ref); return }
     if (n.type === 'challenge' && n.ref) { go('community'); const cv = (be.challenges ?? []).find((c) => c.id === n.ref); if (cv) be.openChallenge(cv); return }
     if (n.type === 'feedback') { go('health'); return }
+    if (n.type === 'class') { go('schedule'); return }
     go('community')  // comment / reply / cheer
   }
   const togglePrivacy = (key: string) => setFn((p) => ({ privacy: { ...p.privacy, [key]: p.privacy[key] === 'public' ? 'private' : 'public' } }))
@@ -1744,6 +1747,34 @@ export default function Portal() {
             )
           })()}
 
+          {/* 시간 요청 모달 (코치) */}
+          {reqForm && (() => {
+            const f = reqForm
+            const canSend = !!f.memberId && !!f.message.trim()
+            return (
+              <div onClick={() => setReqForm(null)} className="hwl-modal-wrap" style={{ position: 'fixed', inset: 0, zIndex: 124, background: 'rgba(4,9,18,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', animation: 'hwl-fade .25s ease both' }}>
+                <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: '#0E1834', border: '1px solid rgba(255,247,232,.14)', borderRadius: 22, padding: 24, boxShadow: '0 40px 90px -40px rgba(0,0,0,.9)' }}>
+                  <div style={eyebrow}>Request</div><div style={cardTitle}>수업 시간 요청</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 11, marginTop: 14 }}>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>회원</label>
+                      <select value={f.memberId} onChange={(e) => setReqForm({ ...f, memberId: e.target.value })} style={{ ...inputStyle, padding: '9px 11px', fontSize: 13 }}>
+                        <option value="">회원 선택</option>
+                        {(be.roster ?? []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    </div>
+                    <div><label style={{ fontSize: 11, color: 'rgba(231,239,234,.55)', display: 'block', marginBottom: 4 }}>메시지</label>
+                      <textarea value={f.message} onChange={(e) => setReqForm({ ...f, message: e.target.value })} style={{ ...inputStyle, padding: '10px 12px', fontSize: 13, minHeight: 70, resize: 'none', lineHeight: 1.5 }} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                    <button onClick={() => setReqForm(null)} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', padding: '12px 18px', borderRadius: 22 }}>취소</button>
+                    <button disabled={!canSend} onClick={() => { void be.createRequest(f.memberId, f.message, []).then(() => setReqForm(null)) }} style={{ all: 'unset', boxSizing: 'border-box', cursor: canSend ? 'pointer' : 'not-allowed', flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#060B17', background: canSend ? CTA : 'rgba(103,215,223,.3)', padding: 12, borderRadius: 22 }}>요청 보내기</button>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* 회차권 등록 모달 (코치) */}
           {pkgForm && (() => {
             const f = pkgForm
@@ -2206,6 +2237,7 @@ export default function Portal() {
                         <button onClick={() => { setSchedAnchor(''); setSchedDay('') }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#9DAFCB', padding: '6px 10px' }}>오늘</button>
                       </div>
                       {isCoach && <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                        <button onClick={() => setReqForm({ memberId: '', message: '이번 주 가능한 수업 시간을 알려주세요!' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9DAFCB', background: 'rgba(255,249,238,.05)', border: '1px solid rgba(255,247,232,.12)', borderRadius: 18, padding: '7px 14px' }}>시간 요청</button>
                         <button onClick={() => setPkgForm({ memberId: '', total: '10', date: todayY, note: '' })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#9FE2E8', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 18, padding: '7px 14px' }}>회차권 등록</button>
                         <button onClick={() => openNew()} style={{ all: 'unset', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: '#060B17', background: CTA, borderRadius: 18, padding: '7px 16px' }}>+ 수업</button>
                       </div>}
@@ -2214,6 +2246,42 @@ export default function Portal() {
                     {isCoach && lowPkgs.length > 0 && (
                       <div style={{ marginBottom: 14, padding: '11px 14px', borderRadius: 12, background: 'rgba(224,160,106,.12)', border: '1px solid rgba(224,160,106,.3)', fontSize: 12.5, color: '#F2C28A', lineHeight: 1.6 }}>
                         <b>재등록 임박</b> · {lowPkgs.map((p) => `${p.memberName}(${p.remaining}회 남음)`).join(', ')}
+                      </div>
+                    )}
+
+                    {/* 회원: 받은 시간 요청 */}
+                    {!isCoach && (be.requests ?? []).filter((r) => r.status === 'pending').map((r) => (
+                      <div key={r.id} style={{ marginBottom: 12, padding: '13px 15px', borderRadius: 14, background: 'rgba(46,155,166,.1)', border: '1px solid rgba(103,215,223,.3)' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#9FE2E8', marginBottom: 4 }}>📩 {r.trainerName} 코치의 시간 요청</div>
+                        <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.75)', marginBottom: 10, whiteSpace: 'pre-wrap' }}>{r.message}</div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input value={reqReply[r.id] ?? ''} onChange={(e) => setReqReply((m) => ({ ...m, [r.id]: e.target.value }))} placeholder="가능한 시간을 적어주세요 (예: 화/목 저녁 7시)" style={{ ...inputStyle, padding: '9px 12px', fontSize: 13 }} />
+                          <button onClick={() => { const t = (reqReply[r.id] ?? '').trim(); if (t) void be.replyRequest(r.id, t) }} style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#060B17', background: CTA, padding: '9px 16px', borderRadius: 12 }}>보내기</button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* 코치: 보낸 요청 + 회신 */}
+                    {isCoach && (be.requests ?? []).filter((r) => r.status !== 'closed').length > 0 && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 10.5, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B', marginBottom: 9 }}>시간 요청</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {(be.requests ?? []).filter((r) => r.status !== 'closed').map((r) => (
+                            <div key={r.id} style={{ ...card, borderRadius: 12, padding: '11px 13px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Avatar initials={r.memberInitials} color={r.memberColor} photo={r.memberPhoto} size={28} fontSize={10} />
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#EAF3F1', flex: 1 }}>{r.memberName}</span>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: r.status === 'replied' ? '#060B17' : '#9DAFCB', background: r.status === 'replied' ? '#7BD88F' : 'rgba(255,255,255,.06)', borderRadius: 7, padding: '1px 7px' }}>{r.status === 'replied' ? '회신옴' : '대기'}</span>
+                              </div>
+                              {r.reply && <div style={{ fontSize: 12.5, color: '#9FE2E8', marginTop: 7, padding: '7px 11px', background: 'rgba(46,155,166,.1)', borderRadius: 9 }}>“{r.reply}”</div>}
+                              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                                {r.status === 'replied' && <button onClick={() => { setSchedErr(''); setSessForm({ memberId: r.memberId, packageId: '', title: 'PT', color: SLOT_COLORS[0], date: todayY, time: '10:00', dur: '50', status: 'scheduled' }) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#060B17', background: CTA, padding: '6px 13px', borderRadius: 12 }}>수업 만들기</button>}
+                                <button onClick={() => void be.closeRequest(r.id)} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#9DAFCB', padding: '6px 8px' }}>닫기</button>
+                                <button onClick={() => { if (confirm('요청을 삭제할까요?')) void be.deleteRequest(r.id) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, color: 'rgba(224,135,92,.7)', padding: '6px 4px' }}>삭제</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 

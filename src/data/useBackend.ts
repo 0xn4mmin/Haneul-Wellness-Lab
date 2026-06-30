@@ -139,6 +139,11 @@ export interface Backend {
   deleteSession: (id: string) => Promise<void>
   createPackage: (memberId: string, total: number, registeredOn: string, note: string | null) => Promise<void>
   deletePackage: (id: string) => Promise<void>
+  requests: api.ScheduleRequest[] | null
+  createRequest: (memberId: string, message: string, options: string[]) => Promise<void>
+  replyRequest: (id: string, reply: string) => Promise<void>
+  closeRequest: (id: string) => Promise<void>
+  deleteRequest: (id: string) => Promise<void>
   // challenges
   challenges: ChallengeView[] | null
   createChallenge: (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => Promise<void>
@@ -683,6 +688,16 @@ export function useBackend(): Backend {
   const createPackage = useCallback(async (memberId: string, total: number, registeredOn: string, note: string | null) => { await api.createPackage(memberId, total, registeredOn, note); await reloadSchedule() }, [reloadSchedule])
   const deletePackage = useCallback(async (id: string) => { await api.deletePackage(id); await reloadSchedule() }, [reloadSchedule])
   useEffect(() => { void reloadSchedule() }, [reloadSchedule, reloadKey])
+  const [requests, setRequests] = useState<api.ScheduleRequest[] | null>(null)
+  const reloadRequests = useCallback(async () => {
+    if (!supabase || !meId) { setRequests(null); return }
+    setRequests(await api.fetchRequests())
+  }, [meId])
+  useEffect(() => { void reloadRequests() }, [reloadRequests, reloadKey])
+  const createRequest = useCallback(async (memberId: string, message: string, options: string[]) => { await api.createRequest(memberId, message, options); await reloadRequests() }, [reloadRequests])
+  const replyRequest = useCallback(async (id: string, reply: string) => { await api.replyRequest(id, reply); await reloadRequests() }, [reloadRequests])
+  const closeRequest = useCallback(async (id: string) => { await api.closeRequest(id); await reloadRequests() }, [reloadRequests])
+  const deleteRequest = useCallback(async (id: string) => { await api.deleteRequest(id); await reloadRequests() }, [reloadRequests])
 
   // ── challenges ──
   const createChallenge = useCallback(async (c: { title: string; metrics: string[]; startDate: string; endDate: string; scope: 'public' | 'private' }) => {
@@ -907,6 +922,7 @@ export function useBackend(): Backend {
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, onlineIds, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
     sessions, packages, createSession, updateSession, deleteSession, createPackage, deletePackage,
+    requests, createRequest, replyRequest, closeRequest, deleteRequest,
     challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,
     members, activeMember, openMember, closeMember, addMemberCheer,

@@ -424,6 +424,36 @@ export async function deletePackage(id: string) {
   return requireSupabase().from('class_packages').delete().eq('id', id)
 }
 
+export interface ScheduleRequest {
+  id: string; trainerId: string; memberId: string; message: string | null; options: string[]
+  status: 'pending' | 'replied' | 'closed'; reply: string | null; createdAt: string
+  trainerName: string; memberName: string; memberInitials: string; memberColor: string; memberPhoto: string | null
+}
+export async function fetchRequests(): Promise<ScheduleRequest[]> {
+  const { data } = await requireSupabase().from('schedule_requests')
+    .select('id, trainer_id, member_id, message, options, status, reply, created_at, trainer:profiles!schedule_requests_trainer_id_fkey(name), member:profiles!schedule_requests_member_id_fkey(name, initials, avatar_color, photo_path)')
+    .order('created_at', { ascending: false })
+  return ((data ?? []) as any[]).map((r) => { const m = mp(r.member); return {
+    id: r.id, trainerId: r.trainer_id, memberId: r.member_id, message: r.message, options: (r.options ?? []) as string[],
+    status: r.status, reply: r.reply, createdAt: r.created_at,
+    trainerName: mp(r.trainer)?.name ?? '코치',
+    memberName: m?.name ?? '', memberInitials: m?.initials ?? '', memberColor: m?.avatar_color ?? '#5E97A0', memberPhoto: avatarUrl(m?.photo_path),
+  } })
+}
+export async function createRequest(memberId: string, message: string, options: string[]) {
+  const me = await uid()
+  return requireSupabase().from('schedule_requests').insert({ trainer_id: me, member_id: memberId, message: message.trim() || null, options })
+}
+export async function replyRequest(id: string, reply: string) {
+  return requireSupabase().from('schedule_requests').update({ reply: reply.trim(), status: 'replied', replied_at: new Date().toISOString() }).eq('id', id)
+}
+export async function closeRequest(id: string) {
+  return requireSupabase().from('schedule_requests').update({ status: 'closed' }).eq('id', id)
+}
+export async function deleteRequest(id: string) {
+  return requireSupabase().from('schedule_requests').delete().eq('id', id)
+}
+
 /** Joins a (possibly private) room by its code. */
 export async function joinRoomByCode(code: string): Promise<{ ok: boolean; reason?: string; room_id?: string; name?: string }> {
   const { data, error } = await requireSupabase().rpc('join_room_by_code', { p_code: code })

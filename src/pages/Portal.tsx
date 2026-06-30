@@ -83,6 +83,7 @@ export default function Portal() {
   const [chEnd, setChEnd] = useState('')
   const [editChallengeId, setEditChallengeId] = useState<string | null>(null)
   const [roomMenu, setRoomMenu] = useState(false)
+  const [chatTab, setChatTab] = useState<'group' | 'dm'>('group')
   const [memberList, setMemberList] = useState(false)
   const [commTab, setCommTab] = useState<'feed' | 'challenge' | 'members'>('feed')
   const [schedView, setSchedView] = useState<'week' | 'month'>('week')
@@ -583,7 +584,8 @@ export default function Portal() {
   const messages = messagesSource.map((m) => { const isMe = m.role === 'me'; return { ...m, dir: (isMe ? 'row-reverse' : 'row') as React.CSSProperties['flexDirection'], justify: isMe ? 'flex-end' : 'flex-start', radius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px', bubbleBg: isMe ? 'linear-gradient(135deg,#7FE0E8,#3FB2BD)' : (m.role === 'trainer' ? 'rgba(103,215,223,.2)' : 'rgba(196,212,240,.16)'), bubbleFg: isMe ? '#06222A' : '#F1F6F4', bubbleBorder: isMe ? 'transparent' : (m.role === 'trainer' ? 'rgba(103,215,223,.32)' : 'rgba(255,255,255,.16)'), ring: m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : 'none' } })
   const chatRooms = be.configured ? (be.rooms ?? []) : null
   const activeRoom = chatRooms?.find((r) => r.id === be.activeRoomId) ?? null
-  const roomTitle = activeRoom ? activeRoom.name : '그룹 채팅'
+  const activeDm = be.configured ? (be.dmThreads ?? []).find((t) => t.roomId === be.activeRoomId) ?? null : null
+  const roomTitle = activeDm ? activeDm.partnerName : activeRoom ? activeRoom.name : '그룹 채팅'
   const hasRooms = !be.configured || (chatRooms != null && chatRooms.length > 0)
   const mockOnline = [
     { name: '코치 하늘', initials: '하늘', color: '#234B47', photo: null as string | null, role: '트레이너', statusColor: '#2E9BA6' },
@@ -1497,12 +1499,17 @@ export default function Portal() {
                     <>
                       <div onClick={() => setRoomMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
                       <div style={{ position: 'absolute', top: '100%', left: 20, right: 20, marginTop: 2, zIndex: 10, background: '#0E1A38', border: '1px solid rgba(255,247,232,.14)', borderRadius: 14, boxShadow: '0 24px 50px -20px rgba(0,0,0,.85)', overflow: 'hidden', maxHeight: 300, overflowY: 'auto' }}>
-                        {chatRooms.map((r) => { const sel = r.id === be.activeRoomId; return (
+                        <div style={{ display: 'flex', gap: 6, padding: 8, borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+                          {(['group', 'dm'] as const).map((t) => <button key={t} onClick={() => setChatTab(t)} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12.5, fontWeight: 700, padding: '7px 0', borderRadius: 9, background: chatTab === t ? '#2E9BA6' : 'rgba(255,255,255,.04)', color: chatTab === t ? '#060B17' : '#9DAFCB' }}>{t === 'group' ? '그룹 채팅' : '개인 채팅'}</button>)}
+                        </div>
+                        {chatTab === 'group' && <>
+                        {chatRooms.map((r) => { const sel = r.id === be.activeRoomId; const un = be.unreadByRoom[r.id] ?? 0; return (
                           <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 5, width: '100%', boxSizing: 'border-box', padding: '8px 12px', background: sel ? 'rgba(46,155,166,.16)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
                             <button onClick={() => { be.selectRoom(r.id); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: '0 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: sel ? '#67D7DF' : '#EAF3F1' }}>
                               {r.isPrivate && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}
                               <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
                             </button>
+                            {un > 0 && <span style={{ flexShrink: 0, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#E0563E', color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{un > 99 ? '99+' : un}</span>}
                             {r.isOwn && (
                               <button onClick={() => { const n = prompt('새 방 이름', r.name); if (n && n.trim() && n.trim() !== r.name) void be.renameRoom(r.id, n.trim()) }} title="이름 수정" style={{ all: 'unset', cursor: 'pointer', flexShrink: 0, width: 26, height: 26, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(157,175,203,.85)' }}>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 20h4l10-10-4-4L4 16v4z" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.5 6.5l4 4" strokeLinecap="round" /></svg>
@@ -1520,6 +1527,26 @@ export default function Portal() {
                           <button onClick={() => { setChatErr(''); setChatModal('create'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(46,155,166,.14)', color: '#67D7DF', border: '1px solid rgba(103,215,223,.3)' }}>＋ 방 만들기</button>
                           <button onClick={() => { setChatErr(''); setChatModal('join'); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600, padding: '9px 0', borderRadius: 10, background: 'rgba(255,249,238,.05)', color: '#9DAFCB', border: '1px solid rgba(255,247,232,.12)' }}>코드로 입장</button>
                         </div>
+                        </>}
+                        {chatTab === 'dm' && (() => {
+                          const cands = be.isAdmin ? (be.roster ?? []) : (be.trainers ?? [])
+                          if (cands.length === 0) return <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.45)', padding: '16px 12px' }}>{be.isAdmin ? '회원이 없어요.' : '대화할 트레이너가 없어요.'}</div>
+                          return cands.map((c) => {
+                            const th = (be.dmThreads ?? []).find((t) => t.partnerId === c.id)
+                            const un = th ? (be.unreadByRoom[th.roomId] ?? 0) : 0
+                            const sel = !!th && th.roomId === be.activeRoomId
+                            return (
+                              <button key={c.id} onClick={() => { void be.openDm(c.id); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, width: '100%', boxSizing: 'border-box', padding: '9px 12px', background: sel ? 'rgba(46,155,166,.16)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+                                <Avatar initials={c.initials} color={c.color} photo={c.photo} size={32} fontSize={11} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 13.5, fontWeight: 700, color: sel ? '#67D7DF' : '#EAF3F1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                                  {th?.lastText && <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{th.lastText}</div>}
+                                </div>
+                                {un > 0 && <span style={{ flexShrink: 0, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#E0563E', color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{un > 99 ? '99+' : un}</span>}
+                              </button>
+                            )
+                          })
+                        })()}
                       </div>
                     </>
                   )}

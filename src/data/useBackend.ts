@@ -98,6 +98,11 @@ export interface Backend {
   updateMeasurement: (id: string, date: string | null, values: Record<string, number>) => Promise<void>
   fetchMeasurementValues: (id: string) => Promise<Record<string, number>>
   unreadChat: number
+  dmThreads: api.DmThread[] | null
+  trainers: { id: string; name: string; initials: string; color: string; photo: string | null }[] | null
+  unreadByRoom: Record<string, number>
+  openDm: (otherId: string) => Promise<void>
+  reloadDms: () => Promise<void>
   metrics: Record<MetricKey, Metric>
   dates: string[]
   privacy: Record<string, 'public' | 'private'> | null
@@ -218,6 +223,9 @@ export function useBackend(): Backend {
   const [messages, setMessages] = useState<MessageView[] | null>(null)
   const [myRoomAlias, setMyRoomAlias] = useState<{ anonymous: boolean; aliasName: string | null } | null>(null)
   const [rooms, setRooms] = useState<RoomView[] | null>(null)
+  const [dmThreads, setDmThreads] = useState<api.DmThread[] | null>(null)
+  const [trainers, setTrainers] = useState<{ id: string; name: string; initials: string; color: string; photo: string | null }[] | null>(null)
+  const [unreadByRoom, setUnreadByRoom] = useState<Record<string, number>>({})
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
   const [roomMembers, setRoomMembers] = useState<api.RoomMember[]>([])
   const [members, setMembers] = useState<MemberView[] | null>(null)
@@ -624,17 +632,39 @@ export function useBackend(): Backend {
     await reloadMessages(activeRoomId)
   }, [activeRoomId, reloadMessages])
 
+  const reloadUnread = useCallback(async () => {
+    if (!supabase || !meId) { setUnreadByRoom({}); return }
+    setUnreadByRoom(await api.fetchUnreadByRoom().catch(() => ({})))
+  }, [meId])
+  const reloadDms = useCallback(async () => {
+    if (!supabase || !meId) { setDmThreads(null); setTrainers(null); return }
+    const [t, tr] = await Promise.all([api.fetchDmThreads(meId), api.fetchTrainers()])
+    setDmThreads(t); setTrainers(tr.filter((x) => x.id !== meId))
+  }, [meId])
   const selectRoom = useCallback((id: string) => {
     roomId.current = id
     setActiveRoomId(id)
     setMessages(null)
-    void api.markRoomRead(id).catch(() => {})
+    void api.markRoomRead(id).then(() => reloadUnread()).catch(() => {})
     void reloadMessages(id)
     void api.fetchMyRoomMembership(id).then(setMyRoomAlias).catch(() => setMyRoomAlias(null))
     // viewing the room clears its chat notifications
     setNotifications((ns) => ns?.map((n) => (n.type === 'chat' ? { ...n, read: true } : n)) ?? ns)
     void api.markRoomNotificationsRead(id).catch(() => {})
-  }, [reloadMessages])
+  }, [reloadMessages, reloadUnread])
+  const openDm = useCallback(async (otherId: string) => {
+    const rid = await api.getOrCreateDm(otherId)
+    await reloadDms()
+    selectRoom(rid)
+  }, [reloadDms, selectRoom])
+  // unread badges: load on login + refresh on any new message in my rooms
+  useEffect(() => { if (supabase && meId) void reloadUnread() }, [meId, reloadUnread, reloadKey])
+  useEffect(() => {
+    const sb = supabase
+    if (!sb || !meId) return
+    const ch = sb.channel('all-msgs').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => { void reloadUnread(); void reloadDms() }).subscribe()
+    return () => { sb.removeChannel(ch) }
+  }, [meId, reloadUnread, reloadDms])
 
   const createRoom = useCallback(async (name: string, isPrivate: boolean) => {
     const room = await api.createRoom(name, isPrivate)
@@ -876,12 +906,12 @@ export function useBackend(): Backend {
   const ensureChat = useCallback(async () => {
     if (lazy.current.chat) return; lazy.current.chat = true
     try {
-      const myRooms = await reloadRooms()
+      const [myRooms] = await Promise.all([reloadRooms(), reloadDms(), reloadUnread(), loadRoster()])
       const first = myRooms[0]?.id ?? null
       roomId.current = first; setActiveRoomId(first)
       if (first) { await reloadMessages(first); setMyRoomAlias(await api.fetchMyRoomMembership(first)) } else { setMessages([]); setRoomMembers([]) }
     } catch (e) { console.warn('[backend] chat', e) }
-  }, [reloadRooms, reloadMessages])
+  }, [reloadRooms, reloadMessages, reloadDms, reloadUnread, loadRoster])
   const ensureSchedule = useCallback(async () => {
     if (lazy.current.schedule) return; lazy.current.schedule = true
     await Promise.all([reloadSchedule(), reloadRequests(), loadRoster()]).catch((e) => console.warn('[backend] schedule', e))
@@ -943,7 +973,8 @@ export function useBackend(): Backend {
       : null,
     setMeasureCycle, sleepLogs, addSleepLog, measurements, goals, setGoal, viewResultSheet,
     deleteMeasurement, updateMeasurement, fetchMeasurementValues, addManualMeasurement,
-    unreadChat: (notifications ?? []).filter((n) => n.type === 'chat' && !n.read).length,
+    unreadChat: Object.values(unreadByRoom).reduce((a, b) => a + b, 0),
+    dmThreads, trainers, unreadByRoom, openDm, reloadDms,
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, isAdmin: profile?.role === 'trainer', updateProfile, uploadAvatar,

@@ -315,14 +315,14 @@ export async function fetchMyRooms(): Promise<RoomRow[]> {
   const sb = requireSupabase()
   const me = await uid()
   const { data } = await sb.from('room_members')
-    .select('room:chat_rooms!room_members_room_id_fkey(id, name, is_private, join_code, created_by)')
+    .select('room:chat_rooms!room_members_room_id_fkey(id, name, is_private, join_code, created_by, kind)')
     .eq('user_id', me)
   const rooms = ((data ?? []) as unknown[])
     .map((r) => {
-      const room = (r as { room: RoomRow | RoomRow[] | null }).room
+      const room = (r as { room: (RoomRow & { kind?: string }) | (RoomRow & { kind?: string })[] | null }).room
       return Array.isArray(room) ? room[0] : room
     })
-    .filter(Boolean) as RoomRow[]
+    .filter((r): r is RoomRow & { kind?: string } => !!r && (r.kind ?? 'group') === 'group') as RoomRow[]
   rooms.sort((a, b) => (a.name === '하늘 라운지' ? -1 : b.name === '하늘 라운지' ? 1 : a.name.localeCompare(b.name)))
   return rooms
 }
@@ -330,10 +330,42 @@ export async function fetchMyRooms(): Promise<RoomRow[]> {
 /** Every room (trainer/admin only; RLS lets trainers read all rooms). */
 export async function fetchAllRooms(): Promise<RoomRow[]> {
   const { data } = await requireSupabase().from('chat_rooms')
-    .select('id, name, is_private, join_code, created_by').order('created_at', { ascending: true })
+    .select('id, name, is_private, join_code, created_by').eq('kind', 'group').order('created_at', { ascending: true })
   const rooms = (data ?? []) as RoomRow[]
   rooms.sort((a, b) => (a.name === '하늘 라운지' ? -1 : b.name === '하늘 라운지' ? 1 : a.name.localeCompare(b.name)))
   return rooms
+}
+
+// ── DM (1:1) ──
+export interface DmThread { roomId: string; partnerId: string; partnerName: string; partnerInitials: string; partnerColor: string; partnerPhoto: string | null; lastText: string | null; lastAt: string | null }
+export async function getOrCreateDm(otherId: string): Promise<string> {
+  const { data, error } = await requireSupabase().rpc('get_or_create_dm', { p_other: otherId })
+  if (error) throw error
+  return data as string
+}
+/** DM rooms the caller is in, with the other participant + last message. */
+export async function fetchDmThreads(meId: string): Promise<DmThread[]> {
+  const { data } = await requireSupabase().from('chat_rooms')
+    .select('id, dm_a, dm_b, a:profiles!chat_rooms_dm_a_fkey(id, name, initials, avatar_color, photo_path), b:profiles!chat_rooms_dm_b_fkey(id, name, initials, avatar_color, photo_path), messages(text, image_path, created_at)')
+    .eq('kind', 'dm').or(`dm_a.eq.${meId},dm_b.eq.${meId}`)
+  return ((data ?? []) as any[]).map((r) => {
+    const a = mp(r.a), b = mp(r.b)
+    const p = (a?.id === meId ? b : a) ?? {}
+    const msgs = ((r.messages ?? []) as any[]).slice().sort((x, y) => (y.created_at as string).localeCompare(x.created_at))
+    const last = msgs[0]
+    return { roomId: r.id, partnerId: p.id, partnerName: p.name ?? '', partnerInitials: p.initials ?? '', partnerColor: p.avatar_color ?? '#5E97A0', partnerPhoto: avatarUrl(p.photo_path),
+      lastText: last ? (last.text || (last.image_path ? '사진' : '')) : null, lastAt: last?.created_at ?? null }
+  })
+}
+export async function fetchTrainers(): Promise<{ id: string; name: string; initials: string; color: string; photo: string | null }[]> {
+  const { data } = await requireSupabase().from('profiles').select('id, name, initials, avatar_color, photo_path').eq('role', 'trainer')
+  return ((data ?? []) as any[]).map((p) => ({ id: p.id, name: p.name, initials: p.initials, color: p.avatar_color, photo: avatarUrl(p.photo_path) }))
+}
+export async function fetchUnreadByRoom(): Promise<Record<string, number>> {
+  const { data } = await requireSupabase().rpc('room_unread_counts')
+  const out: Record<string, number> = {}
+  for (const r of (data ?? []) as { room_id: string; n: number }[]) out[r.room_id] = Number(r.n)
+  return out
 }
 
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'

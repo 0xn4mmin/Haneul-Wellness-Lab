@@ -216,7 +216,9 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
       draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/')
       loader.setDRACOLoader(draco)
     } catch { /* draco optional */ }
-    const chain = [`/assets/anatomy-${gender}.glb`, `/assets/fallback-${gender}.glb`, '/assets/fallback-male.glb']
+    // muscles are near-identical across sexes → female falls back to the male
+    // anatomy muscle model (a body silhouette is only the last resort)
+    const chain = [`/assets/anatomy-${gender}.glb`, '/assets/anatomy-male.glb', `/assets/fallback-${gender}.glb`, '/assets/fallback-male.glb']
     const tryNext = (i: number) => {
       if (disposed || i >= chain.length) return
       loader.load(chain[i], (gltf) => {

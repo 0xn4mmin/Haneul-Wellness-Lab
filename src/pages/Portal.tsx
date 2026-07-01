@@ -2199,7 +2199,7 @@ export default function Portal() {
                       <Avatar initials={p.initials} color={p.color} photo={p.photo} size={i < 3 ? 34 : 30} fontSize={11} ring={i === 0 ? `0 0 0 2px ${MEDAL[0]}` : undefined} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
-                          <span style={{ fontSize: 12.5, fontWeight: i < 3 ? 700 : 600, color: '#EAF3F1' }}>{p.name}{p.isMe ? ' (나)' : ''}</span>
+                          <span style={{ fontSize: 12.5, fontWeight: i < 3 ? 700 : 600, color: '#EAF3F1', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}{p.isMe ? ' (나)' : ''}{rnTag(p.userId, 9)}</span>
                           <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: pv >= 100 ? '#7BD88F' : '#67D7DF' }}>{pv}%</span>
                         </div>
                         <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.min(100, pv)}%`, background: pv >= 100 ? '#7BD88F' : (i === 0 ? `linear-gradient(90deg,${MEDAL[0]},#67D7DF)` : 'linear-gradient(90deg,#2E9BA6,#67D7DF)') }} /></div>

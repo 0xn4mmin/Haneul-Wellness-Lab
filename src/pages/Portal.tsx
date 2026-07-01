@@ -447,7 +447,7 @@ export default function Portal() {
   const showLogin = be.configured ? !be.session : !s.authed
   const loading = be.configured && !!be.session && !be.loaded
   const doLogin = () => { if (be.configured) void be.signIn(s.loginEmail, s.loginPw); else set({ authed: true }) }
-  const doSignup = () => { if (be.configured) void be.signUp(s.loginEmail, s.loginPw); else set({ authed: true }) }
+  const doSignup = () => { if (be.configured) { if (!s.loginRealName.trim()) { alert('회원가입 시 실명을 입력해주세요.'); return } void be.signUp(s.loginEmail, s.loginPw, s.loginRealName.trim()) } else set({ authed: true }) }
   const doLogout = () => { void be.signOut() }
 
   // ---- derived values (mirror of renderVals) ------------------------------
@@ -759,6 +759,7 @@ export default function Portal() {
               <img src="/assets/logo-mark.png" alt="로고" style={{ width: 48, height: 48, objectFit: 'contain', display: 'block', margin: '0 auto 10px' }} />
               <div style={{ textAlign: 'center', fontFamily: "'Gowun Batang',serif", fontSize: 22, color: '#F2F7F3' }}>하늘 웰니스 랩</div>
               <div style={{ textAlign: 'center', fontSize: 12, color: 'rgba(231,239,234,.5)', margin: '4px 0 20px' }}>회원 전용 포털에 로그인하세요</div>
+              <input value={s.loginRealName} onChange={(e) => set({ loginRealName: e.target.value })} placeholder="실명 (회원가입 시 입력)" style={{ ...inputStyle, padding: '12px 16px', fontSize: 14, marginBottom: 9 }} />
               <input value={s.loginEmail} onChange={(e) => set({ loginEmail: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') doLogin() }} placeholder="이메일" style={{ ...inputStyle, padding: '12px 16px', fontSize: 14, marginBottom: 9 }} />
               <input value={s.loginPw} onChange={(e) => set({ loginPw: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') doLogin() }} type="password" placeholder="비밀번호" style={{ ...inputStyle, padding: '12px 16px', fontSize: 14, marginBottom: 14 }} />
               <button onClick={doLogin} style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', display: 'block', textAlign: 'center', width: '100%', fontSize: 15, fontWeight: 700, color: '#060B17', background: CTA, padding: 13, borderRadius: 24, boxShadow: '0 16px 34px -16px rgba(22,192,206,.9)' }}>로그인</button>
@@ -2653,7 +2654,7 @@ export default function Portal() {
                 </div>
                 {roster.filter((r) => r.name.includes(studioQuery.trim())).map((r) => { const grp = (be.roster ?? []).find((x) => x.id === r.id)?.studio; return (
                   <button key={r.id} onClick={() => { setStudioMemberId(r.id); set({ coachTargetId: r.id === 'jiwoo' ? 'minseo' : r.id, coachConfirm: '' }) }} className="hwl-row-hover" style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '1.9fr .7fr .7fr .7fr .85fr .9fr 24px', gap: 8, alignItems: 'center', width: '100%', padding: '13px 18px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}><Avatar initials={r.initials} color={r.color} photo={r.photo} size={38} fontSize={12} /><div><div style={{ fontWeight: 600, fontSize: 14, color: '#EAF3F1' }}>{r.name}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>최근 측정 {r.last}</div></div></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}><Avatar initials={r.initials} color={r.color} photo={r.photo} size={38} fontSize={12} /><div><div style={{ fontWeight: 600, fontSize: 14, color: '#EAF3F1' }}>{r.name}{(() => { const rn = (be.roster ?? []).find((x) => x.id === r.id)?.realName; return rn ? <span style={{ fontSize: 11.5, fontWeight: 500, color: 'rgba(201,162,75,.9)', marginLeft: 6 }}>({rn})</span> : null })()}</div><div style={{ fontSize: 11, color: 'rgba(231,239,234,.4)' }}>최근 측정 {r.last}</div></div></div>
                     <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#67D7DF' }}>{r.score}</div>
                     <div style={{ fontSize: 14, fontFamily: "'IBM Plex Mono',monospace", color: '#EAF3F1' }}>{r.pbf}<span style={{ color: 'rgba(231,239,234,.4)' }}>%</span></div>
                     <div style={{ fontSize: 14, fontFamily: "'IBM Plex Mono',monospace", color: '#EAF3F1' }}>{r.smm}<span style={{ color: 'rgba(231,239,234,.4)' }}>kg</span></div>
@@ -2695,7 +2696,7 @@ export default function Portal() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                         <Avatar initials={sm?.initials ?? ''} color={sm?.color ?? '#5E97A0'} photo={sm?.photo ?? null} size={54} fontSize={16} />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#F2F7F3' }}>{sm?.name}</div>
+                          <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 23, color: '#F2F7F3' }}>{sm?.name}{(() => { const rn = (be.roster ?? []).find((x) => x.id === studioMemberId)?.realName; return rn ? <span style={{ fontFamily: "'Noto Sans KR',sans-serif", fontSize: 13, fontWeight: 500, color: 'rgba(201,162,75,.95)', marginLeft: 8 }}>실명 {rn}</span> : null })()}</div>
                           <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>최근 측정 {sm?.last}</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>

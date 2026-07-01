@@ -50,6 +50,7 @@ export interface PortalState {
   authed: boolean
   loginEmail: string
   loginPw: string
+  loginRealName: string
   profileSaved: string
   profile: Profile
   showChallengeForm: boolean
@@ -115,6 +116,7 @@ export const initialState: PortalState = {
   authed: false,
   loginEmail: '',
   loginPw: '',
+  loginRealName: '',
   profileSaved: '',
   profile: { name: '박지우', birth: '1999-03-12', gender: '남성', phone: '010-9907-4830', photo: null },
   showChallengeForm: false,

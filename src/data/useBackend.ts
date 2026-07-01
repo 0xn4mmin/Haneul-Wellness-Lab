@@ -70,7 +70,7 @@ export interface ActiveMemberDetail {
 }
 export interface ChartCommentView { author: string; initials: string; color: string; role: Role; text: string; time: string }
 export interface FeedbackItem { author: string; initials: string; color: string; photo?: string | null; isCoach: boolean; text: string; time: string }
-export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number; pbf: number; smm: number; studio: string | null; lastDate: string | null }
+export interface RosterRow { id: string; name: string; initials: string; color: string; photo: string | null; score: number; pbf: number; smm: number; studio: string | null; lastDate: string | null; realName: string | null }
 export interface CoachNoteItem { id: string; author: string; initials: string; color: string; photo: string | null; isCoach: boolean; isMine: boolean; text: string; time: string }
 
 export interface Backend {
@@ -79,7 +79,7 @@ export interface Backend {
   session: Session | null
   loginError: string
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, realName?: string) => Promise<void>
   signOut: () => Promise<void>
   reload: () => void
   loaded: boolean    // initial data load for the signed-in user has finished
@@ -505,10 +505,10 @@ export function useBackend(): Backend {
     const { error } = await api.signIn(email, password)
     if (error) setLoginError(error.message)
   }, [])
-  const signUp = useCallback(async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string, realName?: string) => {
     setLoginError('')
     if (!validCreds(email, password)) return
-    const { data, error } = await api.signUp(email, password, email.split('@')[0])
+    const { data, error } = await api.signUp(email, password, email.split('@')[0], realName)
     if (error) {
       setLoginError(/rate limit/i.test(error.message)
         ? '메일 발송 한도를 초과했어요. 잠시 후 다시 시도하거나 관리자에게 문의하세요.'
@@ -903,7 +903,7 @@ export function useBackend(): Backend {
   useEffect(() => { lazy.current = { community: false, chat: false, schedule: false, roster: false } }, [meId, reloadKey])
   const loadRoster = useCallback(async () => {
     if (lazy.current.roster) return; lazy.current.roster = true
-    try { const rows = await api.fetchRoster(); setRoster(rows.map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo, score: r.score ?? 0, pbf: r.pbf ?? 0, smm: r.smm ?? 0, studio: r.studio, lastDate: r.lastDate }))) } catch (e) { console.warn('[backend] roster', e) }
+    try { const rows = await api.fetchRoster(); setRoster(rows.map((r) => ({ id: r.id, name: r.name, initials: r.initials, color: r.color, photo: r.photo, score: r.score ?? 0, pbf: r.pbf ?? 0, smm: r.smm ?? 0, studio: r.studio, lastDate: r.lastDate, realName: r.realName }))) } catch (e) { console.warn('[backend] roster', e) }
   }, [])
   const ensureCommunity = useCallback(async () => {
     if (lazy.current.community) return; lazy.current.community = true

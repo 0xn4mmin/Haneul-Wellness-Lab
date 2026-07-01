@@ -48,6 +48,31 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
   let segMats: Record<string, THREE.MeshStandardMaterial[]> = {}
   let selected = 'trunk'
 
+  // For a single-body (unsegmented) model we paint segments via per-vertex color.
+  const SKIN = new THREE.Color(0xcaa892)
+  const SEG_ORDER = ['rightArm', 'leftArm', 'trunk', 'rightLeg', 'leftLeg']
+  let bodyMeshes: { geo: THREE.BufferGeometry; seg: Uint8Array }[] | null = null
+  const vertexSeg = (x: number, yNorm: number, halfW: number): number => {
+    if (yNorm > 0.86) return 255                                            // head/neck
+    if (yNorm >= 0.5 && Math.abs(x) > halfW * 0.34) return x >= 0 ? 0 : 1    // arm (R/L)
+    if (yNorm < 0.46) return x >= 0 ? 3 : 4                                  // leg (R/L)
+    return 2                                                                // trunk
+  }
+  const applyBodyColors = () => {
+    if (!bodyMeshes) return
+    const tmp = new THREE.Color()
+    for (const { geo, seg } of bodyMeshes) {
+      const col = geo.getAttribute('color') as THREE.BufferAttribute
+      for (let i = 0; i < seg.length; i++) {
+        const sid = seg[i]
+        if (sid === 255) tmp.copy(SKIN)
+        else { const key = SEG_ORDER[sid]; const sd = segData.find((s) => s.key === key); tmp.set(segColor(sd ? sd.pct : 100)); if (selected !== key) tmp.lerp(SKIN, 0.6) }
+        col.setXYZ(i, tmp.r, tmp.g, tmp.b)
+      }
+      col.needsUpdate = true
+    }
+  }
+
   const w = mount.clientWidth || 520
   const h = mount.clientHeight || 360
   const scene = new THREE.Scene()
@@ -145,20 +170,37 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
       if (seg) { (newSeg[seg] = newSeg[seg] || []).push(mat); m.userData.seg = seg }
     })
     // segmented only if the model actually splits into ≥3 parts; otherwise it's a
-    // single-body model → render it as clean skin (no per-segment recolor)
+    // single-body model → paint the 5 segments onto it via per-vertex color so
+    // selecting a part still highlights on the body.
     const segmented = Object.keys(newSeg).length >= 3
+    if (!segmented) {
+      segMats = {}
+      bodyMeshes = []
+      root.updateWorldMatrix(true, true) // world coords still match box0 (not recentered yet)
+      const v = new THREE.Vector3()
+      root.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!(m as unknown as { isMesh?: boolean }).isMesh) return
+        const geo = m.geometry as THREE.BufferGeometry
+        const pos = geo.getAttribute('position') as THREE.BufferAttribute
+        const seg = new Uint8Array(pos.count)
+        for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); m.localToWorld(v); seg[i] = vertexSeg(v.x - ctr.x, (v.y - box0.min.y) / height, halfW) }
+        if (!geo.getAttribute('color')) geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3))
+        const mat = m.material as THREE.MeshStandardMaterial
+        mat.vertexColors = true; mat.color.set(0xffffff); mat.emissive.set(0x120b07); mat.emissiveIntensity = 0.12; mat.roughness = 0.62; mat.metalness = 0.02
+        m.userData.seg = undefined; m.userData.bodySeg = seg
+        bodyMeshes!.push({ geo, seg })
+      })
+    }
     while (fig.children.length) fig.remove(fig.children[0])
     root.position.sub(ctr)
     const holder = new THREE.Group(); holder.add(root)
     holder.scale.setScalar(5.2 / height); holder.position.y = 1.1
     if (faceFlip) holder.rotation.y = Math.PI // model faces -Z → turn to face the camera
     fig.add(holder)
-    if (segmented) { segMats = newSeg; applySegColors() }
-    else {
-      segMats = {}
-      root.traverse((o) => { const m = o as THREE.Mesh; if ((m as unknown as { isMesh?: boolean }).isMesh) m.userData.seg = undefined })
-      allMats.forEach((m) => { m.color.set(0xcaa892); m.emissive.set(0x1a0f0a); m.emissiveIntensity = 0.12; m.roughness = 0.62; m.metalness = 0.02 })
-    }
+    if (segmented) { segMats = newSeg; bodyMeshes = null; applySegColors() }
+    else applyBodyColors()
+    void allMats
   }
   ;(() => {
     const loader = new GLTFLoader()
@@ -194,6 +236,8 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
     for (const hpt of hits) {
       const seg = hpt.object.userData.seg
       if (seg) { onPick(seg); return }
+      const bs = hpt.object.userData.bodySeg as Uint8Array | undefined // single-body model
+      if (bs && hpt.face) { const id = bs[hpt.face.a]; if (id !== 255 && id != null) { onPick(SEG_ORDER[id]); return } }
     }
   }
   const down = (e: MouseEvent | TouchEvent) => {
@@ -240,7 +284,7 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
   loop()
 
   return {
-    setSelected: (k: string) => { selected = k; applySegColors() },
+    setSelected: (k: string) => { selected = k; applySegColors(); applyBodyColors() },
     dispose: () => {
       disposed = true
       cancelAnimationFrame(raf)

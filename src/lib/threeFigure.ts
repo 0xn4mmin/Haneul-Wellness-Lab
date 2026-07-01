@@ -221,7 +221,7 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
       if (disposed || i >= chain.length) return
       loader.load(chain[i], (gltf) => {
         if (disposed) return
-        try { swapGltf(gltf, chain[i].includes('fallback')) } catch (err) { console.warn('[figure] model wiring failed', err) }
+        try { swapGltf(gltf, chain[i].includes('fallback-male')) } catch (err) { console.warn('[figure] model wiring failed', err) }
       }, undefined, () => tryNext(i + 1))
     }
     tryNext(0)

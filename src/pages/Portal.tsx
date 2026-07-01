@@ -75,9 +75,9 @@ export default function Portal() {
   // KakaoTalk-style multi-photo grid (tap to open full)
   const imgGrid = (urls: string[], mt = 0, maxW?: number): React.ReactNode => {
     if (!urls.length) return null
-    if (urls.length === 1) return <img src={urls[0]} onClick={() => setLightbox(urls[0])} alt="" style={{ width: '100%', maxWidth: maxW, borderRadius: 14, marginTop: mt, border: '1px solid rgba(255,255,255,.08)', display: 'block', cursor: 'pointer' }} />
+    if (urls.length === 1) return <img src={urls[0]} onClick={() => setLightbox({ urls, i: 0 })} alt="" style={{ width: '100%', maxWidth: maxW, borderRadius: 14, marginTop: mt, border: '1px solid rgba(255,255,255,.08)', display: 'block', cursor: 'pointer' }} />
     const cols = urls.length === 2 || urls.length === 4 ? 2 : 3
-    return <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4, marginTop: mt, maxWidth: maxW, borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)' }}>{urls.map((u, i) => <img key={i} src={u} onClick={() => setLightbox(u)} alt="" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', cursor: 'pointer' }} />)}</div>
+    return <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4, marginTop: mt, maxWidth: maxW, borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)' }}>{urls.map((u, i) => <img key={i} src={u} onClick={() => setLightbox({ urls, i })} alt="" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', cursor: 'pointer' }} />)}</div>
   }
 
   const [mobileNav, setMobileNav] = useState(false)
@@ -122,7 +122,8 @@ export default function Portal() {
   const [manualVals, setManualVals] = useState<Record<string, string>>({})
   const [postImgs, setPostImgs] = useState<File[]>([])
   const [chatImgs, setChatImgs] = useState<File[]>([])
-  const [lightbox, setLightbox] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<{ urls: string[]; i: number } | null>(null)
+  const lbSwipe = useRef<number | null>(null)
   const [cgMetric, setCgMetric] = useState('')
   const [cgMode, setCgMode] = useState<'absolute' | 'relative'>('relative')
   const [cgTarget, setCgTarget] = useState('')
@@ -708,6 +709,15 @@ export default function Portal() {
   // Each open overlay = one history entry (no hash change, so it doesn't move
   // the tab); back pops it and we close that overlay. Ordered details-first so
   // a modal opened on top of a detail closes first.
+  useEffect(() => {
+    if (!lightbox) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') setLightbox((l) => l ? { urls: l.urls, i: (l.i + 1) % l.urls.length } : l)
+      else if (e.key === 'ArrowLeft') setLightbox((l) => l ? { urls: l.urls, i: (l.i - 1 + l.urls.length) % l.urls.length } : l)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [lightbox])
   const overlayDefs: Array<[boolean, () => void]> = [
     [!!lightbox, () => setLightbox(null)],
     [memberOpen, closeMember],
@@ -2832,13 +2842,27 @@ export default function Portal() {
 
       {!showLogin && !loading && <TabBar view={s.view} go={go} chatBadge={be.configured ? (be.unreadChat || undefined) : undefined} isAdmin={be.isAdmin} />}
 
-      {/* 사진 라이트박스 */}
-      {lightbox && (
-        <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(4,9,18,.9)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom))', animation: 'hwl-fade .2s ease both' }}>
-          <img src={lightbox} alt="" style={{ maxWidth: '94vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 12, display: 'block' }} />
-          <button onClick={() => setLightbox(null)} aria-label="닫기" style={{ all: 'unset', cursor: 'pointer', position: 'fixed', top: 'max(18px,env(safe-area-inset-top))', right: 22, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 22 }}>×</button>
-        </div>
-      )}
+      {/* 사진 라이트박스 (좌우 스와이프) */}
+      {lightbox && (() => {
+        const { urls, i } = lightbox
+        const go = (d: number) => setLightbox((l) => l ? { urls: l.urls, i: (l.i + d + l.urls.length) % l.urls.length } : l)
+        const multi = urls.length > 1
+        return (
+          <div onClick={() => setLightbox(null)}
+            onTouchStart={(e) => { lbSwipe.current = e.touches[0].clientX }}
+            onTouchEnd={(e) => { const dx = e.changedTouches[0].clientX - (lbSwipe.current ?? e.changedTouches[0].clientX); if (multi && Math.abs(dx) > 45) go(dx < 0 ? 1 : -1); lbSwipe.current = null }}
+            style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(4,9,18,.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom))', animation: 'hwl-fade .2s ease both', touchAction: 'pan-y' }}>
+            <img key={i} src={urls[i]} onClick={(e) => e.stopPropagation()} alt="" style={{ maxWidth: '94vw', maxHeight: '84vh', objectFit: 'contain', borderRadius: 12, display: 'block', animation: 'hwl-fade .18s ease both' }} />
+            {multi && <>
+              <button onClick={(e) => { e.stopPropagation(); go(-1) }} aria-label="이전" style={{ all: 'unset', cursor: 'pointer', position: 'fixed', left: 12, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+              <button onClick={(e) => { e.stopPropagation(); go(1) }} aria-label="다음" style={{ all: 'unset', cursor: 'pointer', position: 'fixed', right: 12, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+              <div style={{ position: 'fixed', bottom: 'calc(24px + env(safe-area-inset-bottom))', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 7, pointerEvents: 'none' }}>{urls.map((_, j) => <span key={j} style={{ width: j === i ? 20 : 7, height: 7, borderRadius: 4, background: j === i ? '#67D7DF' : 'rgba(255,255,255,.35)', transition: 'all .2s' }} />)}</div>
+              <div style={{ position: 'fixed', top: 'max(20px,env(safe-area-inset-top))', left: 0, right: 0, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,.75)', fontFamily: "'IBM Plex Mono',monospace", pointerEvents: 'none' }}>{i + 1} / {urls.length}</div>
+            </>}
+            <button onClick={() => setLightbox(null)} aria-label="닫기" style={{ all: 'unset', cursor: 'pointer', position: 'fixed', top: 'max(16px,env(safe-area-inset-top))', right: 18, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 22 }}>×</button>
+          </div>
+        )
+      })()}
 
       {/* 결과지 라이트박스 */}
       {s.scanOpen && (

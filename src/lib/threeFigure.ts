@@ -44,10 +44,9 @@ function classifySeg(name: string, cx: number, yNorm: number, halfW: number): st
 
 /**
  * Builds the segmental lean 3D figure and wires drag-rotate + tap-to-pick.
- * Starts with the procedural capsule mannequin, then—if an anatomy model exists
- * at /assets/anatomy-<gender>.glb—swaps it in (muscle meshes auto-mapped to the
- * 5 InBody segments). Falls back silently to the mannequin if the file is
- * missing or WebGL is unavailable.
+ * Loads an external model (anatomy muscles → the 5 InBody segments, or a body
+ * silhouette painted per-vertex) from the /assets GLB chain; the canvas is
+ * empty until it loads. Returns a no-op if WebGL is unavailable.
  */
 export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, gender: FigGender = 'male'): FigureHandle {
   try {
@@ -109,37 +108,8 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
   )
   blob.rotation.x = -Math.PI / 2; blob.position.y = -2.35; scene.add(blob)
 
+  // Empty until an external model loads (no procedural mannequin).
   const fig = new THREE.Group(); scene.add(fig)
-  const mk = (k: string) => {
-    const m = new THREE.MeshStandardMaterial({ color: 0x37b6c2, roughness: 0.5, metalness: 0.15, emissive: 0x06231f, emissiveIntensity: 0.4 });
-    (segMats[k] = segMats[k] || []).push(m)
-    return m
-  }
-  const tag = (obj: THREE.Object3D, k: string) => obj.traverse((o) => { o.userData.seg = k })
-  const neutral = new THREE.MeshStandardMaterial({ color: 0x7c9690, roughness: 0.6, metalness: 0.05 })
-
-  const capsule = (r: number, len: number, mat: THREE.Material) => {
-    const g = new THREE.Group()
-    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 28), mat)
-    const top = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), mat); top.position.y = len / 2
-    const bot = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), mat); bot.position.y = -len / 2
-    g.add(cyl, top, bot)
-    return g
-  }
-
-  const trunkMat = mk('trunk')
-  const trunk = capsule(0.6, 1.45, trunkMat); trunk.position.set(0, 2.0, 0); trunk.scale.set(1, 1, 0.74); tag(trunk, 'trunk'); fig.add(trunk)
-  const hips = capsule(0.5, 0.35, trunkMat); hips.position.set(0, 1.15, 0); hips.scale.set(1.05, 1, 0.74); tag(hips, 'trunk'); fig.add(hips)
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.46, 28, 20), neutral); head.position.set(0, 3.35, 0); fig.add(head)
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.3, 20), neutral); neck.position.set(0, 2.95, 0); fig.add(neck)
-  const la = capsule(0.185, 1.45, mk('leftArm')); la.position.set(-0.82, 2.35, 0); la.rotation.z = 0.32; tag(la, 'leftArm'); fig.add(la)
-  const ra = capsule(0.185, 1.45, mk('rightArm')); ra.position.set(0.82, 2.35, 0); ra.rotation.z = -0.32; tag(ra, 'rightArm'); fig.add(ra)
-  const ll = capsule(0.245, 1.7, mk('leftLeg')); ll.position.set(-0.3, 0.05, 0); ll.rotation.z = 0.04; tag(ll, 'leftLeg'); fig.add(ll)
-  const rl = capsule(0.245, 1.7, mk('rightLeg')); rl.position.set(0.3, 0.05, 0); rl.rotation.z = -0.04; tag(rl, 'rightLeg'); fig.add(rl)
-  ;[-0.32, 0.32].forEach((x) => {
-    const f = new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 14), neutral)
-    f.scale.set(1, 0.6, 1.6); f.position.set(x, -1.72, 0.12); fig.add(f)
-  })
   fig.rotation.y = -0.35
 
   const applySegColors = () => {

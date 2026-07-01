@@ -41,6 +41,13 @@ export async function setMemberStudio(memberId: string, studio: string | null) {
 export async function setMemberRealName(memberId: string, realName: string) {
   return requireSupabase().from('member_private').upsert({ id: memberId, real_name: realName.trim() || null }, { onConflict: 'id' })
 }
+/** id → real name (RLS: trainers get everyone, members only themselves). */
+export async function fetchRealNames(): Promise<Record<string, string>> {
+  const { data } = await requireSupabase().from('member_private').select('id, real_name')
+  const out: Record<string, string> = {}
+  for (const r of (data ?? []) as { id: string; real_name: string | null }[]) if (r.real_name) out[r.id] = r.real_name
+  return out
+}
 
 async function uid(): Promise<string> {
   const { data } = await requireSupabase().auth.getUser()

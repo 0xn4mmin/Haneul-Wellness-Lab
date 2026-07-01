@@ -33,16 +33,16 @@ export interface BackendProfile {
   name: string; initials: string; color: string; role: 'client' | 'trainer'
   birth: string | null; gender: string | null; phone: string | null; photoUrl: string | null
 }
-export interface PostComment { id?: string; author: string; initials: string; color: string; photo?: string | null; text: string; isOwn?: boolean; isCoach?: boolean; replies?: PostComment[] }
+export interface PostComment { id?: string; authorId?: string; author: string; initials: string; color: string; photo?: string | null; text: string; isOwn?: boolean; isCoach?: boolean; replies?: PostComment[] }
 export interface PostView {
-  id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string
+  id: string; authorId?: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string
   likes: number; liked: boolean; open: boolean; draft: string; comments: PostComment[]; isOwn: boolean
   replyTo: string | null; replyToName: string | null; image?: string | null
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
 export interface MessageReaction { emoji: string; count: number; mine: boolean; users: string[] }
 export interface MessageView {
-  id: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null
+  id: string; authorId?: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null
   isMine: boolean; deleted: boolean; createdAt: string
   replyTo: { author: string; text: string } | null
   reactions: MessageReaction[]
@@ -101,6 +101,7 @@ export interface Backend {
   dmThreads: api.DmThread[] | null
   trainers: { id: string; name: string; initials: string; color: string; photo: string | null }[] | null
   unreadByRoom: Record<string, number>
+  realNames: Record<string, string>
   openDm: (otherId: string) => Promise<void>
   reloadDms: () => Promise<void>
   metrics: Record<MetricKey, Metric>
@@ -230,6 +231,7 @@ export function useBackend(): Backend {
   const [dmThreads, setDmThreads] = useState<api.DmThread[] | null>(null)
   const [trainers, setTrainers] = useState<{ id: string; name: string; initials: string; color: string; photo: string | null }[] | null>(null)
   const [unreadByRoom, setUnreadByRoom] = useState<Record<string, number>>({})
+  const [realNames, setRealNames] = useState<Record<string, string>>({}) // trainer-only: id → real name
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
   const [roomMembers, setRoomMembers] = useState<api.RoomMember[]>([])
   const [members, setMembers] = useState<MemberView[] | null>(null)
@@ -268,14 +270,14 @@ export function useBackend(): Backend {
       const ui = postUi.current[r.id] ?? { open: false, draft: '', replyTo: null }
       const sm = r.shared_metric as { val?: string; label?: string; sub?: string } | null
       // build nested comments: top-level + their replies (one level)
-      const raw = (r.post_comments ?? []).map((c: any) => ({ id: c.id, author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, photo: api.avatarUrl(c.author?.photo_path), text: c.text, isOwn: c.author_id === meId, isCoach: c.author?.role === 'trainer', parentId: c.parent_id as string | null, ts: Date.parse(c.created_at) }))
+      const raw = (r.post_comments ?? []).map((c: any) => ({ id: c.id, authorId: c.author_id, author: c.author?.name, initials: c.author?.initials, color: c.author?.avatar_color, photo: api.avatarUrl(c.author?.photo_path), text: c.text, isOwn: c.author_id === meId, isCoach: c.author?.role === 'trainer', parentId: c.parent_id as string | null, ts: Date.parse(c.created_at) }))
       raw.sort((x: any, y: any) => x.ts - y.ts)
       const byParent: Record<string, PostComment[]> = {}
       raw.filter((c: any) => c.parentId).forEach((c: any) => { (byParent[c.parentId] ??= []).push(c) })
       const comments = raw.filter((c: any) => !c.parentId).map((c: any) => ({ ...c, replies: byParent[c.id] ?? [] }))
       const replyToName = ui.replyTo ? (raw.find((c: any) => c.id === ui.replyTo)?.author ?? null) : null
       return {
-        id: r.id, author: a.name, initials: a.initials, color: a.avatar_color, photo: api.avatarUrl(a.photo_path),
+        id: r.id, authorId: r.author_id, author: a.name, initials: a.initials, color: a.avatar_color, photo: api.avatarUrl(a.photo_path),
         role: roleOf(r.author_id, a.role), time: relTime(r.created_at), text: r.text,
         likes: (r.post_likes ?? []).length,
         liked: (r.post_likes ?? []).some((l: { user_id: string }) => l.user_id === meId),
@@ -333,7 +335,7 @@ export function useBackend(): Backend {
       const readers = members.filter((m) => m.userId !== r.author_id && m.lastReadAt && Date.parse(m.lastReadAt) >= t)
         .map((m) => dispOf(m.userId, { name: m.name, initials: '', color: '', photo: null }).name)
       return {
-        id: r.id, author: d.name, initials: d.initials, color: d.color, photo: d.photo,
+        id: r.id, authorId: r.author_id, author: d.name, initials: d.initials, color: d.color, photo: d.photo,
         role: roleOf(r.author_id, a.role), time: clockTime(r.created_at), text: r.text, image: api.postMediaUrl(r.image_path),
         isMine: r.author_id === meId, deleted: !!r.deleted, createdAt: r.created_at,
         replyTo, reactions, readBy: readers, readCount: readers.length,
@@ -663,6 +665,11 @@ export function useBackend(): Backend {
     await reloadDms()
     selectRoom(rid)
   }, [reloadDms, selectRoom])
+  // trainer-only: real names for every member (shown across community/chat)
+  useEffect(() => {
+    if (!supabase || !meId || profile?.role !== 'trainer') { setRealNames({}); return }
+    void api.fetchRealNames().then(setRealNames).catch(() => setRealNames({}))
+  }, [meId, profile?.role, reloadKey])
   // unread badges: load on login + refresh on any new message in my rooms
   useEffect(() => { if (supabase && meId) void reloadUnread() }, [meId, reloadUnread, reloadKey])
   useEffect(() => {
@@ -994,7 +1001,7 @@ export function useBackend(): Backend {
     setMeasureCycle, sleepLogs, addSleepLog, measurements, goals, setGoal, viewResultSheet,
     deleteMeasurement, updateMeasurement, fetchMeasurementValues, addManualMeasurement,
     unreadChat: Object.values(unreadByRoom).reduce((a, b) => a + b, 0),
-    dmThreads, trainers, unreadByRoom, openDm, reloadDms,
+    dmThreads, trainers, unreadByRoom, realNames, openDm, reloadDms,
     briefing, briefingBusy, briefingRemaining: Math.max(0, 2 - briefingUsed), briefingMsg, regenBriefing,
     metrics: remoteMetrics ?? MOCK_METRICS, dates: remoteDates ?? MOCK_DATES,
     privacy, togglePrivacy, profile, isAdmin: profile?.role === 'trainer', updateProfile, uploadAvatar,

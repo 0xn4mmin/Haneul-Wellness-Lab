@@ -70,6 +70,8 @@ export default function Portal() {
   const setFn = (fn: (prev: PortalState) => Partial<PortalState>) => setS((prev) => ({ ...prev, ...fn(prev) }))
 
   const be = useBackend()
+  // trainer-only: show a member's real name next to their display name everywhere
+  const rnTag = (id?: string | null, size = 10.5): React.ReactNode => { const rn = be.isAdmin && id ? (be.realNames[id] ?? null) : null; return rn ? <span style={{ fontSize: size, fontWeight: 500, color: 'rgba(201,162,75,.92)', marginLeft: 5, whiteSpace: 'nowrap' }}>({rn})</span> : null }
 
   const [mobileNav, setMobileNav] = useState(false)
   const [memberQuery, setMemberQuery] = useState('')
@@ -621,9 +623,9 @@ export default function Portal() {
   ]
   const onlineMembers = be.configured
     ? be.roomMembers.map((m) => m.anonymous
-        ? { name: m.aliasName || '익명', initials: (m.aliasName || '익').slice(0, 2), color: '#5E6B85', photo: m.aliasPhoto, role: '익명', statusColor: '#9DAFCB' }
-        : { name: m.name, initials: m.initials, color: m.color, photo: m.photo ?? null, role: m.role === 'trainer' ? '트레이너' : '회원', statusColor: '#2E9BA6' })
-    : mockOnline
+        ? { name: m.aliasName || '익명', initials: (m.aliasName || '익').slice(0, 2), color: '#5E6B85', photo: m.aliasPhoto, role: '익명', statusColor: '#9DAFCB', id: null as string | null }
+        : { name: m.name, initials: m.initials, color: m.color, photo: m.photo ?? null, role: m.role === 'trainer' ? '트레이너' : '회원', statusColor: '#2E9BA6', id: m.userId as string | null })
+    : mockOnline.map((o) => ({ ...o, id: null as string | null }))
 
   // segmental: real from the latest measurement when signed in, else demo
   const latestMeasure = be.configured ? (be.measurements?.[0] ?? null) : null
@@ -1440,7 +1442,7 @@ export default function Portal() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <Avatar initials={p.initials} color={p.color} photo={p.photo} size={44} fontSize={13} ring={p.ring} />
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 700, fontSize: 14.5, color: '#EAF3F1' }}>{p.author}</span><span style={{ fontSize: 10, fontWeight: 600, color: p.tagFg, background: p.tagBg, padding: '1px 8px', borderRadius: 10 }}>{p.tag}</span></div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontWeight: 700, fontSize: 14.5, color: '#EAF3F1' }}>{p.author}</span>{rnTag((p as { authorId?: string }).authorId)}<span style={{ fontSize: 10, fontWeight: 600, color: p.tagFg, background: p.tagBg, padding: '1px 8px', borderRadius: 10 }}>{p.tag}</span></div>
                       <div style={{ fontSize: 12, color: 'rgba(231,239,234,.4)' }}>{p.time}</div>
                     </div>
                     {p.isOwn && (
@@ -1473,7 +1475,7 @@ export default function Portal() {
                           <div style={{ display: 'flex', gap: 10 }}>
                             <Avatar initials={cm.initials} color={cm.color} photo={cm.photo} size={30} fontSize={10.5} />
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px' }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{cm.author}</span>{(cm as { isCoach?: boolean }).isCoach && <span style={{ fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '0 5px', marginLeft: 5 }}>코치</span>} <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{renderMentions(cm.text)}</span></div>
+                              <div style={{ background: 'rgba(255,255,255,.05)', borderRadius: '3px 13px 13px 13px', padding: '9px 13px' }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{cm.author}</span>{rnTag((cm as { authorId?: string }).authorId, 9)}{(cm as { isCoach?: boolean }).isCoach && <span style={{ fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '0 5px', marginLeft: 5 }}>코치</span>} <span style={{ fontSize: 13, color: 'rgba(231,239,234,.78)' }}>{renderMentions(cm.text)}</span></div>
                               <div style={{ display: 'flex', gap: 12, marginTop: 4, marginLeft: 4 }}>
                                 <button onClick={() => { onReply(p.id, (cm as { id?: string }).id, i, cm.author); document.getElementById(`cmt-${p.id}`)?.focus() }} style={{ all: 'unset', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'rgba(157,175,203,.8)' }}>답글</button>
                                 {(be.configured ? (cm as { isOwn?: boolean }).isOwn : cm.author === ME.name) && (
@@ -1486,7 +1488,7 @@ export default function Portal() {
                             <div key={j} style={{ display: 'flex', gap: 9, marginLeft: 34 }}>
                               <Avatar initials={rp.initials} color={rp.color} photo={rp.photo} size={26} fontSize={9.5} />
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: '3px 12px 12px 12px', padding: '8px 12px' }}><span style={{ fontWeight: 700, fontSize: 12, color: '#EAF3F1' }}>{rp.author}</span>{(rp as { isCoach?: boolean }).isCoach && <span style={{ fontSize: 8.5, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 5, padding: '0 4px', marginLeft: 4 }}>코치</span>} <span style={{ fontSize: 12.5, color: 'rgba(231,239,234,.78)' }}>{renderMentions(rp.text)}</span></div>
+                                <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: '3px 12px 12px 12px', padding: '8px 12px' }}><span style={{ fontWeight: 700, fontSize: 12, color: '#EAF3F1' }}>{rp.author}</span>{rnTag((rp as { authorId?: string }).authorId, 8.5)}{(rp as { isCoach?: boolean }).isCoach && <span style={{ fontSize: 8.5, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 5, padding: '0 4px', marginLeft: 4 }}>코치</span>} <span style={{ fontSize: 12.5, color: 'rgba(231,239,234,.78)' }}>{renderMentions(rp.text)}</span></div>
                                 {(be.configured ? (rp as { isOwn?: boolean }).isOwn : rp.author === ME.name) && (
                                   <button onClick={() => { if (confirm('답글을 삭제할까요?')) onDeleteComment(p.id, (rp as { id?: string }).id, j) }} style={{ all: 'unset', cursor: 'pointer', fontSize: 10.5, fontWeight: 600, color: 'rgba(224,160,106,.8)', marginTop: 3, marginLeft: 4 }}>삭제</button>
                                 )}
@@ -1542,7 +1544,7 @@ export default function Portal() {
                     )}
                     <button onClick={() => be.configured && chatRooms != null && (setMemberList(false), setRoomMenu((v) => !v))} style={{ all: 'unset', cursor: be.configured && chatRooms != null ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, maxWidth: '100%' }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#2E9BA6', boxShadow: '0 0 0 4px rgba(46,155,166,.25)', flexShrink: 0 }} />
-                      <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roomTitle}</span>
+                      <span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 19, color: '#F2F7F3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roomTitle}</span>{rnTag(activeDm?.partnerId, 12)}
                       {activeDm && (be.trainers ?? []).some((t) => t.id === activeDm.partnerId) && <span style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '1px 6px' }}>코치</span>}
                       {be.configured && chatRooms != null && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(157,175,203,.8)" strokeWidth="2" style={{ flexShrink: 0, transform: roomMenu ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                     </button>
@@ -1589,7 +1591,7 @@ export default function Portal() {
                               <button key={c.id} onClick={() => { void be.openDm(c.id); setRoomMenu(false) }} style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, width: '100%', boxSizing: 'border-box', padding: '9px 12px', background: sel ? 'rgba(46,155,166,.16)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
                                 <Avatar initials={c.initials} color={c.color} photo={c.photo} size={32} fontSize={11} />
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 13.5, fontWeight: 700, color: sel ? '#67D7DF' : '#EAF3F1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                                  <div style={{ fontSize: 13.5, fontWeight: 700, color: sel ? '#67D7DF' : '#EAF3F1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}{rnTag(c.id, 10)}</div>
                                   {th?.lastText && <div style={{ fontSize: 11, color: 'rgba(231,239,234,.45)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{th.lastText}</div>}
                                 </div>
                                 {un > 0 && <span style={{ flexShrink: 0, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#E0563E', color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{un > 99 ? '99+' : un}</span>}
@@ -1617,7 +1619,7 @@ export default function Portal() {
                                 <span style={{ position: 'absolute', right: -1, bottom: -1, width: 10, height: 10, borderRadius: '50%', background: online ? '#7BD88F' : 'rgba(157,175,203,.55)', border: '2.5px solid #0E1A38', boxShadow: online ? '0 0 6px rgba(123,216,143,.8)' : 'none' }} />
                               </div>
                               <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 13, fontWeight: 600, color: '#EAF3F1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{disp}</span>{m.role === 'trainer' && <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '0 5px' }}>코치</span>}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 13, fontWeight: 600, color: '#EAF3F1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{disp}</span>{!m.anonymous && rnTag(m.userId, 9)}{m.role === 'trainer' && <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '0 5px' }}>코치</span>}</div>
                                 <div style={{ fontSize: 11, fontWeight: online ? 600 : 400, color: online ? '#7BD88F' : 'rgba(231,239,234,.45)' }}>{label}</div>
                               </div>
                             </div>
@@ -1693,7 +1695,7 @@ export default function Portal() {
                       style={{ display: 'flex', gap: 11, flexDirection: m.dir, animation: 'hwl-rise .3s ease both' }}>
                       <Avatar initials={m.initials} color={m.color} photo={m.photo} size={34} fontSize={11} ring={m.ring} />
                       <div style={{ maxWidth: '76%', display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3, justifyContent: m.justify }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{m.author}</span>{m.role === 'trainer' && <span style={{ fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '0 5px' }}>코치</span>}<span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)' }}>{m.time}</span></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3, justifyContent: m.justify }}><span style={{ fontWeight: 700, fontSize: 12.5, color: '#EAF3F1' }}>{m.author}</span>{rnTag((m as { authorId?: string }).authorId, 9)}{m.role === 'trainer' && <span style={{ fontSize: 9, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 6, padding: '0 5px' }}>코치</span>}<span style={{ fontSize: 10.5, color: 'rgba(231,239,234,.4)' }}>{m.time}</span></div>
                         {deleted ? (
                           <div style={{ fontSize: 13, fontStyle: 'italic', color: 'rgba(231,239,234,.4)', padding: '6px 11px', borderRadius: m.radius, border: '1px dashed rgba(255,255,255,.14)' }}>메시지가 삭제되었습니다</div>
                         ) : (
@@ -2365,7 +2367,7 @@ export default function Portal() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 15, marginBottom: 6 }}>
                       <Avatar initials={activeMember.initials} color={activeMember.color} photo={activeMember.photo} size={58} fontSize={17} ring={activeMember.role === 'trainer' ? '0 0 0 2px #2E9BA6' : undefined} />
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#F2F7F3' }}>{activeMember.name}</span>{activeMember.role === 'trainer' && <span style={{ fontSize: 10, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 8, padding: '2px 8px' }}>코치</span>}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ fontFamily: "'Gowun Batang',serif", fontSize: 24, color: '#F2F7F3' }}>{activeMember.name}</span>{rnTag(activeMember.id, 13)}{activeMember.role === 'trainer' && <span style={{ fontSize: 10, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 8, padding: '2px 8px' }}>코치</span>}</div>
                         <div style={{ fontSize: 12.5, color: 'rgba(231,239,234,.5)' }}>{activeMember.bio2}</div>
                         {activeMember.measureCount != null && activeMember.measureCount > 0 && (
                           <div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.4)', marginTop: 3, fontFamily: "'IBM Plex Mono',monospace" }}>측정 {activeMember.measureCount}회{activeMember.lastDate ? ` · 최근 ${activeMember.lastDate}` : ''}</div>
@@ -2425,7 +2427,7 @@ export default function Portal() {
                     <button key={m.id} onClick={() => openMember(m.id)} className="hwl-card-hover" style={{ all: 'unset', cursor: 'pointer', ...card, borderRadius: 22, padding: 20, display: 'flex', flexDirection: 'column', gap: 13 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <Avatar initials={m.initials} color={m.color} photo={m.photo} size={48} fontSize={15} ring={m.role === 'trainer' ? '0 0 0 2px #2E9BA6' : undefined} />
-                        <div><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontWeight: 700, fontSize: 15, color: '#EAF3F1' }}>{m.name}</span>{m.role === 'trainer' && <span style={{ fontSize: 9.5, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 7, padding: '1px 6px' }}>코치</span>}</div><div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)' }}>{m.bio}</div></div>
+                        <div><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontWeight: 700, fontSize: 15, color: '#EAF3F1' }}>{m.name}</span>{rnTag(m.id, 11)}{m.role === 'trainer' && <span style={{ fontSize: 9.5, fontWeight: 700, color: '#060B17', background: '#67D7DF', borderRadius: 7, padding: '1px 6px' }}>코치</span>}</div><div style={{ fontSize: 11.5, color: 'rgba(231,239,234,.5)' }}>{m.bio}</div></div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                         <div><div style={{ fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', color: '#C9A24B' }}>점수</div><div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 26, color: '#67D7DF' }}>{m.score > 0 ? m.score : '—'}</div></div>

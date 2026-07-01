@@ -121,9 +121,45 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
   }
   applySegColors()
 
-  // Try to swap in a realistic anatomy model (muscle meshes → InBody segments).
-  // Silent no-op if the file isn't present, so the mannequin stays.
+  // Swap in an external model when available: first a segmented anatomy model
+  // (muscle meshes → the 5 InBody segments, tap-to-highlight), else a plain body
+  // model rendered as clean skin. Falls back to the mannequin if none load.
   let disposed = false
+  const swapGltf = (gltf: { scene: THREE.Object3D }, faceFlip = false) => {
+    const root = gltf.scene
+    const box0 = new THREE.Box3().setFromObject(root)
+    const size = box0.getSize(new THREE.Vector3())
+    const ctr = box0.getCenter(new THREE.Vector3())
+    const height = size.y || 1
+    const halfW = (size.x || 1) / 2
+    const newSeg: Record<string, THREE.MeshStandardMaterial[]> = {}
+    const allMats: THREE.MeshStandardMaterial[] = []
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!(m as unknown as { isMesh?: boolean }).isMesh) return
+      const mc = new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3())
+      const yNorm = (mc.y - box0.min.y) / height
+      const seg = classifySeg(`${m.name} ${m.parent?.name ?? ''}`, mc.x - ctr.x, yNorm, halfW)
+      const mat = new THREE.MeshStandardMaterial({ color: 0x9aa6a4, roughness: 0.5, metalness: 0.06, emissive: 0x0a1a18, emissiveIntensity: 0.3 })
+      m.material = mat; allMats.push(mat)
+      if (seg) { (newSeg[seg] = newSeg[seg] || []).push(mat); m.userData.seg = seg }
+    })
+    // segmented only if the model actually splits into ≥3 parts; otherwise it's a
+    // single-body model → render it as clean skin (no per-segment recolor)
+    const segmented = Object.keys(newSeg).length >= 3
+    while (fig.children.length) fig.remove(fig.children[0])
+    root.position.sub(ctr)
+    const holder = new THREE.Group(); holder.add(root)
+    holder.scale.setScalar(5.2 / height); holder.position.y = 1.1
+    if (faceFlip) holder.rotation.y = Math.PI // model faces -Z → turn to face the camera
+    fig.add(holder)
+    if (segmented) { segMats = newSeg; applySegColors() }
+    else {
+      segMats = {}
+      root.traverse((o) => { const m = o as THREE.Mesh; if ((m as unknown as { isMesh?: boolean }).isMesh) m.userData.seg = undefined })
+      allMats.forEach((m) => { m.color.set(0xcaa892); m.emissive.set(0x1a0f0a); m.emissiveIntensity = 0.12; m.roughness = 0.62; m.metalness = 0.02 })
+    }
+  }
   ;(() => {
     const loader = new GLTFLoader()
     try {
@@ -131,35 +167,15 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
       draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/')
       loader.setDRACOLoader(draco)
     } catch { /* draco optional */ }
-    loader.load(`/assets/anatomy-${gender}.glb`, (gltf) => {
-      if (disposed) return
-      try {
-        const root = gltf.scene
-        const box0 = new THREE.Box3().setFromObject(root)
-        const size = box0.getSize(new THREE.Vector3())
-        const ctr = box0.getCenter(new THREE.Vector3())
-        const height = size.y || 1
-        const halfW = (size.x || 1) / 2
-        const newSeg: Record<string, THREE.MeshStandardMaterial[]> = {}
-        root.traverse((o) => {
-          const m = o as THREE.Mesh
-          if (!(m as unknown as { isMesh?: boolean }).isMesh) return
-          const mc = new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3())
-          const yNorm = (mc.y - box0.min.y) / height
-          const seg = classifySeg(`${m.name} ${m.parent?.name ?? ''}`, mc.x - ctr.x, yNorm, halfW)
-          const mat = new THREE.MeshStandardMaterial({ color: 0x9aa6a4, roughness: 0.5, metalness: 0.06, emissive: 0x0a1a18, emissiveIntensity: 0.3 })
-          m.material = mat
-          if (seg) { (newSeg[seg] = newSeg[seg] || []).push(mat); m.userData.seg = seg }
-        })
-        while (fig.children.length) fig.remove(fig.children[0])
-        root.position.sub(ctr)
-        const holder = new THREE.Group(); holder.add(root)
-        holder.scale.setScalar(5.4 / height); holder.position.y = 1.1
-        fig.add(holder)
-        segMats = newSeg
-        applySegColors()
-      } catch (err) { console.warn('[figure] anatomy wiring failed', err) }
-    }, undefined, () => { /* no model file → keep the mannequin */ })
+    const chain = [`/assets/anatomy-${gender}.glb`, `/assets/fallback-${gender}.glb`, '/assets/fallback-male.glb']
+    const tryNext = (i: number) => {
+      if (disposed || i >= chain.length) return
+      loader.load(chain[i], (gltf) => {
+        if (disposed) return
+        try { swapGltf(gltf, chain[i].includes('fallback')) } catch (err) { console.warn('[figure] model wiring failed', err) }
+      }, undefined, () => tryNext(i + 1))
+    }
+    tryNext(0)
   })()
 
   // interaction

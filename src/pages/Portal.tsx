@@ -913,9 +913,10 @@ export default function Portal() {
                   <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#67D7DF" strokeWidth="1.6"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" /></svg>
                 </div>
                 <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 22, color: '#F2F7F3', marginBottom: 8 }}>{meDisp.name}님, 환영해요</div>
-                <div style={{ fontSize: 13.5, color: 'rgba(231,239,234,.6)', lineHeight: 1.7, maxWidth: 360, margin: '0 auto 20px' }}>아직 측정 데이터가 없어요. 인바디 결과지를 업로드하면 자동으로 인식해 차트·추이·코치 피드백이 채워집니다.</div>
+                <div style={{ fontSize: 13.5, color: 'rgba(231,239,234,.6)', lineHeight: 1.7, maxWidth: 360, margin: '0 auto 20px' }}>아직 측정 데이터가 없어요. 인바디 결과지를 업로드하거나 직접 입력하면 차트·추이·코치 피드백이 채워집니다.</div>
                 <div style={{ maxWidth: 360, margin: '0 auto' }}>
                   <OcrUpload onCommitted={be.reload} />
+                  <button onClick={() => { setManualVals({}); setManualDate(todayISO); setManualTargetId(null); setManualOpen(true) }} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%', textAlign: 'center', marginTop: 10, padding: '11px 0', borderRadius: 12, border: '1px dashed rgba(103,215,223,.4)', color: '#9FE2E8', fontSize: 13, fontWeight: 600 }}>✎ 직접 입력으로 측정 추가</button>
                 </div>
               </section>
             ) : (

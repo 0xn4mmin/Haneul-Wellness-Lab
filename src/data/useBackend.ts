@@ -37,12 +37,12 @@ export interface PostComment { id?: string; authorId?: string; author: string; i
 export interface PostView {
   id: string; authorId?: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string
   likes: number; liked: boolean; open: boolean; draft: string; comments: PostComment[]; isOwn: boolean
-  replyTo: string | null; replyToName: string | null; image?: string | null
+  replyTo: string | null; replyToName: string | null; image?: string | null; images?: string[]
   hasMetric?: boolean; metricVal?: string; metricLabel?: string; metricSub?: string
 }
 export interface MessageReaction { emoji: string; count: number; mine: boolean; users: string[] }
 export interface MessageView {
-  id: string; authorId?: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null
+  id: string; authorId?: string; author: string; initials: string; color: string; photo?: string | null; role: Role; time: string; text: string; image?: string | null; images?: string[]
   isMine: boolean; deleted: boolean; createdAt: string
   replyTo: { author: string; text: string } | null
   reactions: MessageReaction[]
@@ -116,7 +116,7 @@ export interface Backend {
   posts: PostView[] | null
   postsMore: boolean
   loadMorePosts: () => Promise<void>
-  createPost: (text: string, file?: File | null) => Promise<void>
+  createPost: (text: string, files?: File[] | null) => Promise<void>
   deletePost: (id: string) => Promise<void>
   deletePostComment: (id: string) => Promise<void>
   toggleLike: (id: string) => void
@@ -126,7 +126,7 @@ export interface Backend {
   submitPostComment: (id: string) => void
   // chat
   messages: MessageView[] | null
-  sendMessage: (text: string, file?: File | null, replyTo?: string | null) => Promise<void>
+  sendMessage: (text: string, files?: File[] | null, replyTo?: string | null) => Promise<void>
   deleteMessage: (id: string) => Promise<void>
   toggleReaction: (id: string, emoji: string) => Promise<void>
   setRoomAlias: (anonymous: boolean, aliasName: string | null, photoFile: File | null) => Promise<void>
@@ -283,6 +283,7 @@ export function useBackend(): Backend {
         liked: (r.post_likes ?? []).some((l: { user_id: string }) => l.user_id === meId),
         open: ui.open, draft: ui.draft, isOwn: r.author_id === meId,
         replyTo: ui.replyTo, replyToName, image: api.postMediaUrl(r.image_path),
+        images: ((r.image_paths?.length ? r.image_paths : (r.image_path ? [r.image_path] : [])) as string[]).map((p) => api.postMediaUrl(p)).filter((u): u is string => !!u),
         comments,
         hasMetric: !!sm, metricVal: sm?.val, metricLabel: sm?.label, metricSub: sm?.sub,
       }
@@ -337,6 +338,7 @@ export function useBackend(): Backend {
       return {
         id: r.id, authorId: r.author_id, author: d.name, initials: d.initials, color: d.color, photo: d.photo,
         role: roleOf(r.author_id, a.role), time: clockTime(r.created_at), text: r.text, image: api.postMediaUrl(r.image_path),
+        images: ((r.image_paths?.length ? r.image_paths : (r.image_path ? [r.image_path] : [])) as string[]).map((p) => api.postMediaUrl(p)).filter((u): u is string => !!u),
         isMine: r.author_id === meId, deleted: !!r.deleted, createdAt: r.created_at,
         replyTo, reactions, readBy: readers, readCount: readers.length,
       }
@@ -579,9 +581,9 @@ export function useBackend(): Backend {
   }, [reloadPosts, reloadMembers, reloadMessages])
 
   // ── posts ──
-  const createPost = useCallback(async (text: string, file?: File | null) => {
-    const imagePath = file ? await api.uploadPostMedia(file) : null
-    await api.createPost(text, imagePath)
+  const createPost = useCallback(async (text: string, files?: File[] | null) => {
+    const paths = files && files.length ? await api.uploadPostMediaMany(files) : []
+    await api.createPost(text, paths)
     await reloadPosts()
   }, [reloadPosts])
   const deletePost = useCallback(async (id: string) => { await api.deletePost(id); await reloadPosts() }, [reloadPosts])
@@ -616,10 +618,10 @@ export function useBackend(): Backend {
   }, [reloadPosts])
 
   // ── chat ──
-  const sendMessage = useCallback(async (text: string, file?: File | null, replyTo?: string | null) => {
+  const sendMessage = useCallback(async (text: string, files?: File[] | null, replyTo?: string | null) => {
     if (!activeRoomId) return
-    const imagePath = file ? await api.uploadPostMedia(file) : null
-    await api.sendMessage(activeRoomId, text, imagePath, replyTo ?? null)
+    const paths = files && files.length ? await api.uploadPostMediaMany(files) : []
+    await api.sendMessage(activeRoomId, text, paths, replyTo ?? null)
     await api.markRoomRead(activeRoomId).catch(() => {})
     await reloadMessages(activeRoomId)
   }, [activeRoomId, reloadMessages])

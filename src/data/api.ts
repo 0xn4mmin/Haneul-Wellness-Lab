@@ -219,25 +219,30 @@ export function postMediaUrl(path?: string | null): string | null {
 export async function uploadPostMedia(file: File): Promise<string> {
   const sb = requireSupabase()
   const me = await uid()
-  const path = `${me}/${Date.now()}-${file.name}`
+  const path = `${me}/${Date.now()}-${Math.floor(Math.random() * 1e6)}-${file.name}`
   const { error } = await sb.storage.from('post-media').upload(path, file, { upsert: true })
   if (error) throw error
   return path
+}
+/** Upload several photos, returning their storage paths in order. */
+export async function uploadPostMediaMany(files: File[]): Promise<string[]> {
+  return Promise.all(files.map((f) => uploadPostMedia(f)))
 }
 
 // ───────────────────────── feed ─────────────────────────
 export async function fetchPosts(limit = 12, offset = 0) {
   const { data, error } = await requireSupabase()
     .from('posts')
-    .select('id, author_id, text, shared_metric, image_path, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role, photo_path), post_likes(user_id), post_comments(id, text, author_id, parent_id, created_at, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color, photo_path, role))')
+    .select('id, author_id, text, shared_metric, image_path, image_paths, created_at, author:profiles!posts_author_id_fkey(name, initials, avatar_color, role, photo_path), post_likes(user_id), post_comments(id, text, author_id, parent_id, created_at, author:profiles!post_comments_author_id_fkey(name, initials, avatar_color, photo_path, role))')
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
   if (error) throw error
   return data ?? []
 }
-export async function createPost(text: string, imagePath?: string | null, sharedMetric?: unknown) {
+export async function createPost(text: string, imagePaths?: string[] | null, sharedMetric?: unknown) {
   const me = await uid()
-  return requireSupabase().from('posts').insert({ author_id: me, text, image_path: imagePath ?? null, shared_metric: sharedMetric ?? null })
+  const paths = imagePaths ?? []
+  return requireSupabase().from('posts').insert({ author_id: me, text, image_path: paths[0] ?? null, image_paths: paths.length ? paths : null, shared_metric: sharedMetric ?? null })
 }
 export async function toggleLike(postId: string, liked: boolean) {
   const me = await uid()
@@ -261,14 +266,15 @@ export async function deletePostComment(commentId: string) {
 export async function fetchMessages(roomId: string) {
   const { data, error } = await requireSupabase()
     .from('messages')
-    .select('id, author_id, text, image_path, deleted, reply_to, created_at, author:profiles!messages_author_id_fkey(id, name, initials, avatar_color, role, photo_path), message_reactions(emoji, user_id)')
+    .select('id, author_id, text, image_path, image_paths, deleted, reply_to, created_at, author:profiles!messages_author_id_fkey(id, name, initials, avatar_color, role, photo_path), message_reactions(emoji, user_id)')
     .eq('room_id', roomId).order('created_at', { ascending: true })
   if (error) throw error
   return data ?? []
 }
-export async function sendMessage(roomId: string, text: string, imagePath?: string | null, replyTo?: string | null) {
+export async function sendMessage(roomId: string, text: string, imagePaths?: string[] | null, replyTo?: string | null) {
   const me = await uid()
-  return requireSupabase().from('messages').insert({ room_id: roomId, author_id: me, text, image_path: imagePath ?? null, reply_to: replyTo ?? null })
+  const paths = imagePaths ?? []
+  return requireSupabase().from('messages').insert({ room_id: roomId, author_id: me, text, image_path: paths[0] ?? null, image_paths: paths.length ? paths : null, reply_to: replyTo ?? null })
 }
 export async function deleteMessage(messageId: string) {
   const me = await uid()

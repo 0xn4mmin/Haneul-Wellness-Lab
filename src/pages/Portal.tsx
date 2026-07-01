@@ -72,6 +72,13 @@ export default function Portal() {
   const be = useBackend()
   // trainer-only: show a member's real name next to their display name everywhere
   const rnTag = (id?: string | null, size = 10.5): React.ReactNode => { const rn = be.isAdmin && id ? (be.realNames[id] ?? null) : null; return rn ? <span style={{ fontSize: size, fontWeight: 500, color: 'rgba(201,162,75,.92)', marginLeft: 5, whiteSpace: 'nowrap' }}>({rn})</span> : null }
+  // KakaoTalk-style multi-photo grid (tap to open full)
+  const imgGrid = (urls: string[], mt = 0, maxW?: number): React.ReactNode => {
+    if (!urls.length) return null
+    if (urls.length === 1) return <img src={urls[0]} onClick={() => setLightbox(urls[0])} alt="" style={{ width: '100%', maxWidth: maxW, borderRadius: 14, marginTop: mt, border: '1px solid rgba(255,255,255,.08)', display: 'block', cursor: 'pointer' }} />
+    const cols = urls.length === 2 || urls.length === 4 ? 2 : 3
+    return <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4, marginTop: mt, maxWidth: maxW, borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)' }}>{urls.map((u, i) => <img key={i} src={u} onClick={() => setLightbox(u)} alt="" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', display: 'block', cursor: 'pointer' }} />)}</div>
+  }
 
   const [mobileNav, setMobileNav] = useState(false)
   const [memberQuery, setMemberQuery] = useState('')
@@ -113,8 +120,9 @@ export default function Portal() {
   const [studioStats, setStudioStats] = useState<{ startsAt: string; durationMin: number; status: string; packageId: string | null }[] | null>(null)
   const [manualDate, setManualDate] = useState('')
   const [manualVals, setManualVals] = useState<Record<string, string>>({})
-  const [postImg, setPostImg] = useState<File | null>(null)
-  const [chatImg, setChatImg] = useState<File | null>(null)
+  const [postImgs, setPostImgs] = useState<File[]>([])
+  const [chatImgs, setChatImgs] = useState<File[]>([])
+  const [lightbox, setLightbox] = useState<string | null>(null)
   const [cgMetric, setCgMetric] = useState('')
   const [cgMode, setCgMode] = useState<'absolute' | 'relative'>('relative')
   const [cgTarget, setCgTarget] = useState('')
@@ -280,7 +288,7 @@ export default function Portal() {
     if (lastUserId.current === curUserId) return
     lastUserId.current = curUserId
     set({ view: 'health', role: 'client', activeMember: null, scanOpen: false, showChallengeForm: false, profileSaved: '', chDone: '', newPost: '', newMsg: '', newComment: '' })
-    setNotifOpen(false); setCycleModal(false); setGoalModal(false); setChatModal('none'); setGaugeInfo(null); setMemberQuery(''); setPostImg(null); setChatImg(null)
+    setNotifOpen(false); setCycleModal(false); setGoalModal(false); setChatModal('none'); setGaugeInfo(null); setMemberQuery(''); setPostImgs([]); setChatImgs([])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curUserId])
 
@@ -304,7 +312,7 @@ export default function Portal() {
     const target = (v === 'health' && be.isAdmin) ? 'trainer' : v
     set({ view: target, role: target === 'trainer' ? 'trainer' : s.role, activeMember: null, scanOpen: false, showChallengeForm: false, chDone: '', profileSaved: '' })
     if (be.configured) be.closeMember()
-    setMobileNav(false); setNotifOpen(false); setCycleModal(false); setGoalModal(false); setGaugeInfo(null); setMemberQuery(''); setPostImg(null); setChatImg(null)
+    setMobileNav(false); setNotifOpen(false); setCycleModal(false); setGoalModal(false); setGaugeInfo(null); setMemberQuery(''); setPostImgs([]); setChatImgs([])
     if (typeof window !== 'undefined') window.scrollTo({ top: 0 })
     const el = document.querySelector('.hwl-content'); if (el) el.scrollTop = 0
   }
@@ -340,10 +348,10 @@ export default function Portal() {
     setFn((p) => ({ newComment: '', coachFeedback: [...p.coachFeedback, item] }))
   }
   const submitPost = () => {
-    const t = s.newPost.trim(); if (!t && !postImg) return
-    if (be.configured) { void be.createPost(t, postImg); set({ newPost: '' }); setPostImg(null); return }
-    const post = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t, image: postImg ? URL.createObjectURL(postImg) : null, likes: 0, liked: false, open: false, comments: [], draft: '' }
-    setPostImg(null)
+    const t = s.newPost.trim(); if (!t && !postImgs.length) return
+    if (be.configured) { void be.createPost(t, postImgs); set({ newPost: '' }); setPostImgs([]); return }
+    const post = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t, image: postImgs[0] ? URL.createObjectURL(postImgs[0]) : null, likes: 0, liked: false, open: false, comments: [], draft: '' }
+    setPostImgs([])
     setFn((p) => ({ newPost: '', posts: [post, ...p.posts] }))
   }
   const onDeletePost = (id: string | number) => {
@@ -376,10 +384,10 @@ export default function Portal() {
   const onReply = (id: string | number, commentId: string | undefined, idx: number, name: string) => (be.configured ? be.setReplyTo(String(id), commentId ?? null, name) : setReplyToMock(Number(id), idx, name))
   const onCancelReply = (id: string | number) => (be.configured ? be.setReplyTo(String(id), null) : setReplyToMock(Number(id), null))
   const sendMsg = () => {
-    const t = s.newMsg.trim(); if (!t && !chatImg) return
-    if (be.configured) { void be.sendMessage(t, chatImg, replyTarget?.id ?? null); set({ newMsg: '' }); setChatImg(null); setReplyTarget(null); return }
-    const msg = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t, image: chatImg ? URL.createObjectURL(chatImg) : null }
-    setChatImg(null); setReplyTarget(null)
+    const t = s.newMsg.trim(); if (!t && !chatImgs.length) return
+    if (be.configured) { void be.sendMessage(t, chatImgs, replyTarget?.id ?? null); set({ newMsg: '' }); setChatImgs([]); setReplyTarget(null); return }
+    const msg = { id: Date.now(), author: ME.name, initials: ME.initials, color: ME.color, role: 'me' as const, time: '방금', text: t, image: chatImgs[0] ? URL.createObjectURL(chatImgs[0]) : null }
+    setChatImgs([]); setReplyTarget(null)
     setFn((p) => ({ newMsg: '', messages: [...p.messages, msg] }))
   }
   const submitCreateRoom = () => {
@@ -701,6 +709,7 @@ export default function Portal() {
   // the tab); back pops it and we close that overlay. Ordered details-first so
   // a modal opened on top of a detail closes first.
   const overlayDefs: Array<[boolean, () => void]> = [
+    [!!lightbox, () => setLightbox(null)],
     [memberOpen, closeMember],
     [!!be.challengeDetail, () => be.closeChallenge()],
     [s.showChallengeForm, () => set({ showChallengeForm: false })],
@@ -1422,16 +1431,20 @@ export default function Portal() {
                     {hits.map((n) => <button key={n} onClick={() => set({ newPost: s.newPost.replace(/@[가-힣A-Za-z0-9_]*$/, `@${n} `) })} style={{ all: 'unset', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#67D7DF', background: 'rgba(46,155,166,.14)', border: '1px solid rgba(103,215,223,.3)', borderRadius: 14, padding: '5px 11px' }}>@{n}</button>)}
                   </div>
                 ) })()}
-                {postImg && (
-                  <div style={{ position: 'relative', display: 'inline-block', marginTop: 11 }}>
-                    <img src={URL.createObjectURL(postImg)} alt="" style={{ maxHeight: 120, maxWidth: '100%', borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', display: 'block' }} />
-                    <button onClick={() => setPostImg(null)} style={{ all: 'unset', cursor: 'pointer', position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', background: 'rgba(6,11,23,.8)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>×</button>
+                {postImgs.length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 11 }}>
+                    {postImgs.map((f, i) => (
+                      <div key={i} style={{ position: 'relative', width: 88, height: 88 }}>
+                        <img src={URL.createObjectURL(f)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', display: 'block' }} />
+                        <button onClick={() => setPostImgs((a) => a.filter((_, j) => j !== i))} style={{ all: 'unset', cursor: 'pointer', position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(6,11,23,.85)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>×</button>
+                      </div>
+                    ))}
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 11 }}>
                   <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#9FE2E8', background: 'rgba(46,155,166,.12)', border: '1px solid rgba(103,215,223,.25)', borderRadius: 18, padding: '8px 13px' }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" /></svg>사진
-                    <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) setPostImg(f); e.target.value = '' }} style={{ display: 'none' }} />
+                    <input type="file" accept="image/*" multiple onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) setPostImgs((a) => [...a, ...fs].slice(0, 10)); e.target.value = '' }} style={{ display: 'none' }} />
                   </label>
                   <button onClick={submitPost} style={{ all: 'unset', cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: '#060B17', background: CTA, padding: '10px 22px', borderRadius: 22 }}>피드에 올리기</button>
                 </div>
@@ -1452,7 +1465,7 @@ export default function Portal() {
                     )}
                   </div>
                   {p.text && <div style={{ fontSize: 15, lineHeight: 1.65, color: 'rgba(231,239,234,.85)', margin: '14px 2px 4px', whiteSpace: 'pre-wrap' }}>{renderMentions(p.text)}</div>}
-                  {(p as { image?: string | null }).image && <img src={(p as { image?: string | null }).image as string} alt="" style={{ width: '100%', borderRadius: 14, marginTop: 12, border: '1px solid rgba(255,255,255,.08)', display: 'block' }} />}
+                  {imgGrid((p as { images?: string[]; image?: string | null }).images ?? ((p as { image?: string | null }).image ? [(p as { image?: string | null }).image as string] : []), 12)}
                   {p.hasMetric && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 13, background: 'rgba(46,155,166,.12)', border: '1px solid rgba(103,215,223,.25)', borderRadius: 14, padding: '13px 15px', margin: '6px 0 2px' }}>
                       <div style={{ fontFamily: "'Gowun Batang',serif", fontSize: 30, color: '#67D7DF' }}>{p.metricVal}</div>
@@ -1687,6 +1700,7 @@ export default function Portal() {
                     const readBy = (m as { readBy?: string[] }).readBy ?? []
                     const isMine = m.role === 'me' || (m as { isMine?: boolean }).isMine
                     const img = (m as { image?: string | null }).image
+                    const imgs = (m as { images?: string[] }).images ?? (img ? [img] : [])
                     const open = msgActions === mid
                     return (
                     <div key={m.id}
@@ -1701,7 +1715,7 @@ export default function Portal() {
                         ) : (
                           <div onClick={() => be.configured && setMsgActions(open ? null : mid)} style={{ cursor: be.configured ? 'pointer' : 'default', borderRadius: m.radius, background: m.bubbleBg, border: `1px solid ${m.bubbleBorder}`, overflow: 'hidden' }}>
                             {reply && <div style={{ fontSize: 11.5, padding: '7px 12px 0', color: isMine ? 'rgba(6,17,15,.7)' : 'rgba(231,239,234,.6)' }}><b>{reply.author}</b><div style={{ opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200, borderLeft: '2px solid currentColor', paddingLeft: 7, marginTop: 2 }}>{reply.text}</div></div>}
-                            {img && <img src={img} alt="" style={{ width: '100%', maxWidth: 240, display: 'block', marginTop: reply ? 6 : 0 }} />}
+                            {imgGrid(imgs, reply ? 6 : 0, 240)}
                             {m.text && <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-.1px', lineHeight: 1.42, padding: '6px 11px', color: m.bubbleFg }}>{m.text}</div>}
                           </div>
                         )}
@@ -1734,16 +1748,20 @@ export default function Portal() {
                     <button onClick={() => setReplyTarget(null)} style={{ all: 'unset', cursor: 'pointer', fontSize: 16, color: 'rgba(231,239,234,.5)' }}>×</button>
                   </div>
                 )}
-                {chatImg && (
-                  <div style={{ padding: '10px 18px 0', position: 'relative', display: 'inline-block' }}>
-                    <img src={URL.createObjectURL(chatImg)} alt="" style={{ maxHeight: 90, borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', display: 'block' }} />
-                    <button onClick={() => setChatImg(null)} style={{ all: 'unset', cursor: 'pointer', position: 'absolute', top: 4, right: 22, width: 20, height: 20, borderRadius: '50%', background: 'rgba(6,11,23,.8)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>×</button>
+                {chatImgs.length > 0 && (
+                  <div style={{ padding: '10px 18px 0', display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                    {chatImgs.map((f, i) => (
+                      <div key={i} style={{ position: 'relative', width: 72, height: 72 }}>
+                        <img src={URL.createObjectURL(f)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', display: 'block' }} />
+                        <button onClick={() => setChatImgs((a) => a.filter((_, j) => j !== i))} style={{ all: 'unset', cursor: 'pointer', position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(6,11,23,.85)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>×</button>
+                      </div>
+                    ))}
                   </div>
                 )}
                 <div style={{ padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', gap: 9, alignItems: 'center' }}>
                   <label style={{ cursor: be.configured && !activeRoom ? 'default' : 'pointer', flex: 'none', width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9FE2E8', opacity: be.configured && !activeRoom ? 0.5 : 1 }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    <input type="file" accept="image/*" disabled={be.configured && !be.activeRoomId} onChange={(e) => { const f = e.target.files?.[0]; if (f) setChatImg(f); e.target.value = '' }} style={{ display: 'none' }} />
+                    <input type="file" accept="image/*" multiple disabled={be.configured && !be.activeRoomId} onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) setChatImgs((a) => [...a, ...fs].slice(0, 10)); e.target.value = '' }} style={{ display: 'none' }} />
                   </label>
                   <input value={s.newMsg} disabled={be.configured && !be.activeRoomId} onChange={(e) => set({ newMsg: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMsg() } }} placeholder={be.configured && !be.activeRoomId ? '대화를 선택하세요' : '메시지를 입력하세요…'} style={{ flex: 1, minWidth: 0, fontFamily: 'inherit', fontSize: 14.5, padding: '13px 18px', borderRadius: 24, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', outline: 'none', color: '#EAF3F1', opacity: be.configured && !be.activeRoomId ? 0.5 : 1 }} />
                   <button onClick={sendMsg} style={{ all: 'unset', cursor: 'pointer', flex: 'none', width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg,#67D7DF,#2E9BA6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#060B17" strokeWidth="2"><path d="M4 12l16-7-7 16-2-7z" strokeLinejoin="round" /></svg></button>
@@ -2813,6 +2831,14 @@ export default function Portal() {
       </main>
 
       {!showLogin && !loading && <TabBar view={s.view} go={go} chatBadge={be.configured ? (be.unreadChat || undefined) : undefined} isAdmin={be.isAdmin} />}
+
+      {/* 사진 라이트박스 */}
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(4,9,18,.9)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom))', animation: 'hwl-fade .2s ease both' }}>
+          <img src={lightbox} alt="" style={{ maxWidth: '94vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 12, display: 'block' }} />
+          <button onClick={() => setLightbox(null)} aria-label="닫기" style={{ all: 'unset', cursor: 'pointer', position: 'fixed', top: 'max(18px,env(safe-area-inset-top))', right: 22, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 22 }}>×</button>
+        </div>
+      )}
 
       {/* 결과지 라이트박스 */}
       {s.scanOpen && (

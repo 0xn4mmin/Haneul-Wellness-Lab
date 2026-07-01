@@ -143,6 +143,7 @@ export default function Portal() {
   selectedSegRef.current = s.selectedSegment
   const chatRef = useRef<HTMLDivElement | null>(null)
   const chatPanelRef = useRef<HTMLElement | null>(null)
+  const figGender: 'male' | 'female' = ((be.configured ? be.profile?.gender : s.profile.gender) === '여성') ? 'female' : 'male'
 
   // 3D figure lifecycle via a callback ref: React calls this with the node when
   // the canvas mounts and with null when it unmounts. This correctly re-inits
@@ -151,13 +152,14 @@ export default function Portal() {
   const mount3d = useCallback((node: HTMLDivElement | null) => {
     if (node) {
       figure.current?.dispose()
-      figure.current = createFigure(node, (seg) => setS((prev) => ({ ...prev, selectedSegment: seg })))
+      figure.current = createFigure(node, (seg) => setS((prev) => ({ ...prev, selectedSegment: seg })), figGender)
       figure.current.setSelected(selectedSegRef.current)
     } else {
       figure.current?.dispose()
       figure.current = null
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [figGender])
   useEffect(() => { figure.current?.setSelected(s.selectedSegment) }, [s.selectedSegment])
 
   // chat auto-scroll

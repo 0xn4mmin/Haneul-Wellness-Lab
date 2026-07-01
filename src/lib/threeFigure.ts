@@ -1,6 +1,9 @@
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { segData, segColor } from '../data/portalData'
 
+export type FigGender = 'male' | 'female'
 export interface FigureHandle {
   setSelected: (key: string) => void
   dispose: () => void
@@ -9,13 +12,40 @@ export interface FigureHandle {
 const NOOP: FigureHandle = { setSelected: () => {}, dispose: () => {} }
 
 /**
- * Builds the segmental lean 3D figure (capsule-limbs mannequin) and wires
- * drag-rotate + tap-to-pick. Calls `onPick(segKey)` when a segment is tapped.
- * Degrades to a no-op if WebGL is unavailable.
+ * Classify an anatomy-model mesh into one of the 5 InBody segments by its name
+ * (left/right + body-part keywords) with a spatial fallback (height + x offset).
+ * Returns null for head/neck/other meshes (rendered neutral, not selectable).
  */
-export function createFigure(mount: HTMLElement, onPick: (seg: string) => void): FigureHandle {
+function classifySeg(name: string, cx: number, yNorm: number, halfW: number): string | null {
+  const n = name.toLowerCase()
+  const L = /left|_l\b|\bl_|\.l\b|(^|[^a-z])l([^a-z]|$)/.test(n)
+  const R = /right|_r\b|\br_|\.r\b|(^|[^a-z])r([^a-z]|$)/.test(n)
+  const side = L && !R ? 'left' : R && !L ? 'right' : (cx >= 0 ? 'right' : 'left')
+  const head = /head|skull|neck|face|cervic|jaw|crani|hair|eye/.test(n)
+  const arm = /arm|brachi|deltoid|forearm|bicep|tricep|shoulder|hand|wrist|elbow/.test(n)
+  const leg = /leg|femor|quadric|gastro|calf|thigh|glute|hamstring|tibia|fibula|foot|shin|soleus|ankle|knee|patella/.test(n)
+  const trunk = /trunk|torso|abdom|abs|pector|chest|trapez|spine|back|lat|obliq|core|rib|serrat|erector|waist|pelvi|gluteus/.test(n)
+  if (head) return null
+  if (arm) return side === 'right' ? 'rightArm' : 'leftArm'
+  if (leg) return side === 'right' ? 'rightLeg' : 'leftLeg'
+  if (trunk) return 'trunk'
+  // spatial fallback when the name is uninformative
+  if (yNorm > 0.86) return null
+  if (yNorm >= 0.5 && Math.abs(cx) > halfW * 0.4) return side === 'right' ? 'rightArm' : 'leftArm'
+  if (yNorm < 0.45) return side === 'right' ? 'rightLeg' : 'leftLeg'
+  return 'trunk'
+}
+
+/**
+ * Builds the segmental lean 3D figure and wires drag-rotate + tap-to-pick.
+ * Starts with the procedural capsule mannequin, then—if an anatomy model exists
+ * at /assets/anatomy-<gender>.glb—swaps it in (muscle meshes auto-mapped to the
+ * 5 InBody segments). Falls back silently to the mannequin if the file is
+ * missing or WebGL is unavailable.
+ */
+export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, gender: FigGender = 'male'): FigureHandle {
   try {
-  const segMats: Record<string, THREE.MeshStandardMaterial[]> = {}
+  let segMats: Record<string, THREE.MeshStandardMaterial[]> = {}
   let selected = 'trunk'
 
   const w = mount.clientWidth || 520
@@ -91,6 +121,47 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void):
   }
   applySegColors()
 
+  // Try to swap in a realistic anatomy model (muscle meshes → InBody segments).
+  // Silent no-op if the file isn't present, so the mannequin stays.
+  let disposed = false
+  ;(() => {
+    const loader = new GLTFLoader()
+    try {
+      const draco = new DRACOLoader()
+      draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/')
+      loader.setDRACOLoader(draco)
+    } catch { /* draco optional */ }
+    loader.load(`/assets/anatomy-${gender}.glb`, (gltf) => {
+      if (disposed) return
+      try {
+        const root = gltf.scene
+        const box0 = new THREE.Box3().setFromObject(root)
+        const size = box0.getSize(new THREE.Vector3())
+        const ctr = box0.getCenter(new THREE.Vector3())
+        const height = size.y || 1
+        const halfW = (size.x || 1) / 2
+        const newSeg: Record<string, THREE.MeshStandardMaterial[]> = {}
+        root.traverse((o) => {
+          const m = o as THREE.Mesh
+          if (!(m as unknown as { isMesh?: boolean }).isMesh) return
+          const mc = new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3())
+          const yNorm = (mc.y - box0.min.y) / height
+          const seg = classifySeg(`${m.name} ${m.parent?.name ?? ''}`, mc.x - ctr.x, yNorm, halfW)
+          const mat = new THREE.MeshStandardMaterial({ color: 0x9aa6a4, roughness: 0.5, metalness: 0.06, emissive: 0x0a1a18, emissiveIntensity: 0.3 })
+          m.material = mat
+          if (seg) { (newSeg[seg] = newSeg[seg] || []).push(mat); m.userData.seg = seg }
+        })
+        while (fig.children.length) fig.remove(fig.children[0])
+        root.position.sub(ctr)
+        const holder = new THREE.Group(); holder.add(root)
+        holder.scale.setScalar(5.4 / height); holder.position.y = 1.1
+        fig.add(holder)
+        segMats = newSeg
+        applySegColors()
+      } catch (err) { console.warn('[figure] anatomy wiring failed', err) }
+    }, undefined, () => { /* no model file → keep the mannequin */ })
+  })()
+
   // interaction
   const el = renderer.domElement
   const ray = new THREE.Raycaster()
@@ -155,6 +226,7 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void):
   return {
     setSelected: (k: string) => { selected = k; applySegColors() },
     dispose: () => {
+      disposed = true
       cancelAnimationFrame(raf)
       window.removeEventListener('mousemove', moveH)
       window.removeEventListener('mouseup', up)

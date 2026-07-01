@@ -30,9 +30,10 @@ function classifySeg(name: string, cx: number, yNorm: number, halfW: number): st
   if (leg) return side === 'right' ? 'rightLeg' : 'leftLeg'
   if (trunk) return 'trunk'
   // spatial fallback when the name is uninformative
-  if (yNorm > 0.86) return null
-  if (yNorm >= 0.5 && Math.abs(cx) > halfW * 0.4) return side === 'right' ? 'rightArm' : 'leftArm'
-  if (yNorm < 0.45) return side === 'right' ? 'rightLeg' : 'leftLeg'
+  const ax = Math.abs(cx) / (halfW || 1)
+  if (yNorm > 0.87) return null
+  if (ax > 0.28 && yNorm > 0.58) return side === 'right' ? 'rightArm' : 'leftArm'
+  if (yNorm < 0.48) return side === 'right' ? 'rightLeg' : 'leftLeg'
   return 'trunk'
 }
 
@@ -53,10 +54,11 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
   const SEG_ORDER = ['rightArm', 'leftArm', 'trunk', 'rightLeg', 'leftLeg']
   let bodyMeshes: { geo: THREE.BufferGeometry; seg: Uint8Array }[] | null = null
   const vertexSeg = (x: number, yNorm: number, halfW: number): number => {
-    if (yNorm > 0.86) return 255                                            // head/neck
-    if (yNorm >= 0.5 && Math.abs(x) > halfW * 0.34) return x >= 0 ? 0 : 1    // arm (R/L)
-    if (yNorm < 0.46) return x >= 0 ? 3 : 4                                  // leg (R/L)
-    return 2                                                                // trunk
+    const ax = Math.abs(x) / (halfW || 1)             // 0=center … 1=fingertip (T-pose span)
+    if (yNorm > 0.87) return 255                       // head + neck
+    if (ax > 0.28 && yNorm > 0.58) return x >= 0 ? 0 : 1 // outstretched arms + hands
+    if (yNorm < 0.48) return x >= 0 ? 3 : 4             // legs, below the pelvis
+    return 2                                           // trunk (chest · abdomen · pelvis)
   }
   const applyBodyColors = () => {
     if (!bodyMeshes) return
@@ -66,7 +68,7 @@ export function createFigure(mount: HTMLElement, onPick: (seg: string) => void, 
       for (let i = 0; i < seg.length; i++) {
         const sid = seg[i]
         if (sid === 255) tmp.copy(SKIN)
-        else { const key = SEG_ORDER[sid]; const sd = segData.find((s) => s.key === key); tmp.set(segColor(sd ? sd.pct : 100)); if (selected !== key) tmp.lerp(SKIN, 0.6) }
+        else { const key = SEG_ORDER[sid]; const sd = segData.find((s) => s.key === key); tmp.set(segColor(sd ? sd.pct : 100)); if (selected !== key) tmp.lerp(SKIN, 0.42) }
         col.setXYZ(i, tmp.r, tmp.g, tmp.b)
       }
       col.needsUpdate = true

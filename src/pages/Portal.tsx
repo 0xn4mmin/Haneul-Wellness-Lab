@@ -2705,7 +2705,9 @@ export default function Portal() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 14, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 12, color: 'rgba(231,239,234,.6)' }}>그룹</span>
+                        <span style={{ fontSize: 12, color: 'rgba(231,239,234,.6)' }}>실명</span>
+                        <input key={studioMemberId} defaultValue={(be.roster ?? []).find((x) => x.id === studioMemberId)?.realName ?? ''} placeholder="실명 입력·수정" onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} onBlur={(e) => { const v = e.target.value.trim(); const cur = (be.roster ?? []).find((x) => x.id === studioMemberId)?.realName ?? ''; if (v !== cur) void be.setMemberRealName(studioMemberId, v).catch((err) => alert(err instanceof Error ? err.message : '변경 실패')) }} style={{ fontFamily: 'inherit', fontSize: 12.5, padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(201,162,75,.35)', background: 'rgba(201,162,75,.08)', color: '#EAF3F1', width: 120 }} />
+                        <span style={{ fontSize: 12, color: 'rgba(231,239,234,.6)', marginLeft: 6 }}>그룹</span>
                         <select value={smStudio} onChange={(e) => { void be.setMemberStudio(studioMemberId, e.target.value || null).catch((err) => alert(err instanceof Error ? err.message : '변경 실패')) }} style={{ fontFamily: 'inherit', fontSize: 12.5, padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.05)', color: '#EAF3F1', WebkitAppearance: 'none', appearance: 'none' }}>
                           <option value="">미지정</option>
                           {['BigDaS', '래미안그레이튼', '선릉 핏허브', '청담 쉐어필라테스'].map((g) => <option key={g} value={g}>{g}</option>)}

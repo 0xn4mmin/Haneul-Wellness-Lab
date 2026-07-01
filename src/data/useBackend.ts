@@ -189,6 +189,7 @@ export interface Backend {
   // trainer
   roster: RosterRow[] | null
   setMemberStudio: (memberId: string, studio: string | null) => Promise<void>
+  setMemberRealName: (memberId: string, realName: string) => Promise<void>
   refreshRoster: () => Promise<void>
   addCoachNote: (memberId: string, metricKey: string, text: string) => Promise<string>
   coachNotes: CoachNoteItem[] | null
@@ -930,6 +931,12 @@ export function useBackend(): Backend {
     lazy.current.roster = false
     await Promise.all([loadRoster(), reloadMembers()])
   }, [loadRoster, reloadMembers])
+  const setMemberRealName = useCallback(async (memberId: string, realName: string) => {
+    const { error } = await api.setMemberRealName(memberId, realName)
+    if (error) throw new Error(error.message)
+    lazy.current.roster = false
+    await loadRoster()
+  }, [loadRoster])
   const loadCoachNotes = useCallback(async (memberId: string) => {
     if (!memberId || !/^[0-9a-f-]{36}$/i.test(memberId)) { setCoachNotes(null); return }
     const rows = await api.fetchChartComments(memberId, 'overall').catch(() => [])
@@ -995,7 +1002,7 @@ export function useBackend(): Backend {
     messages, sendMessage, deleteMessage, toggleReaction, setRoomAlias, myRoomAlias,
     rooms, activeRoomId, roomMembers, onlineIds, selectRoom, createRoom, joinRoom, deleteRoom, renameRoom,
     sessions, packages, createSession, updateSession, deleteSession, createPackage, updatePackage, sendReregNotice, deletePackage, fetchMemberSessions,
-    ensureCommunity, ensureChat, ensureSchedule, ensureTrainer, setMemberStudio, refreshRoster,
+    ensureCommunity, ensureChat, ensureSchedule, ensureTrainer, setMemberStudio, setMemberRealName, refreshRoster,
     requests, createRequest, postRequestMessage, closeRequest, deleteRequest,
     challenges, createChallenge, deleteChallenge, updateChallenge,
     challengeDetail, openChallenge, closeChallenge, inviteToChallenge, removeChallengeMember, leaveChallenge, setChallengeGoal, deleteChallengeGoal, editChallengeGoalFor, fetchMemberReadings,

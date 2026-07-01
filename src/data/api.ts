@@ -37,6 +37,10 @@ export function studioCluster(studio: string | null | undefined): 'bigdas' | 'ma
 export async function setMemberStudio(memberId: string, studio: string | null) {
   return requireSupabase().rpc('set_member_studio', { p_member: memberId, p_studio: studio })
 }
+/** Trainer sets/updates a member's real name (member_private RLS allows trainers). */
+export async function setMemberRealName(memberId: string, realName: string) {
+  return requireSupabase().from('member_private').upsert({ id: memberId, real_name: realName.trim() || null }, { onConflict: 'id' })
+}
 
 async function uid(): Promise<string> {
   const { data } = await requireSupabase().auth.getUser()

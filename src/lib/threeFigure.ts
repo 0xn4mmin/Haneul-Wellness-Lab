@@ -16,20 +16,25 @@ const NOOP: FigureHandle = { setSelected: () => {}, dispose: () => {} }
  * (left/right + body-part keywords) with a spatial fallback (height + x offset).
  * Returns null for head/neck/other meshes (rendered neutral, not selectable).
  */
+// Latin-anatomy aware. Left/right by x sign (Z-Anatomy names carry no .l/.r).
+// Order matters: head/throat first, then LEG before ARM (so "biceps femoris" is a
+// leg, not an arm), then TRUNK, then spatial fallback for ambiguous names.
+const RE_HEAD = /capitis|cervic|colli|scalen|hyoid|thyroid|arytenoid|cricoid|epiglott|pharyng|laryng|palat|glosso|lingu|ocul|orbit|pterygoid|masseter|temporal|buccinat|zygomat|risorius|nasal|frontal|occipit|auricul|platysma|digastric|mylohyoid|genio|stylo|orbicularis|corrugator|procerus|mentalis|splenius|sternocleidomastoid|levator (labii|anguli|palpebrae)|depressor|tarsal|ary-epiglott/
+const RE_LEG = /femor|glute|patell|tibia|fibula|gastrocnem|soleus|poplit|sartorius|gracilis|quadriceps|vastus|hamstring|iliopsoas|iliacus|psoas|hallucis|pedis|plantae?|peroneus|fibularis|calcane|tarsi|obturator|piriformis|gemellus|adductor (longus|brevis|magnus|minimus)|(digitorum|digiti) (longus|brevis)|tibialis|crural|thigh|\bleg\b|\bfoot\b|\bshin\b|\bcalf\b|\bknee\b|\bankle\b|\btoe/
+const RE_ARM = /brachi|deltoid|coracobrach|supraspinat|infraspinat|subscapular|teres|carpi|pollicis|anconeus|pronator|supinator|thenar|palmar|opponens|\barm\b|\bhand\b|\bwrist\b|\belbow\b|\bforearm\b|\bshoulder\b/
+const RE_TRUNK = /abdomin|obliqu|transversus|pector|latissimus|trapez|rhomboid|serrat|erector|spinalis|longissimus|iliocostalis|intercostal|quadratus lumborum|diaphragm|multifidus|rotatore|subclavius|levator scapulae|semispinalis|interspinal|intertransvers|\brib\b|thoracis|lumborum|iliac(us|osacralis)|\bback\b|\bchest\b|\btrunk\b/
+const RE_AMBIG = /flexor|extensor|digitorum|inteross|lumbric|abductor|adductor/
 function classifySeg(name: string, cx: number, yNorm: number, halfW: number): string | null {
   const n = name.toLowerCase()
-  const L = /left|_l\b|\bl_|\.l\b|(^|[^a-z])l([^a-z]|$)/.test(n)
-  const R = /right|_r\b|\br_|\.r\b|(^|[^a-z])r([^a-z]|$)/.test(n)
-  const side = L && !R ? 'left' : R && !L ? 'right' : (cx >= 0 ? 'right' : 'left')
-  const head = /head|skull|neck|face|cervic|jaw|crani|hair|eye/.test(n)
-  const arm = /arm|brachi|deltoid|forearm|bicep|tricep|shoulder|hand|wrist|elbow/.test(n)
-  const leg = /leg|femor|quadric|gastro|calf|thigh|glute|hamstring|tibia|fibula|foot|shin|soleus|ankle|knee|patella/.test(n)
-  const trunk = /trunk|torso|abdom|abs|pector|chest|trapez|spine|back|lat|obliq|core|rib|serrat|erector|waist|pelvi|gluteus/.test(n)
-  if (head) return null
-  if (arm) return side === 'right' ? 'rightArm' : 'leftArm'
-  if (leg) return side === 'right' ? 'rightLeg' : 'leftLeg'
-  if (trunk) return 'trunk'
-  // spatial fallback when the name is uninformative
+  // model faces the camera → mirror view: +x side is the person's right limb
+  const side = cx >= 0 ? 'left' : 'right'
+  if (RE_HEAD.test(n)) return null
+  if (RE_LEG.test(n)) return side === 'right' ? 'rightLeg' : 'leftLeg'
+  if (RE_ARM.test(n)) return side === 'right' ? 'rightArm' : 'leftArm'
+  if (RE_TRUNK.test(n)) return 'trunk'
+  // ambiguous (digitorum/flexor/… exist in both forearm & foot) → split by height
+  if (RE_AMBIG.test(n)) return yNorm < 0.4 ? (side === 'right' ? 'rightLeg' : 'leftLeg') : (side === 'right' ? 'rightArm' : 'leftArm')
+  // pure spatial fallback
   const ax = Math.abs(cx) / (halfW || 1)
   if (yNorm > 0.87) return null
   if (ax > 0.28 && yNorm > 0.58) return side === 'right' ? 'rightArm' : 'leftArm'
